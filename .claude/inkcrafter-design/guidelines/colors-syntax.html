@@ -1,0 +1,31 @@
+<!-- @dsCard group="Colors" viewport="700x260" subtitle="One token per lezer tag in editor/inkLanguage.ts" name="Ink syntax" -->
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css">
+<style>
+body{margin:0;padding:14px 16px;background:var(--surface-pane);font-family:var(--font-ui);font-size:var(--text-sm)}
+pre{margin:0;font-family:var(--font-mono);font-size:var(--text-sm);line-height:1.65;background:var(--surface-inset);padding:12px 14px;border-radius:var(--radius-md);border:1px solid var(--border-hairline)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)}
+</style></head>
+<body>
+<pre><span style="color:var(--syntax-comment);font-style:italic">// the cove, after the storm</span>
+<span style="color:var(--syntax-keyword);font-weight:700">VAR</span> <span style="color:var(--syntax-text)">lantern</span> <span style="color:var(--syntax-operator)">=</span> <span style="color:var(--syntax-number)">false</span>
+<span style="color:var(--syntax-heading);font-weight:700">=== the_cove ===</span>
+<span style="color:var(--syntax-text)">The boat is still there.</span> <span style="color:var(--syntax-meta)"># bg:cove/dawn</span>
+<span style="color:var(--syntax-keyword);font-weight:700">*</span> <span style="color:var(--syntax-label)">(push)</span> <span style="color:var(--syntax-text)">[Push it out]</span> <span style="color:var(--syntax-operator)">~</span> <span style="color:var(--syntax-text)">trust</span> <span style="color:var(--syntax-operator)">+=</span> <span style="color:var(--syntax-number)">1</span>
+    <span style="color:var(--syntax-link);font-weight:700">-&gt;</span> <span style="color:var(--syntax-text)">the_open_water</span>
+<span style="color:var(--syntax-keyword);font-weight:700">*</span> <span style="color:var(--syntax-operator)">{</span><span style="color:var(--syntax-text)">lantern</span><span style="color:var(--syntax-operator)">}</span> <span style="color:var(--syntax-text)">[Wait for </span><span style="color:var(--syntax-mention);border-bottom:1px dotted var(--syntax-mention)">Kael</span><span style="color:var(--syntax-text)">]</span>
+<span style="color:var(--syntax-keyword);font-weight:700">-</span> <span style="color:var(--syntax-meta);font-style:italic">TODO: write the refusal branch</span></pre>
+<div class="legend">
+  <span style="color:var(--syntax-heading)">heading · knots</span>
+  <span style="color:var(--syntax-keyword)">keyword · bullets, VAR</span>
+  <span style="color:var(--syntax-link)">link · diverts</span>
+  <span style="color:var(--syntax-operator)">operator · ~ { } |</span>
+  <span style="color:var(--syntax-meta)">meta · tags, TODO</span>
+  <span style="color:var(--syntax-label)">labelName</span>
+  <span style="color:var(--syntax-string)">string</span>
+  <span style="color:var(--syntax-number)">number, atom</span>
+  <span style="color:var(--syntax-comment)">comment</span>
+  <span>prose · unstyled</span>
+</div>
+</body></html>

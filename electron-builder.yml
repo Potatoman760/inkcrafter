@@ -1,0 +1,21 @@
+appId: com.inkcrafter.app
+productName: InkCrafter
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**
+  - package.json
+  # Seeded into an empty workspace on first launch.
+  - examples/**
+win:
+  target:
+    - nsis
+mac:
+  target:
+    - dmg
+  category: public.app-category.developer-tools
+linux:
+  target:
+    - AppImage
+  category: Development

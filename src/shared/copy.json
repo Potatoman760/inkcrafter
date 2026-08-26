@@ -1,0 +1,84 @@
+{
+  "cast.attribute.bool": "True or false.",
+  "cast.attribute.clamped": "Clamped to the range; ink cannot do that itself.",
+  "cast.attribute.oneOf": "One of a fixed set; anything else is refused at runtime.",
+  "cast.inkName": "Variables are {variable}.",
+  "cast.onScreenOnly": "Only if they appear on screen.",
+  "cast.sprite": "Shown by # char: {name}, the first by default.",
+
+  "codex.aiContext": "When this entry is sent to the model.",
+  "codex.aliases": "Comma separated.",
+  "codex.appearance": "What image generation should preserve: face, build, hair, clothing and other defining visual traits.",
+  "codex.description": "Markdown — this is what the model reads.",
+  "codex.fields": "Labelled fields, each with its own AI visibility.",
+  "codex.id": "What other entries and projects link to.",
+  "codex.notAliases": "Phrases that should not count as a mention.",
+  "codex.notes": "Private scratch space — never sent to the model.",
+  "codex.tags": "Comma separated.",
+
+  "comfy.baseUrl": "The address ComfyUI prints when it starts.",
+  "comfy.output": "Whose pictures to collect.",
+  "comfy.promptPrefix": "Inserted before this workflow's main prompt, followed by a newline. Use it for LoRA triggers or model tokens; the negative prompt is unchanged.",
+  "comfy.timeout": "One picture, in seconds.",
+  "comfy.workflowDir": "The .json files you saved with Workflow → Export (API).",
+
+  "export.destination": "A folder the game serves — usually its public/bundle.",
+  "export.nothingWritten": "Nothing was written.",
+  "export.whatIsWritten": "The project, flattened into something a browser can fetch.",
+
+  "inkWrite.context": "What the model will be given.",
+  "inkWrite.instruction": "What to write, in ink.",
+
+  "library.about": "What this library covers.",
+
+  "manuscript.readFrom": "Any file in the project.",
+
+  "map.box": "Pixels of the {width}×{height} picture.",
+  "map.hotspot": "A hotspot in the media catalogue — its looks are the states.",
+  "map.otherwise": "Otherwise the reader sees: {fallback}.",
+  "map.goesTo": "A knot that stands on its own — travel resets the callstack — or another map to open in place of this one.",
+  "map.name": "What a hotspot on another map names to open this one. Never written in ink.",
+  "map.defaultFor": "Arriving at one of these knots makes this the map the reader sees. A knot covers its stitches. A knot nobody lists leaves the map alone, so only list where it changes.",
+
+  "media.displayName": "What the player sees; never reaches the ink.",
+  "media.looks": "The first is what a bare tag shows.",
+  "media.name": "What the tag is written from.",
+  "media.tags": "Comma separated, for finding things later.",
+  "media.unfiled": "{count} in the folder that no catalogue entry claims.",
+
+  "plan.aliases": "Comma separated.",
+  "plan.attached": "Created with this Scene and kept linked to it.",
+  "plan.children": "{count} below this one.",
+  "plan.loose": "In the project, placed nowhere.",
+  "plan.storyWide": "Belongs to the story, not a section.",
+  "plan.wouldGenerate": "The Ink knot owned by this Scene.",
+
+  "project.entry": "The file compiled as the story.",
+  "project.libraries": "Shared between projects.",
+  "project.newFolder": "Lower case, hyphenated — it becomes a folder on disk.",
+  "project.premise": "Markdown — the body of project.md.",
+
+  "prompts.assistant": "Added to the end of the assistant's own instructions. It keeps its tool list and file formats, which it needs to work at all.",
+  "prompts.ink": "Replaces the instructions sent when drafting ink. The app's own is checked against the real compiler.",
+  "prompts.prose": "Replaces the instructions sent when drafting a section of narration.",
+
+  "provider.apiKey.set": "Stored, encrypted.",
+  "provider.apiKey.unset": "Not set.",
+  "provider.baseUrl": "Include the version path.",
+  "provider.model": "The default for new requests.",
+
+  "player.dir": "A checkout of InkCrafter Player — the one with a game/ folder in it.",
+  "player.server": "Started by Preview in player, stopped when you quit.",
+
+  "stats.custom": "Passed through to the export untouched.",
+  "stats.display": "What the player sees.",
+  "stats.icon": "Whatever your engine resolves — a path, a sprite, an atlas key.",
+  "stats.inkName": "The ink identifier.",
+  "stats.item.display": "Shown to the player; exported, not written into the ink.",
+  "stats.note": "For you; becomes a comment above the declaration.",
+
+  "write.codex": "Found in the scene and your instruction.",
+  "write.draft": "Edit before applying.",
+  "write.instruction": "Main prompt sent to the model.",
+  "write.model": "Defaults to the provider's."
+}

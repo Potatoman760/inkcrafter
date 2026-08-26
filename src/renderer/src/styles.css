@@ -1,0 +1,4859 @@
+/**
+ * The app's own rules. The palette, scales and resets they build on live in
+ * design/ — see design/README.md.
+ *
+ * Everything below sits in the `app` layer, declared after `design` in
+ * design/index.css, so these rules outrank tokens/base.css whatever order the
+ * bundler emits the two files in. `color-scheme` is set per-theme in
+ * tokens/semantic.css and must not be reinstated here.
+ */
+/**
+ * What a bare element looks like before any component claims it. Sits in the
+ * `reset` layer, below `design`, so adding `ic-btn` to a <button> actually
+ * changes it — in the `app` layer these would outrank every .ic-* rule.
+ */
+@layer reset {
+  /* Unstyled on purpose. A button that is meant to look like a button says
+     so with .ic-btn; the rest — rows, menu items, links in prose — carry
+     their own class and should start from nothing rather than from chrome
+     they have to undo. */
+  button {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    padding: var(--space-0);
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: default;
+  }
+}
+
+@layer app {
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+/* 13px is the system's interface size, one step down from the 14px this app
+   used. It reflows every panel — revert this one declaration if the window
+   reads too tight at its 1440x900 default. */
+body {
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+  overflow: hidden;
+}
+
+.app {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+}
+
+/* Toolbar */
+
+/**
+ * Stretched rather than centred, so the tab strip can reach the bottom edge and
+ * its underline meets the panel it belongs to. Everything that is not a tab
+ * centres itself.
+ */
+/* .ic-toolbar draws the bar. This one is stretched rather than centred so the
+   view tabs reach its bottom edge and their marker meets the panel below.
+   No gap: the brand's width is exactly the sidebar plus its splitter, and a
+   gap after it would push the tab strip off the column it aligns to.
+   Everything that needs breathing room asks for it individually. */
+.toolbar {
+  align-items: stretch;
+  gap: var(--space-0);
+  height: auto;
+  min-height: 38px;
+  padding: 0 12px 0 0;
+  background: var(--surface-raised);
+}
+
+.toolbar > *:not(.view-tabs) {
+  align-self: center;
+}
+
+/* Sits over the file list; its width is set inline from the sidebar's. */
+.brand {
+  flex: none;
+  box-sizing: border-box;
+  padding: var(--space-0) var(--space-5);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  /* There is no logo; the name is set in type. Accent here would read as a
+     control rather than an identity. */
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: 14px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-tertiary);
+}
+
+/* Unsaved is a caution, not a primary — the one thing amber still means. */
+.dirty-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--state-warning);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.status {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A catalogue writing itself to disk, said in the tab row it belongs to. Not
+   a StatusPill: that lives at the right end of the window toolbar and reports
+   on the compile, and two pills would be two answers to "is it saved". */
+.saving-note {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+/* Workspace */
+
+/* Columns are set inline from the persisted pane widths; this is the fallback
+   before that state exists. */
+.workspace {
+  display: grid;
+  grid-template-columns: var(--pane-sidebar-default) auto minmax(0, 1fr) auto
+    var(--pane-side-default);
+  min-height: 0;
+}
+
+/* .ic-splitter draws the divider: a hairline in the middle of a 5px column
+   that goes accent while dragging. Its ::after is that line, so the grab area
+   — 13px, because a 5px target is hard to hit — moves to ::before. */
+.splitter::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -4px;
+  width: 13px;
+  height: 100%;
+}
+
+.splitter:focus-visible {
+  outline: none;
+}
+
+.splitter:focus-visible::after {
+  background: var(--focus-ring);
+}
+
+/* Set while dragging, so crossing the editor does not select its text. */
+body.is-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The toast stack is absolute against this pane — see design/components/Toast.tsx
+   for why it must not be the window. */
+.pane-editor {
+  position: relative;
+}
+
+/* A catalogue keeps a line at the bottom of the pane saying which files it
+   generates. The toast reports exactly those writes, so landing on top of the
+   sentence explaining them is the one place it has nothing to say. */
+.pane-editor:has(.stats-foot) .ic-toasts {
+  bottom: calc(var(--space-6) + var(--control-lg));
+}
+
+/* .ic-pane-header supplies the strip; this app puts its label straight in the
+   header rather than in a __title span, so the type treatment comes here. */
+.pane-header {
+  justify-content: space-between;
+  padding: 6px 14px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--text-tertiary);
+  background: var(--surface-raised);
+}
+
+/* What a tab row's section can do, at the right-hand end of it. These were each
+   dialog's own header buttons; they act on the section rather than the window,
+   so they travel with its tabs instead of with the title.
+   The rules that put their chrome back are gone: a tab is the .ic-tab class
+   now, so a button sitting beside one was never stripped in the first place. */
+.tab-actions {
+  gap: var(--space-4);
+  padding: var(--space-0) var(--space-4);
+}
+
+/* The selected codex entry, where the codex already is. It had a tab of its own
+   on the right until the dock needed that room for the assistant. */
+.codex-item-summary {
+  padding: 8px 10px 12px;
+  border-left: 2px solid var(--text-accent);
+  background: var(--surface-inset);
+}
+
+.codex-item-summary .entry-summary {
+  font-size: var(--text-sm);
+}
+
+/* Game Manager
+   ------------------------------------------------------------------------- */
+
+/* A view fills its column, so there is no size to choose any more. */
+.manager-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Which catalogue, as opposed to which view of it. Heavier than the row it
+   sits above so the two read as different questions rather than one long
+   chain of tabs. */
+.manager-tabs {
+  background: var(--surface-canvas);
+  border-bottom-width: 2px;
+}
+
+/* Louder than the strip beneath it: this row asks which catalogue and the next
+   asks which view of it, and dimming rather than recolouring keeps the two
+   questions apart without introducing a second accent. */
+.manager-tabs .ic-tab {
+  height: var(--control-lg);
+  padding: 0 var(--space-7);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  opacity: 0.55;
+  text-transform: none;
+  letter-spacing: var(--tracking-none);
+}
+
+.manager-tabs .ic-tab.is-active {
+  opacity: 1;
+}
+
+.achievement-layout {
+  flex: 1;
+  min-height: 0;
+}
+
+.achievement-condition {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) minmax(72px, auto) minmax(140px, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.achievement-detail {
+  max-width: 760px;
+}
+
+
+/* The text and its table of contents, side by side. The row is what fills the
+   pane now; the host below is only the text half of it. */
+.editor-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.editor-host {
+  flex: 1;
+  /* Both, and neither is redundant: min-height keeps the flex item from growing
+     past the pane, min-width keeps a long unwrapped line from pushing the
+     outline off the left edge. A flex item's floor is its content, not zero. */
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* The scenes in the open file.
+
+   A fixed width rather than one sized to its contents: knot names vary from
+   `hub` to `seedblossom_after_the_storm`, and a rail that resized as the author
+   typed a header would shift the text they were typing it in. Long names are
+   cut off instead, with the full one in the tooltip. */
+.ink-outline {
+  width: 172px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-2) var(--space-5);
+  background: var(--surface-inset);
+  border-right: 1px solid var(--border-hairline);
+}
+
+.ink-outline-label {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.ink-outline-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ink-outline-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ink-outline-item:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.ink-outline-item:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* Indented under the knot holding it, and smaller — a stitch is a part of a
+   scene rather than one of its own. */
+.ink-outline-item.is-stitch {
+  padding-left: var(--space-7);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* Where the cursor is. The same colour the editor paints a knot header, so the
+   rail and the text agree about what a scene name looks like. */
+.ink-outline-item.is-here {
+  background: var(--surface-selected);
+  color: var(--syntax-heading);
+}
+
+.ink-outline-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Quiet enough to read past when scanning names, there when looking for the
+   line a compiler error named. */
+.ink-outline-line {
+  flex: none;
+  font-size: var(--text-2xs);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Player */
+
+.player {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface-inset);
+}
+
+.player-empty {
+  margin: auto;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.transcript {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-7) var(--space-8);
+  line-height: 1.65;
+  font-size: var(--text-lg);
+}
+
+.transcript-text {
+  margin: 0 0 0.9em;
+}
+
+.transcript-choice {
+  margin: 0 0 0.9em;
+  color: var(--text-accent);
+  font-style: italic;
+}
+
+.transcript-choice::before {
+  content: '› ';
+}
+
+.transcript-error {
+  margin: 0 0 0.9em;
+  color: var(--state-error);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.transcript-tags {
+  margin-left: 8px;
+}
+
+.tag {
+  margin-left: 5px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-active);
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: 14px 24px 18px;
+  border-top: 1px solid var(--border-default);
+}
+
+.choice {
+  width: 100%;
+  text-align: left;
+  padding: var(--space-4) var(--space-5);
+  border-color: var(--border-strong);
+}
+
+.choice:hover {
+  border-color: var(--text-accent);
+  color: var(--text-accent);
+}
+
+.player-ended {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.restart {
+  margin-top: 4px;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+/* Codex sidebar */
+
+.codex {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface-raised);
+}
+
+/* A field in a 232px column has to be allowed to shrink; .ic-input is
+   width:100%, which is not the same thing inside a flex row. */
+:where(.codex, .entry-editor) :where(.ic-input, .ic-select, .ic-textarea) {
+  min-width: 0;
+}
+
+/* Ink the author could type, so it is set in mono. */
+.entry-editor .ic-textarea {
+  font-family: var(--font-mono);
+  line-height: 1.55;
+}
+
+
+/**
+ * Stacked, one control per row.
+ *
+ * This used to put the type select and the Add button side by side, which
+ * overflowed: the panel is resizable down to 160px, and a `select` sizes itself
+ * to its longest option and will not shrink below it, so the button was pushed
+ * past the panel's right edge and over the editor.
+ */
+.codex-new {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.codex-new > * {
+  width: 100%;
+  min-width: 0;
+}
+
+
+.codex-filter {
+  margin: 8px 10px 4px;
+}
+
+.panel-new + .codex-filter,
+.panel-new-preview + .codex-filter {
+  margin-top: 8px;
+}
+
+/* .ic-hint is the one-line guidance in a pane. These run a little roomier
+   than the component's default because they are usually a whole sentence
+   explaining where something lives. */
+.ic-hint,
+.codex-unavailable {
+  margin: 0;
+  padding: 12px 14px;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.ic-hint.pad {
+  padding: var(--space-7) var(--space-8);
+}
+
+.codex-unavailable code {
+  color: var(--text-accent);
+  font-size: var(--text-sm);
+}
+
+.codex-error {
+  margin: 0;
+  padding: 8px 14px;
+  color: var(--state-error);
+  font-size: var(--text-sm);
+}
+
+.codex-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 12px;
+}
+
+/* .ic-group-label supplies the treatment; these sit in a narrow scrolling
+   list, so they run tighter than its default. */
+.codex-group .ic-group-label {
+  margin: 12px 0 4px;
+  padding: 0 14px;
+}
+
+/* The folder a dragged file would land in. The whole section is the target —
+   its heading and its rows — because a folder holding one file is otherwise a
+   very small thing to hit. */
+.codex-group.is-drop-target {
+  background: var(--state-info-bg);
+  box-shadow: inset 2px 0 0 var(--state-info);
+}
+
+/* A folder with nothing in it says so, and says what to do about it. Without a
+   line here it would be a heading with a gap under it, which reads as a bug. */
+.codex-group-empty {
+  padding: 2px 14px 6px;
+  font-style: italic;
+}
+
+/* The rename field stands exactly where the row it replaces stood, so the name
+   does not jump as it is edited. */
+.file-rename {
+  width: calc(100% - 12px);
+  margin: 0 6px;
+  font-family: var(--font-mono);
+}
+
+/* A file waiting to be pasted after a cut. Dimmed rather than removed: it is
+   still there until the paste lands, and a row that vanished on Ctrl+X would
+   say the move had already happened. */
+.file-tree .ic-row.is-held,
+.codex-list .ic-row.is-held {
+  opacity: 0.5;
+}
+
+.prompts-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* The box is the point of the pane, so it takes the room: a prompt is
+   paragraphs, and editing one through a four-line slot is worse than not
+   editing it at all. */
+.prompt-box {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+  resize: vertical;
+}
+
+/* The app's own text, for reading rather than editing. Held to a height so the
+   assistant's — which runs to thousands of words — cannot push the controls
+   under it off the pane. */
+.prompt-read {
+  max-height: 320px;
+  margin: 0;
+  padding: var(--space-4);
+  overflow: auto;
+  border: var(--border-width) solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-snug);
+  white-space: pre-wrap;
+}
+
+/* Placed at the pointer, so it is positioned in script rather than here. The
+   stacking is `.ic-menu`'s own. */
+.file-menu {
+  min-width: 190px;
+}
+
+/* Anchored under the scissors beside a look. Scoped to the menu because the
+   trigger wears the class too, so a pointerdown on it is not read as a
+   dismissal. */
+.cutout-menu[role='menu'] {
+  min-width: 208px;
+}
+
+/* These lists run the full width of a narrow pane, so a row reaches the edges
+   rather than sitting in the padded gutter .ic-row assumes. */
+.codex .ic-row,
+.file-tree .ic-row,
+.provider-list .ic-row {
+  border-radius: var(--radius-none);
+  padding-right: var(--space-6);
+  padding-left: var(--space-6);
+}
+
+/* The name and its badge sit at opposite ends. */
+.ic-row__name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.ic-badge {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Codex entry editor */
+
+.entry-editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.entry-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  padding: 12px 14px 6px;
+}
+
+.entry-name {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.entry-type {
+  align-self: center;
+  padding: 5px 9px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  background: var(--surface-inset);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.entry-mentions {
+  margin: 0;
+  padding: 0 14px 10px;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+/* The entry editor's second-level strip. .ic-tabs--sub is this exact shape. */
+.entry-tabs {
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.entry-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* .ic-field stacks a label, its control and its hint. A label here often
+   carries a second clause explaining the field, set as an <em> that is not
+   part of the label treatment. */
+.ic-field {
+  gap: 5px;
+}
+
+.ic-field__label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+}
+
+.ic-field__label em {
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: var(--tracking-none);
+  font-weight: var(--weight-regular);
+  color: var(--text-faint);
+}
+
+/* The hint belongs to the control above it, so it sits tight under it. */
+.ic-field__hint {
+  margin: -6px 0 0;
+  line-height: 1.55;
+}
+
+.detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* The one action in a detail pane that cannot be undone, set apart from the
+   fields above it. A rule and space rather than a colour: the button carries
+   the red already, and a red band behind it would read as an error the pane is
+   reporting rather than an action it is offering. */
+.detail-row--danger {
+  margin-top: var(--space-7);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border-hairline);
+}
+
+.detail-label {
+  flex: 1;
+  /* A floor rather than the usual `min-width: 0`. This one is a text input
+     sharing a row, and a text input that has been shrunk to a few pixels is not
+     a smaller control — it is one that cannot be typed in, which is how this
+     was reported. */
+  min-width: 10ch;
+}
+
+/* The dropdown beside it holds three short fixed words and wants no more room
+   than they need.
+
+   Without this it took the whole row. `.ic-select` is `width: 100%`, which as a
+   flex basis means the entire line, while `.detail-label`'s `flex: 1` sets its
+   own basis to zero — so the label only ever got what the dropdown declined,
+   and that was nothing. Scoped to this row rather than fixed on `.ic-select`,
+   because a select filling its container is right everywhere it is stacked in
+   a field; it is only wrong when it shares a line. */
+.detail > .detail-row > .ic-select {
+  flex: none;
+  width: auto;
+}
+
+/* .ic-check draws the row; these sit in a dialog list, so they run wide. */
+.checkbox {
+  font-size: var(--text-md);
+}
+
+.checkbox-type {
+  margin-left: auto;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+/* Destructive actions sit alone, away from whatever they would destroy. */
+.ic-btn--danger {
+  align-self: flex-start;
+}
+
+/* Project picker */
+
+.picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: var(--space-9);
+  overflow-y: auto;
+}
+
+.picker-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  width: 100%;
+  max-width: 520px;
+}
+
+.picker-title {
+  margin: 0;
+  font-size: var(--text-display);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-accent);
+}
+
+.picker-subtitle {
+  margin: -6px 0 6px;
+  color: var(--text-tertiary);
+}
+
+.picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.picker-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--surface-raised);
+}
+
+.picker-item:hover {
+  border-color: var(--text-accent);
+}
+
+.picker-item-title {
+  font-weight: 600;
+}
+
+.picker-item-blurb {
+  grid-column: 1;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-item-meta {
+  grid-row: 1;
+  grid-column: 2;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.picker-new {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: 6px;
+}
+
+/* The one field on the first-run screen, so it takes the row. */
+.picker-new .ic-input {
+  flex: 1;
+  height: var(--control-lg);
+}
+
+.picker-folder {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+/* Project file tree */
+
+.project-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+
+/**
+ * The Add button goes last whatever the markup order, so the row that commits
+ * the form sits under everything it commits. In the codex panel the library
+ * select comes after the button in the DOM.
+ */
+.codex-new button {
+  order: 1;
+}
+
+.codex-warning {
+  margin: 0;
+  padding: 8px 14px;
+  color: var(--state-warning);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  background: var(--state-warning-bg);
+  border-top: 1px solid color-mix(in oklab, var(--state-warning) 40%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--state-warning) 40%, transparent);
+}
+
+.codex-item-warn {
+  flex: none;
+  color: var(--state-warning);
+  font-weight: 700;
+}
+
+/* Manuscript */
+
+/**
+ * The view switches, as tabs.
+ *
+ * The same idiom as the pane tabs inside each column — underline on the active
+ * one, nothing drawn around the rest — and aligned with the editor column, so
+ * the three strips of tabs down the window read as one system rather than three
+ * unrelated controls.
+ */
+/* The window's primary switch, so it runs at the toolbar's full height rather
+   than the tab strip's, and its marker meets the border below it. */
+.view-tabs {
+  flex: none;
+  align-items: stretch;
+}
+
+.view-tabs .ic-tab {
+  height: auto;
+  padding: 0 var(--space-6);
+  font-size: var(--text-md);
+}
+
+/**
+ * Tools, not views.
+ *
+ * Buttons, because each opens a dialog over what you are doing where the tabs
+ * to the left replace it. Drawn as tabs they would be promising that Media
+ * takes you somewhere, which it does not — so they keep their borders and never
+ * take an active state.
+ */
+.tool-buttons {
+  display: flex;
+  flex: none;
+  gap: var(--space-3);
+  margin-right: 10px;
+}
+
+.tool-buttons button {
+  padding: 3px 12px;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.tool-buttons button:hover {
+  color: var(--text-primary);
+  border-color: var(--text-accent);
+}
+
+
+.manuscript {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--surface-inset);
+}
+
+.manuscript-page {
+  /* The reading column never widens; the pane grows around it. The rail is
+     added to the measure rather than taken out of it, so turning it on did not
+     narrow anybody's prose. */
+  max-width: calc(var(--measure-read) + var(--rail-width) + var(--space-6));
+  margin: 0 auto;
+  padding: 40px 24px 120px;
+}
+
+/* Wide enough for a real name — `seraphine/neutral` beside a thumbnail and the
+   side she is standing on — and no wider: this column is in the margin of a
+   page and has to read as marginalia rather than as a second pane. Added to the
+   page's measure rather than taken out of it, so widening it moves the page and
+   not the prose column.
+
+   Fixed, so that opening a rail does not shove the prose sideways: the closed
+   strip right-aligns into the same column the open panel fills. */
+.manuscript-section {
+  --rail-width: 220px;
+
+  display: grid;
+  grid-template-columns: var(--rail-width) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+/* The whole block is the click target for selecting a section, so the marker
+   goes here rather than on each paragraph. */
+.manuscript-section.is-selected .manuscript-body {
+  box-shadow: -14px 0 0 -12px var(--text-accent);
+}
+
+.section-rail {
+  display: flex;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+}
+
+/* Closed: what this section changed, named, pushed up against the prose so the
+   eye reads it as belonging to the paragraph beside it. Right-aligned rather
+   than filling the gutter, so a section that changed one thing does not look
+   like a panel with one item in it. */
+.section-rail.is-closed {
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: flex-end;
+  padding-top: 0.35em;
+  color: var(--text-faint);
+}
+
+.rail-brief {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.rail-brief.is-wrong {
+  color: var(--state-error);
+}
+
+/* Quieter than the open rail's rows: this is marginalia to be read past, and
+   the section beside it is what the eye is meant to be on. */
+.rail-brief .rail-name,
+.rail-brief .rail-detail {
+  font-size: var(--text-2xs);
+}
+
+/* Beside the name rather than pushed to the far edge: the strip is
+   right-aligned, so there is no edge to push to. */
+.rail-brief .rail-detail {
+  margin-left: 0;
+}
+
+.section-rail.is-open {
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-width) solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.rail-label {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.rail-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  min-width: 0;
+}
+
+/* Set here reads solid; carried in from an earlier section reads faint. The
+   difference is the rail's one idea, so it is carried by weight and colour
+   together rather than by colour alone. */
+.rail-row.is-here {
+  color: var(--text-primary);
+}
+
+.rail-row.is-inherited {
+  color: var(--text-faint);
+}
+
+.rail-name {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-detail {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: var(--text-2xs);
+}
+
+.rail-thumb {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: var(--radius-sm);
+}
+
+/* The row itself opens the menu that changes it. A button rather than a click
+   handler on the div, so it is reachable by keyboard and announced as the
+   control it is. */
+.rail-open {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rail-open:hover .rail-name {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+
+/* Marks what is staged now in a menu opened to change it. Not a filter: picking
+   the same thing again is how an author changes only the look, or only where
+   somebody stands. */
+.ic-menu__item.is-current {
+  color: var(--text-primary);
+}
+
+.ic-menu__item.is-current::after {
+  content: '·';
+  margin-left: auto;
+  color: var(--text-accent);
+  font-weight: 700;
+}
+
+/* The remove button appears on hover, so a rail at rest reads as a list of
+   what is staged rather than as a row of controls. It stays reachable by
+   keyboard, which is why it is opacity rather than display. */
+.rail-row .ic-iconbtn {
+  margin-left: auto;
+  opacity: 0;
+}
+
+.rail-row:hover .ic-iconbtn,
+.rail-row .ic-iconbtn:focus-visible {
+  opacity: 1;
+}
+
+/* `rail-detail` sits inside the button now, so the X is always the one taking
+   the free space. */
+.rail-row .rail-detail {
+  margin-left: auto;
+}
+
+.rail-add {
+  display: flex;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-hairline);
+}
+
+.tag-picker .picker-slot,
+.tag-picker .picker-filter {
+  padding: var(--space-2) var(--space-3);
+}
+
+.tag-picker .picker-change {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.picker-thumb {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: var(--radius-sm);
+}
+
+.manuscript-head {
+  margin-bottom: 32px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.manuscript-head h1 {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+}
+
+.manuscript-head p {
+  margin: 4px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.manuscript-prose {
+  position: relative;
+  margin: 0 0 1.15em;
+  font-family: var(--font-read);
+  font-size: var(--text-read);
+  line-height: var(--leading-read);
+  color: var(--text-primary);
+}
+
+
+
+.write-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: 14px;
+  overflow-y: auto;
+}
+
+:where(.write-panel) :where(.ic-input, .ic-select, .ic-textarea) {
+  min-width: 0;
+}
+
+/* Prose being drafted, not a form value: it gets the reading size. Held at the
+   container's specificity so a named field — .draft-ink is ink, not prose —
+   still decides for itself. */
+:where(.write-panel) .ic-textarea {
+  font-size: var(--text-md);
+  line-height: 1.55;
+}
+
+.write-target {
+  margin: 0;
+  padding: 6px 9px;
+  border-radius: var(--radius-md);
+  background: var(--accent-signal-quiet);
+  border: 1px solid color-mix(in oklab, var(--text-accent) 40%, transparent);
+  color: var(--text-accent);
+  font-size: var(--text-xs);
+}
+
+/* A textarea cannot style its own content, so the text is drawn twice: an
+   invisible copy carries the underlines, the real one sits on top. Every
+   property affecting glyph position is set on both. */
+.highlight-input {
+  position: relative;
+}
+
+.highlight-input textarea,
+.highlight-backdrop {
+  margin: 0;
+  width: 100%;
+  min-height: 5.6rem;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: var(--text-md);
+  line-height: 1.55;
+  letter-spacing: normal;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  box-sizing: border-box;
+}
+
+.highlight-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: transparent;
+  border-color: transparent;
+  pointer-events: none;
+}
+
+.highlight-backdrop mark {
+  background: transparent;
+  color: transparent;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--syntax-mention);
+  text-underline-offset: 3px;
+}
+
+.highlight-input textarea {
+  position: relative;
+  resize: vertical;
+  background: var(--surface-inset);
+  color: var(--text-primary);
+}
+
+/* The backdrop sits above the opaque textarea background, below its text. */
+.highlight-input textarea {
+  background: transparent;
+}
+
+.highlight-input::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+}
+
+
+/* .ic-segmented is this shape; it takes the row rather than hugging it. */
+.word-limits {
+  display: flex;
+}
+
+.word-limits button {
+  flex: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+
+.draft {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: 10px;
+  border-top: 1px solid var(--border-default);
+}
+
+.manuscript-traced {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  background: var(--accent-signal-quiet);
+  border: 1px solid color-mix(in oklab, var(--text-accent) 40%, transparent);
+  font-size: var(--text-xs);
+  color: var(--text-accent);
+}
+
+.manuscript-traced code {
+  font-size: var(--text-xs);
+}
+
+.manuscript-hint {
+  margin: -14px 0 26px;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.prose-line,
+.junction-text {
+  border-radius: var(--radius-sm);
+  box-decoration-break: clone;
+}
+
+.prose-line.is-editable:hover,
+.junction-text.is-editable:hover {
+  background: var(--accent-signal-quiet);
+  box-shadow: 0 0 0 3px var(--accent-signal-quiet);
+  cursor: text;
+}
+
+.prose-line.is-locked:hover,
+.junction-text.is-locked:hover {
+  background: var(--surface-hover);
+  box-shadow: 0 0 0 3px var(--surface-hover);
+  cursor: help;
+}
+
+.line-editor {
+  display: block;
+  width: 100%;
+  resize: none;
+  overflow: hidden;
+  font: inherit;
+  line-height: inherit;
+  color: var(--text-primary);
+  background: var(--surface-raised);
+  border: 1px solid var(--text-accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-1) var(--space-3);
+}
+
+.line-editor:focus {
+  outline: none;
+}
+
+.prose-mention {
+  border: none;
+  padding: var(--space-0);
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--syntax-mention);
+  text-underline-offset: 3px;
+}
+
+.prose-mention:hover {
+  background: var(--state-info-bg);
+  color: var(--text-primary);
+}
+
+/* Line numbers sit in the margin, out of the way of the prose. */
+.source-link {
+  position: absolute;
+  left: -3.2rem;
+  border: none;
+  padding: var(--space-0) var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--syntax-gutter);
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.manuscript-prose:hover .source-link,
+.junction li:hover .source-link {
+  opacity: 1;
+}
+
+.source-link:hover {
+  background: transparent;
+  color: var(--text-accent);
+}
+
+.junction {
+  margin: 26px 0 30px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+.junction.is-pending {
+  border-color: var(--text-accent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--text-accent) 30%, transparent);
+}
+
+.junction-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-raised);
+}
+
+.junction-label {
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-tertiary);
+}
+
+.junction.is-pending .junction-label {
+  color: var(--text-accent);
+}
+
+.junction-hint {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.junction-options {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-3);
+}
+
+.junction-options li {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* A choice the reader could take, read at prose size rather than control
+   size — this is the manuscript, not a form. .ic-row carries the rest. */
+.junction-option {
+  padding: 7px 10px;
+  font-size: var(--text-lg);
+  line-height: 1.5;
+}
+
+.junction-option.is-chosen {
+  color: var(--text-accent);
+  opacity: 1;
+}
+
+.junction-option:disabled {
+  cursor: default;
+}
+
+.junction-marker {
+  flex: none;
+  width: 0.9em;
+  color: var(--text-accent);
+}
+
+.manuscript-ending {
+  margin: 34px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-default);
+  text-align: center;
+  font-size: var(--text-sm);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.manuscript-ending.is-loop,
+.manuscript-ending.is-error {
+  text-transform: none;
+  letter-spacing: normal;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--state-warning);
+}
+
+.manuscript-ending.is-error {
+  color: var(--state-error);
+}
+
+.manuscript-blocked {
+  margin: auto;
+  padding: var(--space-10);
+  max-width: 36rem;
+  color: var(--text-tertiary);
+}
+
+.manuscript-diagnostic {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--state-error);
+  word-break: break-word;
+}
+
+.outline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.outline select,
+.outline button {
+  font: inherit;
+  color: var(--text-primary);
+}
+
+.outline select {
+  background: var(--surface-inset);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 5px 8px;
+}
+
+.outline-item {
+  padding: var(--space-2) var(--space-3);
+}
+
+.outline-item.is-pending {
+  color: var(--text-accent);
+}
+
+.outline-index {
+  flex: none;
+  width: 1.2em;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
+}
+
+.outline-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Codex entry dialog */
+
+.entry-dialog {
+  width: min(720px, 100%);
+  height: min(680px, 100%);
+}
+
+.entry-dialog .ic-dialog__header h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.entry-dialog .entry-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+.codex-find {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-pane);
+}
+
+.codex-find .ic-input {
+  flex: 1;
+  min-width: 120px;
+}
+
+.codex-find__count {
+  min-width: 72px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* A disabled primary stops being primary: a filled accent that cannot be
+   pressed reads as the thing to press. */
+.ic-btn--primary:disabled {
+  color: var(--text-tertiary);
+  background: transparent;
+  border-color: var(--border-default);
+}
+
+.library-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 3px 6px;
+  border-radius: var(--radius-md);
+  border-left: 2px solid transparent;
+}
+
+.library-row.is-selected {
+  background: var(--surface-selected);
+  border-left-color: var(--text-accent);
+}
+
+.library-row input[type='checkbox'] {
+  accent-color: var(--text-accent);
+  flex: none;
+}
+
+.library-name {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  padding: var(--space-1) var(--space-0);
+  text-align: left;
+  font-size: var(--text-md);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-row.is-selected .library-name {
+  color: var(--text-accent);
+}
+
+.linked-libraries {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-0);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.linked-libraries li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  font-size: var(--text-md);
+}
+
+.entry-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.entry-summary .entry-header,
+.entry-summary .entry-mentions {
+  padding: var(--space-0);
+}
+
+.summary-line {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+
+.summary-label {
+  display: inline-block;
+  min-width: 5.5rem;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Plan */
+
+.plan-grid {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: var(--space-6);
+  background: var(--surface-inset);
+}
+
+/* .ic-empty centres itself in the pane and names the next action. The board
+   is wide, so this one is allowed more measure than the default. */
+.plan-empty {
+  max-width: 32rem;
+  padding: var(--space-10);
+}
+
+/* An act grows to fill what is there rather than sitting at 280px with the
+   pane empty beside it — one act should not read as one narrow column. It
+   never shrinks below 280px, so several acts still lay out as the board they
+   are and the grid scrolls sideways. */
+.plan-act {
+  flex: 1 1 280px;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Adding an act is an affordance rather than an act, so it does not take an
+   equal share of the width from the acts that exist. */
+.plan-act.is-new {
+  flex: 0 0 220px;
+  min-width: 220px;
+  gap: var(--space-3);
+  opacity: 0.8;
+}
+
+.plan-act-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+}
+
+.plan-act-title {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 3px 5px;
+}
+
+.plan-act-title:hover,
+.plan-act-title:focus {
+  background: var(--surface-inset);
+  border-color: var(--border-default);
+  outline: none;
+}
+
+.plan-act-count {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.plan-act-summary {
+  margin: 0;
+  padding: var(--space-0) var(--space-3);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+
+/* Chapters wrap across whatever width the act has, rather than stacking one
+   per row. A wide pane with a single act reads as a board; a narrow one, or
+   several acts, falls back to the column it was. */
+.plan-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  align-items: start;
+  gap: var(--space-4);
+}
+
+/* .ic-card draws the card and its top status stripe. A board is dozens of
+   these in a column, so this one is tighter than the component's default. */
+.plan-card {
+  gap: 7px;
+  padding: 10px;
+}
+
+/* A chapter moves only from its handle, so selecting or editing prose cannot
+   accidentally start a drag. The target card lights as one object: in a
+   wrapping grid that is clearer than a line whose direction changes by row. */
+.plan-card-drop {
+  min-width: 0;
+  border-radius: var(--radius-lg);
+  transition: opacity var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.plan-card-drop > .plan-card {
+  height: 100%;
+}
+
+.plan-card-drop.is-dragging {
+  opacity: 0.45;
+}
+
+.plan-card-drop.is-drop-target {
+  box-shadow: 0 0 0 2px var(--text-accent);
+}
+
+.plan-drag {
+  flex: none;
+  width: var(--control-sm);
+  height: var(--control-sm);
+  color: var(--text-faint);
+  cursor: grab;
+}
+
+.plan-drag:active {
+  cursor: grabbing;
+}
+
+/* A card is 280px wide, so its fields have to be allowed to shrink. The rest
+   of the treatment is .ic-input / .ic-select / .ic-textarea.
+   This used to restate the whole thing, which is why .plan-status needed
+   !important to say anything quieter than it. */
+:where(.plan-card) :where(.ic-input, .ic-select, .ic-textarea) {
+  min-width: 0;
+  padding: 5px 7px;
+}
+
+.plan-card textarea {
+  font-size: var(--text-md);
+  line-height: 1.5;
+}
+
+/* Where the edit stops. The card's own 7px gap is the spacing between fields
+   that belong together, and these buttons do not belong to the files and the
+   knot below them — without the extra it reads as one continuous list. */
+.plan-card-actions {
+  margin-bottom: var(--space-5);
+}
+
+/* The summary box is sized in JS to whatever is in it, so a manual resize
+   would be undone by the next keystroke. This is the floor — an empty summary
+   still opens a box worth typing into — and the ceiling, past which it scrolls
+   rather than pushing the rest of the card off the board. */
+.plan-card-editor {
+  resize: none;
+  min-height: 128px;
+  max-height: 60vh;
+}
+
+.ic-card__head {
+  align-items: center;
+}
+
+/* The title is the way in to editing the card, so it is a button that does
+   not look like one. */
+.plan-card-title-button,
+.plan-card-title {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font: var(--weight-semibold) var(--text-md) / var(--leading-snug) var(--font-ui);
+  color: var(--text-primary);
+}
+
+.plan-card-title-button:hover {
+  color: var(--text-accent);
+  background: transparent;
+}
+
+/* Which state this chapter is in, on a row of its own so a long title keeps the
+   whole width between the drag and expand controls. The card's top stripe is
+   what carries the status; this is only how you change it.
+
+   `width: auto` because .ic-select is `width: 100%` — sensible in a Field,
+   where a control owns its row, and needlessly large for one short status. */
+.plan-status-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.plan-status {
+  flex: none;
+  width: auto;
+  font-size: var(--text-xs);
+  /* The right side is what .ic-select reserves for the chevron it draws as a
+     background. Overriding the padding outright put the word under the arrow. */
+  padding: 2px var(--space-7) 2px var(--space-3);
+  color: var(--text-tertiary);
+}
+
+.plan-card-summary {
+  cursor: text;
+}
+
+.plan-cast li button {
+  border: none;
+  padding: var(--space-0);
+  font: inherit;
+  color: inherit;
+  background: transparent;
+}
+
+/* The knot this card writes to, and how many scenes hang off it. .ic-card__foot
+   supplies the rule above it and the mono treatment. */
+.plan-card .ic-card__foot {
+  justify-content: space-between;
+}
+
+.plan-scenes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  transition: box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.plan-scenes.is-drop-target {
+  box-shadow: 0 0 0 2px var(--text-accent);
+}
+
+.plan-scenes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+}
+
+.plan-scenes-label {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  gap: var(--space-3);
+}
+
+.plan-scenes-label code {
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-regular);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.plan-scene {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+  transition: opacity var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.plan-scene.is-drop-target {
+  box-shadow: 0 0 0 2px var(--text-accent);
+}
+
+.plan-scene.is-dragging {
+  opacity: 0.45;
+}
+
+.plan-scene-drag {
+  color: var(--text-faint);
+  cursor: grab;
+}
+
+.plan-scene-drag:active {
+  cursor: grabbing;
+}
+
+.plan-scene-main {
+  min-width: 0;
+  border: none;
+  padding: 6px 8px;
+  text-align: left;
+  background: transparent;
+}
+
+.plan-scene-main strong,
+.plan-scene-main span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-scene-main strong {
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.plan-scene-main span {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.plan-scene-main:hover strong {
+  color: var(--text-accent);
+}
+
+.plan-scene-new {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+}
+
+.plan-file-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-0);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.plan-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.plan-file-path {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  padding: var(--space-1) var(--space-0);
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-file-path:hover {
+  color: var(--text-accent);
+  background: transparent;
+}
+
+.plan-add {
+  border-style: dashed;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  padding: var(--space-3);
+}
+
+.plan-add.is-drop-target {
+  border-color: var(--text-accent);
+  color: var(--text-accent);
+  background: var(--surface-hover);
+}
+
+/* Expanding a section. The button stays quiet until the card is under the
+   pointer, so a board of forty chapters is not forty glyphs competing. */
+/* .ic-iconbtn draws it. Quiet until the card is under the pointer, so a board
+   of forty chapters is not forty glyphs competing. */
+.plan-expand {
+  flex: none;
+  width: var(--control-sm);
+  height: var(--control-sm);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.plan-card:hover .plan-expand,
+.plan-act-head:hover .plan-expand,
+.plan-expand:focus-visible {
+  opacity: 1;
+}
+
+.plan-expand:hover {
+  color: var(--text-accent);
+  background: var(--surface-hover);
+}
+
+/* The app-managed Ink file inside an expanded Scene. */
+.plan-ink {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: 6px;
+}
+
+/* Gallery catalogue ------------------------------------------------------ */
+
+/* Minigame catalogue ----------------------------------------------------- */
+.minigame-fields { padding: var(--space-4); display: grid; gap: var(--space-4); overflow: auto; }
+.minigame-list { display: grid; gap: var(--space-1); padding: var(--space-2); }
+.minigame-bindings, .minigame-tunings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.minigame-section { display: grid; gap: var(--space-2); }
+.minigame-section h3 { margin: 0; font-size: var(--font-size-sm); }
+.minigame-background-preview { width: min(100%, 42rem); aspect-ratio: 16 / 9; object-fit: cover; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-1); }
+.minigame-tuning-base, .minigame-modifier { display: flex; align-items: center; gap: var(--space-2); }
+.minigame-tuning-base .ic-input, .minigame-modifier .ic-input { width: 7rem; }
+.minigame-modifier .ic-select { min-width: 9rem; flex: 1; }
+.gallery-layout {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.8fr) minmax(340px, 1.2fr);
+  min-height: 0;
+  height: 100%;
+}
+
+.gallery-groups,
+.gallery-detail {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.gallery-groups {
+  border-right: 1px solid var(--border-hairline);
+}
+
+.gallery-group-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  align-items: start;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+
+.gallery-group-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  text-align: left;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.gallery-group-card.is-selected {
+  border-color: var(--text-accent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--text-accent) 35%, transparent);
+}
+
+.gallery-group-art,
+.gallery-cover-preview {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  color: var(--text-faint);
+  background: var(--surface-inset);
+}
+
+.gallery-group-card--16x9 .gallery-group-art { aspect-ratio: 16 / 9; width: 100%; }
+.gallery-group-card--9x16 .gallery-group-art { aspect-ratio: 9 / 16; width: min(68%, 120px); align-self: center; }
+
+.gallery-group-art img,
+.gallery-group-art video,
+.gallery-cover-preview img,
+.gallery-cover-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gallery-group-card--9x16 .gallery-group-art img,
+.gallery-group-card--9x16 .gallery-group-art video,
+.gallery-cover-preview--9x16 img,
+.gallery-cover-preview--9x16 video {
+  object-fit: contain;
+}
+
+.gallery-group-card strong,
+.gallery-group-card small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gallery-group-card small { color: var(--text-tertiary); }
+
+.gallery-detail-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5);
+}
+
+.gallery-cover-preview--16x9 { aspect-ratio: 16 / 9; width: min(100%, 520px); }
+.gallery-cover-preview--9x16 { aspect-ratio: 9 / 16; width: min(52%, 260px); }
+
+.gallery-item-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-2) var(--space-5);
+  max-height: 360px;
+  overflow: auto;
+  padding: var(--space-2);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+}
+
+.gallery-item-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.gallery-item-row .ic-check {
+  flex: 1;
+  min-width: 0;
+}
+
+.gallery-item-row .ic-iconbtn {
+  flex: none;
+  color: var(--text-tertiary);
+}
+
+.gallery-item-browser {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.gallery-item-filter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.gallery-item-filter .ic-input {
+  flex: 1;
+}
+
+.gallery-item-filter [role='status'] {
+  flex: none;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.gallery-remove { padding: var(--space-5); }
+
+.plan-ink-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.plan-ink-from {
+  flex: none;
+  font-size: var(--text-2xs);
+  font-style: italic;
+  color: var(--text-tertiary);
+}
+
+.plan-knots {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 6px 0 0;
+  padding: var(--space-0);
+}
+
+.plan-knots button {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-tertiary);
+  background: transparent;
+}
+
+.plan-knots button:hover {
+  color: var(--text-accent);
+  border-color: var(--text-accent);
+}
+
+/* The knot this section claims: the one worth finding at a glance. */
+.plan-knots button.is-match {
+  color: var(--text-accent);
+  border-color: var(--text-accent);
+  background: var(--surface-active);
+}
+
+/* Matrix */
+
+.plan-matrix-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-6);
+  background: var(--surface-inset);
+}
+
+.plan-matrix {
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.plan-matrix th,
+.plan-matrix td {
+  border: 1px solid var(--border-default);
+  padding: 5px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.plan-matrix thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-raised);
+  color: var(--text-tertiary);
+  font-weight: 500;
+  font-size: var(--text-xs);
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plan-matrix tbody th {
+  position: sticky;
+  left: 0;
+  background: var(--surface-raised);
+  font-weight: 500;
+}
+
+.plan-matrix-corner {
+  left: 0;
+  z-index: 1;
+}
+
+.plan-matrix td {
+  text-align: center;
+  color: var(--text-tertiary);
+  min-width: 2.4rem;
+}
+
+.plan-matrix td.is-present {
+  color: var(--text-accent);
+  background: var(--accent-signal-quiet);
+}
+
+/* Outline view
+
+   The plan read straight down: acts, their chapters, and every scene summary
+   under each. One column at a reading measure rather than a board — the point
+   is to read the story in order, so nothing competes for the horizontal space
+   and the eye never has to hunt for where the next chapter starts. */
+
+.plan-outline {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-8) var(--space-6) var(--space-12);
+  background: var(--surface-inset);
+}
+
+/* Summaries are prose, so the column is held to a measure and centred rather
+   than stretched across a wide pane. */
+.plan-outline-act {
+  max-width: 46rem;
+  margin: 0 auto var(--space-10);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.plan-outline-act-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.plan-outline-act-heading {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+}
+
+/* The act number is the label; the title is the name. Keeping them different
+   weights means a numbered act still reads as one heading. */
+.plan-outline-act-number {
+  flex: none;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.plan-outline-act-title {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  color: var(--text-primary);
+}
+
+.plan-outline-count {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* A chapter is stepped in from its act, so the nesting is visible without a
+   rule or a marker for every one of them. */
+.plan-outline-chapter {
+  margin-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.plan-outline-chapter + .plan-outline-chapter {
+  margin-top: var(--space-6);
+}
+
+.plan-outline-chapter-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+}
+
+.plan-outline-eyebrow {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+}
+
+.plan-outline-chapter-heading {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 600;
+}
+
+.plan-outline-chapter-title {
+  width: 100%;
+  font: inherit;
+  color: var(--text-primary);
+}
+
+/* A scene is stepped in again and titled quietly: the summary is what is being
+   read here, and a row of bold scene names would fight the chapter above them. */
+.plan-outline-scene {
+  margin-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.plan-outline-scene-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.plan-outline-scene-title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+/* Every title is the way in to renaming it, so it is a button that looks like
+   the text it replaces until the pointer is over it. */
+.plan-outline-open {
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+}
+
+.plan-outline-open:hover {
+  color: var(--text-accent);
+}
+
+/* A summary is a box because that is the unit being edited — one paragraph,
+   one click, one field. Newlines are kept: a summary written as three beats
+   should still read as three. */
+.plan-outline-prose {
+  width: 100%;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-6);
+  background: var(--surface-raised);
+  text-align: left;
+  white-space: pre-wrap;
+  font-size: var(--text-read);
+  line-height: 1.65;
+  color: var(--text-secondary);
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+.plan-outline-prose:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+}
+
+.plan-outline-prose.is-empty {
+  font-style: italic;
+  color: var(--text-faint);
+}
+
+/* The editor stands exactly where the box it replaces stood, so opening a
+   summary does not move the paragraph under the pointer. Height is set in JS
+   to whatever is in it, so a manual resize would be overwritten. */
+.plan-outline-editor {
+  width: 100%;
+  min-height: 4.5rem;
+  border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-6);
+  resize: none;
+  font-size: var(--text-read);
+  line-height: 1.65;
+}
+
+.plan-outline-none {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--text-faint);
+}
+
+/* .ic-iconbtn draws it. Quiet until the heading it belongs to is under the
+   pointer, so a long outline is not a column of glyphs. */
+.plan-outline-action {
+  flex: none;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.plan-outline-act-head:hover .plan-outline-action,
+.plan-outline-chapter-head:hover .plan-outline-action,
+.plan-outline-scene-head:hover .plan-outline-action,
+.plan-outline-action:focus-visible {
+  opacity: 1;
+}
+
+/* Outline */
+
+.outline-structure {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.outline-tree,
+.outline-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-0);
+}
+
+.outline-tree ul {
+  margin-left: 10px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border-default);
+}
+
+.outline-node {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 3px 6px;
+  text-align: left;
+  font-size: var(--text-md);
+}
+
+.outline-node:hover {
+  background: var(--surface-hover);
+}
+
+.outline-node-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outline-node-knot {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.outline-node:hover .outline-node-knot {
+  color: var(--text-accent);
+}
+
+.outline-node-empty {
+  margin: 0 0 2px 6px;
+  font-size: var(--text-xs);
+  font-style: italic;
+  color: var(--text-tertiary);
+  opacity: 0.7;
+}
+
+/* Settings overlay */
+
+/* .ic-scrim and .ic-dialog draw the overlay and the panel. These dialogs are
+   fixed-size workspaces rather than message boxes, so they take a height as
+   well as a width and let their body scroll. */
+.ic-dialog {
+  width: min(880px, 100%);
+  height: min(620px, 100%);
+  max-width: 100%;
+}
+
+/* Except a small one, which is a message box after all: a dialog asking for a
+   folder name is not 620px tall. After the rule above rather than before it —
+   the two have the same weight, so the later one is the one that counts. */
+.ic-dialog--sm {
+  width: min(440px, 100%);
+  height: auto;
+}
+
+/* And the preview, which is the other way: a lightbox is mostly picture, so it
+   takes what the window will give it. After the rule above for the same reason
+   --sm is. */
+.media-preview {
+  width: min(1500px, 94vw);
+  height: min(1000px, 92vh);
+}
+
+/* Flush drops the body's padding but not its gap, which would otherwise show
+   as a band between the picture and the step bar. */
+.media-preview .ic-dialog__body {
+  gap: var(--space-0);
+}
+
+.media-preview__stage {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: var(--space-5);
+  /* The deepest ground the palette has: it is what lets a sprite with soft
+     edges or a background at dusk be judged, rather than the panel colour.
+     Follows the theme, so this is not a dark-mode-only decision. */
+  background: var(--surface-inset);
+}
+
+/* Fitted to the room, enlarging when the file is small: "preview it bigger" is
+   the whole request, and a 160×90 placeholder shown at 160×90 in a 1300px
+   window is a green stamp in a black field. What keeps that honest is the
+   header, which states the real dimensions beside the name — the picture is
+   sized for looking at, and the facts say what it actually is. */
+/* A track has nothing to fit, so its controls are given a sensible width
+   instead of being stretched to the frame. */
+.media-preview__stage audio {
+  width: min(520px, 100%);
+}
+
+.media-preview__stage img,
+.media-preview__stage video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.media-preview__bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  border-top: 1px solid var(--border-default);
+  background: var(--surface-raised);
+}
+
+.media-preview__count {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  min-width: 6ch;
+  text-align: center;
+}
+
+/* A thumbnail that opens the preview. Bare: the picture is the affordance, and
+   a border around every one of them would read as a second control. */
+.media-peek {
+  display: block;
+  padding: var(--space-0);
+  border: none;
+  background: none;
+  cursor: zoom-in;
+  border-radius: var(--radius-md);
+}
+
+.media-peek:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.media-peek:hover {
+  opacity: 0.82;
+}
+
+/* The header holds the dialog's own actions, so they sit at its right end. */
+.ic-dialog__header {
+  justify-content: space-between;
+  background: var(--surface-raised);
+}
+
+.ic-dialog__header h2 {
+  margin: 0;
+  flex: 1;
+  color: var(--text-primary);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.settings-body {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+
+.settings-rail {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 0;
+  background: var(--surface-raised);
+  border-right: 1px solid var(--border-default);
+}
+
+.settings-rail .ic-row {
+  border-radius: var(--radius-none);
+  font-size: var(--text-md);
+}
+
+.settings-content {
+  min-width: 0;
+  overflow-y: auto;
+  padding: 16px 18px;
+}
+
+.dialog-actions-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Two fields, and they are about different things: where the player is, and
+   whether it is running. .settings-content stacks its children flush. */
+.player-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-7);
+}
+
+/* The path is long and not editable here — it comes from the folder picker,
+   which is the only way to be sure it exists. */
+.player-path {
+  flex: 1;
+  min-width: 0;
+}
+
+.player-status {
+  flex: none;
+}
+
+/* Only shown when the server would not start, so it is a transcript of a
+   failure rather than a console sitting open. */
+.player-log {
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  max-height: 12rem;
+  overflow: auto;
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-snug);
+  white-space: pre-wrap;
+}
+
+.settings-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+:where(.settings-tab) :where(.ic-input, .ic-select) {
+  min-width: 0;
+}
+
+
+/* The ComfyUI tab. Three things have to be true before a picture can be drawn
+   and they fail separately, so each gets its own row rather than sharing one
+   "connected" light. */
+.comfy-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-7);
+}
+
+.comfy-url,
+.comfy-path {
+  flex: 1;
+  min-width: 0;
+}
+
+.comfy-status,
+.comfy-timeout {
+  flex: none;
+}
+
+.comfy-timeout {
+  width: 11ch;
+}
+
+/* Same shape as the provider list beside its editor: the workflows are the
+   thing being chosen between, and the bindings are what one of them is. */
+.comfy-layout {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-default);
+}
+
+.comfy-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-right: 14px;
+  border-right: 1px solid var(--border-default);
+}
+
+.comfy-list .ic-row {
+  padding: var(--space-3) var(--space-4);
+}
+
+.comfy-bindings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/* The node picker takes the room; the input name beside it is a short word.
+   Both halves are needed: .ic-select is width:100%, so without `width: auto`
+   the second one claims the whole row and squeezes the first to its chevron. */
+.comfy-bindings .detail-row .ic-select:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.comfy-bindings .detail-row .ic-select--sm {
+  flex: none;
+  width: auto;
+}
+
+.provider-layout {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.provider-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-right: 14px;
+  border-right: 1px solid var(--border-default);
+}
+
+.provider-list .ic-row {
+  padding: var(--space-3) var(--space-4);
+}
+
+.provider-list .detail-row {
+  margin-top: 8px;
+}
+
+.provider-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.provider-actions {
+  margin-top: 2px;
+}
+
+/* Model picker */
+
+.model-picker {
+  position: relative;
+}
+
+.model-picker .detail-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* .ic-popover draws the panel; this one is anchored under the field it
+   belongs to and matches its width. */
+.model-dropdown {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.model-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+/* A model id is an identifier, so it is set in mono. */
+.model-option {
+  display: block;
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-option.is-highlighted,
+.model-option.is-selected {
+  background: var(--surface-active);
+}
+
+.model-option.is-current {
+  color: var(--text-accent);
+}
+
+.model-option.is-current::after {
+  content: ' ·  current';
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  opacity: 0.7;
+}
+
+.model-note {
+  margin: 0;
+  padding: 7px 10px;
+  border-top: 1px solid var(--border-default);
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.model-list + .model-note {
+  background: var(--surface-raised);
+}
+
+.model-note.is-error {
+  color: var(--state-error);
+  border-top: none;
+  font-family: var(--font-mono);
+  word-break: break-word;
+}
+
+.provider-clear {
+  align-self: flex-start;
+  margin-top: -6px;
+}
+
+.provider-test-ok,
+.provider-test-fail {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  word-break: break-word;
+}
+
+.provider-test-ok {
+  color: var(--state-ok);
+  background: var(--state-ok-bg);
+  border: 1px solid color-mix(in oklab, var(--state-ok) 40%, transparent);
+}
+
+.provider-test-fail {
+  color: var(--state-error);
+  background: var(--state-error-bg);
+  border: 1px solid color-mix(in oklab, var(--state-error) 40%, transparent);
+}
+
+/* Diagnostics */
+
+/* .ic-diagnostics and .ic-diag draw the strip. The compiler reports a line but
+   no column, so the number gets a column of its own and the messages align. */
+.ic-diag__line {
+  min-width: 64px;
+}
+
+/* The assistant ------------------------------------------------------------ */
+
+/* The assistant fills the dock rather than sitting in a window. It is a column
+   like every other tab's content: a context bar, a transcript that scrolls, and
+   an input pinned to the bottom. */
+.assistant-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Narrower than the dialog was, so the padding has to give. */
+.assistant-panel .assistant-context {
+  flex-wrap: wrap;
+  padding: 8px 10px;
+}
+
+.assistant-panel .assistant-transcript,
+.assistant-panel .assistant-input {
+  padding: 12px 10px;
+}
+
+/* Beside the project picker, where there is no dock and no project yet — it can
+   still make one, which is the only thing worth asking for at that point. */
+.picker-assistant {
+  display: flex;
+  flex-direction: column;
+  width: min(420px, 40vw);
+  border-left: 1px solid var(--border-default);
+  background: var(--surface-raised);
+}
+
+.assistant-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  background: var(--surface-inset);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.assistant-model {
+  flex: 0 1 300px;
+  min-width: 0;
+}
+
+.assistant-transcript {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* The compact preview of what accompanies the next message. It sits against
+   the composer because typing can change which codex entries are detected. */
+.assistant-detected-context {
+  flex: none;
+  margin: 0 10px;
+  border: 1px solid var(--border-default);
+  border-bottom: 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--surface-inset);
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.assistant-context-toggle {
+  width: 100%;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 5px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.assistant-context-toggle strong {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.assistant-context-toggle span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assistant-context-detail {
+  padding: 2px 10px 9px 29px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.assistant-context-detail p {
+  margin: 6px 0;
+}
+
+.assistant-context-detail .is-absent {
+  font-style: italic;
+  opacity: 0.75;
+}
+
+.assistant-empty {
+  margin: auto 0;
+}
+
+.assistant-suggestions {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: var(--space-0);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* A prompt to send, not a command to run: it is a sentence, so it wraps and
+   sets its own height rather than taking a control's. Dashed, because the
+   text is a suggestion the author edits, not a label. */
+.assistant-suggestions .ic-btn {
+  width: 100%;
+  height: auto;
+  justify-content: flex-start;
+  white-space: normal;
+  text-align: left;
+  padding: 8px 10px;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-tertiary);
+  border-style: dashed;
+}
+
+.assistant-suggestions .ic-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--text-accent);
+}
+
+.assistant-message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 88%;
+}
+
+.assistant-message p {
+  margin: 0;
+  padding: 8px 11px;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-md);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  /* Transcript text is working material: it must remain selectable even if a
+     pane-resize gesture briefly disables selection on the window. */
+  user-select: text;
+  cursor: text;
+}
+
+.assistant-message.is-user {
+  align-self: flex-end;
+}
+
+.assistant-message.is-user p {
+  background: var(--text-accent);
+  color: var(--text-inverse);
+}
+
+/* The global selection tint shares the bubble's accent hue and was nearly
+   invisible here, making a working selection look like no selection at all. */
+.assistant-message.is-user p::selection {
+  color: var(--text-primary);
+  background: var(--surface-canvas);
+}
+
+.assistant-message.is-assistant p {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+}
+
+/* What it did, always visible: a file appearing on disk with no visible cause
+   is what would make this untrustworthy. */
+.assistant-tools {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-0);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* A tick or an alert, then what it did. */
+.assistant-tools li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.assistant-tool-name {
+  border: none;
+  padding: 1px 6px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-tertiary);
+  background: transparent;
+  text-align: left;
+}
+
+/* The bullet was standing in for a status; the icon is the status now. */
+
+.assistant-tools li.is-failed .assistant-tool-name {
+  color: var(--state-error);
+}
+
+.assistant-tool-name:hover {
+  color: var(--text-accent);
+  background: transparent;
+}
+
+.assistant-tool-args {
+  margin: 2px 0 4px 14px;
+  padding: var(--space-3) var(--space-4);
+  max-height: 180px;
+  overflow: auto;
+  font-size: var(--text-2xs);
+  line-height: 1.5;
+  color: var(--text-tertiary);
+  background: var(--surface-inset);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.assistant-working {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--text-tertiary);
+}
+
+/* What the tool running right now last said. Set in the same monospace as the
+   finished calls above it, because it is the same kind of thing — the only
+   difference is that this one has not happened yet, which is what the dashed
+   circle says beside the ticks. */
+.assistant-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-style: normal;
+  color: var(--text-secondary);
+}
+
+.assistant-input {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-end;
+  padding: var(--space-5) var(--space-6);
+  border-top: 1px solid var(--border-default);
+  background: var(--surface-raised);
+}
+
+/* The composer grows with the dock rather than by dragging, and it is the one
+   textarea in the app that must not be resizable — the send button sits under
+   it. */
+.assistant-input .ic-textarea {
+  flex: 1;
+  min-height: 0;
+  resize: none;
+  font-size: var(--text-md);
+}
+
+/* Drafting ink beside the editor ------------------------------------------ */
+
+/* The builder: what will be sent, listed before it is sent. */
+.ink-context {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-0);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+
+.ink-context > li {
+  padding-left: 10px;
+  border-left: 2px solid var(--border-default);
+}
+
+.ink-context strong {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* Context that is simply not there, said plainly rather than left blank. */
+.ink-context .is-absent {
+  font-style: italic;
+  opacity: 0.75;
+}
+
+.ink-context .ic-chips {
+  margin-top: 4px;
+}
+
+.draft-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.draft-compiles {
+  font-size: var(--text-xs);
+  color: var(--state-ok);
+}
+
+.draft-broken {
+  font-size: var(--text-xs);
+  color: var(--state-error);
+}
+
+.draft-ink {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+
+/* Stats and items ---------------------------------------------------------- */
+
+.stats-dialog {
+  width: min(900px, 100%);
+  height: min(700px, 100%);
+}
+
+/* .ic-master-detail supplies the two columns. A catalogue's master carries a
+   filter and an add box above its list, so it is wider than the default and
+   scrolls as one column. */
+.stats-master {
+  overflow-y: auto;
+  padding: 10px;
+  gap: var(--space-4);
+  background: var(--surface-inset);
+}
+
+.stats-master .ic-input {
+  margin: 0;
+}
+
+.stats-detail {
+  gap: var(--space-5);
+  padding: 16px 18px;
+}
+
+.stats-rows {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-0);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.stats-rows li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-md);
+}
+
+
+.stats-pick {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  border: none;
+  border-radius: var(--radius-none);
+  padding: 4px 7px;
+  text-align: left;
+}
+
+.stats-pick code {
+  font-size: var(--text-xs);
+  color: var(--text-accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.stats-pick span {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* Quiet until the row is under the pointer: a hundred rows is not a hundred
+   pairs of arrows competing for attention. */
+.stats-move {
+  display: flex;
+  flex: none;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.stats-rows li:hover .stats-move,
+.stats-category .ic-group-label:hover .stats-move,
+.stats-move button:focus-visible {
+  opacity: 1;
+}
+
+.stats-move button {
+  border: none;
+  padding: var(--space-0) var(--space-2);
+  font-size: var(--text-2xs);
+  line-height: 1.4;
+  color: var(--text-tertiary);
+  background: transparent;
+}
+
+.stats-move button:hover {
+  color: var(--text-accent);
+  background: transparent;
+}
+
+/* .ic-group-label supplies the treatment; a category also carries its reorder
+   buttons at the far end. */
+.stats-category .ic-group-label {
+  justify-content: space-between;
+  margin: 10px 0 2px;
+  padding: 0;
+}
+
+.stats-category .ic-group-label code {
+  color: var(--text-accent);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-none);
+  text-transform: none;
+}
+
+.stats-category-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: 3px;
+}
+
+.stats-category-name input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 2px 5px;
+}
+
+.stats-category-name input:hover,
+.stats-category-name input:focus {
+  background: var(--surface-raised);
+  border-color: var(--border-default);
+  outline: none;
+}
+
+/* Adding something, at the top of the column that lists it.
+   These sat under their lists, at the far end of a scroll, which is the last
+   place anyone looks for the way to add one. */
+.panel-new {
+  display: flex;
+  gap: 5px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+/* The name takes the row and the Add button takes what it needs — its label
+   grew by a glyph, and a placeholder that reads "e.g. Wrer" is worse than a
+   button that sits a little tighter. */
+.panel-new .ic-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.panel-new .ic-btn {
+  flex: none;
+  padding: 0 var(--space-4);
+}
+
+.panel-new-preview {
+  margin: 0;
+  padding: 6px 10px 0;
+}
+
+/* One primary button leading a panel that has no list to lead — the cast and
+   the map. Same place, same weight, so the four sections agree. */
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-raised);
+}
+
+.panel-actions .field-hint {
+  margin: 0;
+  padding: var(--space-0);
+}
+
+.panel-new input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 5px 7px;
+}
+
+/* A second create, inside a list rather than leading one: adding a category
+   belongs after the categories it would join. */
+.panel-new.is-inline {
+  padding: 8px 0 0;
+  margin-top: auto;
+  border-bottom: none;
+}
+
+.panel-new .stats-category-input {
+  flex: 0 0 110px;
+}
+
+.panel-new-preview code,
+.stats-foot code {
+  color: var(--text-accent);
+}
+
+/* A catalogue's detail column is a form, and it is read at the same size as
+   the prose beside it. */
+:where(.stats-detail) :where(.ic-input, .ic-select, .ic-textarea) {
+  font-size: var(--text-md);
+  min-width: 0;
+}
+
+.stats-detail textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.stats-detail input:focus,
+.stats-detail select:focus,
+.stats-detail textarea:focus {
+  outline: 1px solid var(--text-accent);
+  border-color: var(--text-accent);
+}
+
+/* A stat's name is an identifier the author could type into ink, so it gets the
+   monospace treatment identifiers get everywhere — not the accent colour, which
+   means "interactive". beats the bare `input` rules above. */
+.stats-name-input {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+/* Where the old name is still used, which a rename does not fix. */
+.name-uses {
+  margin-top: 4px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-inset);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.name-uses ul {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: var(--space-0);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.name-uses li {
+  display: flex;
+  gap: var(--space-4);
+  align-items: baseline;
+  font-size: var(--text-xs);
+}
+
+.name-uses li code {
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-fields {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: var(--space-0);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.custom-fields li {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.custom-add {
+  align-self: flex-start;
+  border-style: dashed;
+  padding: 3px 10px;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.stats-foot {
+  padding: 9px 16px;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  background: var(--surface-raised);
+  border-top: 1px solid var(--border-default);
+}
+
+/* The ink right-click menu -------------------------------------------------- */
+
+/* .ic-menu draws the panel; this one is anchored to the pointer and holds a
+   whole picker, so it takes a size and scrolls. */
+.ink-menu {
+  position: fixed;
+  z-index: 60;
+  width: max-content;
+  min-width: 150px;
+  max-width: 240px;
+  max-height: 330px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+}
+
+/* Filters, previews and configuration controls need the old working width;
+   the initial action list sizes itself only to its labels. */
+.ink-menu.is-picker {
+  width: 290px;
+  max-width: none;
+}
+
+/* Context-menu actions are denser than form controls. The previous control
+   height made a two-item submenu as tall as a small dialog. */
+.ink-menu .ic-menu__item {
+  height: 28px;
+  padding: 0 8px;
+  gap: 7px;
+  font-size: var(--text-xs);
+}
+
+.ink-menu-submenu-mark {
+  margin-left: auto;
+  color: var(--text-faint);
+}
+
+.ink-menu-submenu {
+  position: relative;
+}
+
+/* A real submenu stays beside its parent. The borders overlap by a pixel so
+   there is no dead strip that closes it while the pointer crosses over. */
+.ink-menu-flyout {
+  position: absolute;
+  left: calc(100% - 1px);
+  top: -4px;
+  z-index: 81;
+  display: block;
+  width: 148px;
+  min-width: 148px;
+  max-height: none;
+}
+
+.ink-menu-flyout.is-left {
+  right: calc(100% - 1px);
+  left: auto;
+}
+
+/* The ink name a command will write, shown on the item that writes it. */
+.ic-menu__item code {
+  color: var(--text-accent);
+  font-size: var(--text-xs);
+}
+
+.ink-menu-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding: 3px 8px 6px;
+  border-bottom: 1px solid var(--border-default);
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.ink-menu-filter,
+.ink-menu-amount {
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  background: var(--surface-inset);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 4px 7px;
+  min-width: 0;
+}
+
+.ink-menu-filter {
+  margin: 6px 0 4px;
+}
+
+.ink-menu-filter:focus,
+.ink-menu-amount:focus {
+  outline: 1px solid var(--text-accent);
+  border-color: var(--text-accent);
+}
+
+.ink-menu-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.ink-menu-list h4 {
+  margin: 6px 0 2px;
+  padding: var(--space-0) var(--space-4);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+}
+
+.ink-menu-pick {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 3px 8px;
+}
+
+.ink-menu-pick code {
+  color: var(--text-accent);
+  font-size: var(--text-xs);
+}
+
+.ink-menu-pick span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  text-align: right;
+}
+
+.ink-menu-pick.is-chosen {
+  background: var(--surface-active);
+}
+
+.ink-menu-config {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 6px 2px 0;
+  border-top: 1px solid var(--border-default);
+  margin-top: 4px;
+}
+
+.ink-menu-config select {
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  background: var(--surface-inset);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 3px 5px;
+}
+
+.ink-menu-amount {
+  width: 60px;
+}
+
+/* The clamp the game will apply, which ink cannot express and the author
+   otherwise has no way of seeing while writing the change. */
+.ink-menu-range {
+  flex-basis: 100%;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* What will be written, shown before it is. */
+.ink-menu-apply {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-default);
+}
+
+.ink-menu-apply code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--text-accent);
+}
+
+/* Media --------------------------------------------------------------------- */
+
+.media-dialog {
+  width: min(920px, 100%);
+  height: min(700px, 100%);
+}
+
+.media-master {
+  overflow-y: auto;
+  padding: 10px;
+  gap: var(--space-4);
+  background: var(--surface-inset);
+}
+
+.media-master .ic-input {
+  margin: 0;
+}
+
+.media-detail {
+  gap: var(--space-5);
+  padding: 16px 18px;
+}
+
+:where(.media-detail) :where(.ic-input, .ic-select) {
+  font-size: var(--text-md);
+  min-width: 0;
+}
+
+.media-detail input:focus,
+.media-detail select:focus {
+  outline: 1px solid var(--text-accent);
+  border-color: var(--text-accent);
+}
+
+.media-rows {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-0);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+
+/* The row and its thumbnail became siblings when the thumbnail became a button
+   of its own: a button inside a button is not a thing. */
+.media-rows li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.media-rows li .media-pick {
+  flex: 1;
+  min-width: 0;
+}
+
+.media-pick {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+}
+
+.media-pick-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.media-pick-text code {
+  font-size: var(--text-xs);
+  color: var(--text-accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-pick-text span {
+  font-size: var(--text-2xs);
+  color: var(--text-tertiary);
+}
+
+/* A checkerboard, so a transparent sprite is visible against it. */
+/* .ic-thumb supplies the frame and the transparency checkerboard. A sprite is
+   sized to be recognised in a list, and it must not be cropped to do it. */
+.media-thumb {
+  flex: none;
+  width: 40px;
+  height: 40px;
+}
+
+.media-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.media-missing {
+  font-size: var(--text-md);
+  color: var(--state-error);
+}
+
+.media-variants {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-0);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.media-variants li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.media-variant-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.media-variant-body code {
+  font-size: var(--text-2xs);
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-variant-body .media-tag {
+  color: var(--text-accent);
+}
+
+.media-look-file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.media-look-file select {
+  flex: 1;
+  min-width: 0;
+}
+
+.media-look-file .ic-btn {
+  flex: none;
+}
+
+.media-add {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: 8px;
+}
+
+.media-add input {
+  flex: 0 0 110px;
+}
+
+.media-add select {
+  flex: 1;
+  min-width: 0;
+}
+
+.media-grid {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: var(--space-0);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 10px;
+}
+
+.media-grid li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.media-grid__delete {
+  position: absolute;
+  z-index: 1;
+  top: 5px;
+  right: 5px;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 35%);
+}
+
+.media-grid__delete:hover:not(:disabled) {
+  color: var(--state-error);
+}
+
+.media-grid img {
+  width: 100%;
+  height: 78px;
+  object-fit: contain;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+}
+
+/* A clip has no still to show, so it gets a play mark the same size and shape
+   as the pictures beside it rather than a gap or a broken icon. */
+.media-grid__clip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 78px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+  color: var(--text-tertiary);
+}
+
+.media-grid code {
+  font-size: var(--text-2xs);
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The preview stage --------------------------------------------------------- */
+
+/* The track a scene set. Under the stage rather than in it: there is nothing
+   to look at, and it is the one row here that plays something. */
+.player-music {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-raised);
+  font-size: var(--text-2xs);
+  color: var(--text-tertiary);
+}
+
+.player-music__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.player-music__missing {
+  color: var(--state-error);
+}
+
+/* Which of the two things the preview is playing. Above the stage because it
+   changes what the stage is showing, and quiet because it is a statement of
+   fact with one action on the end of it. */
+.player-where {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-raised);
+  font-size: var(--text-2xs);
+  color: var(--text-tertiary);
+}
+
+.player-where code {
+  color: var(--text-accent);
+}
+
+.stage {
+  position: relative;
+  flex: none;
+  aspect-ratio: 16 / 9;
+  max-height: 46%;
+  overflow: hidden;
+  background: var(--surface-inset);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.stage-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Mirrored, for a place drawn facing the wrong way for the scene. Nothing to
+   restate alongside it: the backdrop fills the frame, so it has no transform of
+   its own for a second declaration to replace. */
+.stage-bg.is-flipped {
+  transform: scaleX(-1);
+}
+
+.stage-bg.is-empty {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--ink-900),
+    var(--ink-900) 10px,
+    var(--ink-850) 10px,
+    var(--ink-850) 20px
+  );
+}
+
+/* Stood on the floor of the frame, which is where a VN puts a sprite. */
+.stage-char {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  max-height: 92%;
+  /* Narrower than before: three of these have to fit beside one another, and a
+     sprite that took most of the frame would cover the two either side. */
+  max-width: 46%;
+  object-fit: contain;
+}
+
+/* Where the tag put them. Not thirds — the outer two sit in from the edge so a
+   wide sprite is not half off the frame, which is also roughly where a visual
+   novel stands somebody. */
+.stage-char.is-left {
+  left: 24%;
+}
+
+.stage-char.is-middle {
+  left: 50%;
+}
+
+.stage-char.is-right {
+  left: 76%;
+}
+
+/* The scene dimmed behind an animation, so it reads as something happening to
+   the scene rather than as a very large person standing in it. White rather
+   than the app's dark scrim: this is the story's frame, not the app's chrome,
+   and a pale wash is what a flashback or a spell looks like. */
+.stage-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: rgb(255 255 255 / 62%);
+}
+
+/* As large as it goes without being stretched.
+
+   The box fills the frame and `contain` fits the picture inside it, which is
+   the part that scales *up* as well as down — `max-width` alone caps a large
+   effect and leaves a small one at its natural size, stranded in the middle of
+   the stage. `contain` also centres what is left over, so a wide effect gets
+   bars above and below and a tall one gets them either side. */
+.stage-anim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Mirrored, for a directional effect drawn the wrong way round. No translate to
+   restate here, unlike a character: this one is centred by its margins. */
+.stage-anim.is-flipped {
+  transform: scaleX(-1);
+}
+
+/* Mirrored, for a sprite drawn facing the wrong way for where she is standing.
+   The translate has to be restated rather than added to, because `transform`
+   is one property and a second declaration would replace the centring.
+
+   Order matters and reads backwards: the mirror happens first, about the
+   element's own centre, so the box does not move; then the same translate
+   centres it on the slot exactly as before. */
+.stage-char.is-flipped {
+  transform: translateX(-50%) scaleX(-1);
+}
+
+.stage-problems {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 5px 8px;
+  font-size: var(--text-2xs);
+  color: var(--state-warning);
+  background: color-mix(in oklab, var(--surface-inset) 80%, transparent);
+}
+
+/* What the tags did that the picture cannot show: who is speaking, and whether
+   the map is reachable from here. Top-left, so it never covers a sprite's face. */
+.stage-notes {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  gap: var(--space-2);
+  padding: 5px 8px;
+}
+
+.stage-notes span {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-2xs);
+  color: var(--text-tertiary);
+  background: color-mix(in oklab, var(--surface-inset) 80%, transparent);
+}
+
+/* One attribute of one NPC. The ink variable it becomes is shown at the end of
+   the row, because an author writing `# npc: abeline affection +2` is spelling
+   out something this row decided. */
+/* min, "to", max, then the bar taking whatever is left. */
+.stat-range {
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.stat-range .ic-input {
+  flex: 0 0 5rem;
+}
+
+.stat-range-meter {
+  flex: 1 1 4rem;
+  min-width: 3rem;
+}
+
+/* The cast is a catalogue like the others, so its master column matches the
+   stats and media ones rather than inventing a third width. */
+.cast-layout {
+  flex: 1;
+  min-height: 0;
+}
+
+.cast-layout .ic-master-detail__master {
+  /* A long ink name should ellipsis inside the row rather than pushing the
+     column sideways. */
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 10px;
+  gap: var(--space-4);
+  background: var(--surface-inset);
+}
+
+.cast-layout .ic-master-detail__detail {
+  gap: var(--space-5);
+  padding: 16px 18px;
+}
+
+.cast-layout .ic-master-detail__detail .ic-pane-header {
+  margin: -16px -18px 0;
+}
+
+/* The bar takes what the row has left, so a wide pane shows more of it and a
+   narrow one still shows the number beside it. */
+.npc-attr-meter {
+  flex: 1 1 4rem;
+  min-width: 3rem;
+}
+
+.npc-attr {
+  display: flex;
+  align-items: center;
+  /* Wraps rather than squeezing. In a dialog this row had 900px; in the Game
+     view it has whatever is left beside the dock, and `min-width: 0` let the
+     key and label collapse to slivers. */
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: 4px;
+}
+
+.npc-attr input[type='text'],
+.npc-attr input:not([type]) {
+  flex: 1 1 7rem;
+  min-width: 5rem;
+}
+
+.npc-attr input[type='number'] {
+  flex: 0 0 4.5rem;
+}
+
+.npc-attr label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.npc-attr code {
+  margin-left: auto;
+  font-size: var(--text-2xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+/* The map is laid out on its picture: "is the sanctum roughly where the sanctum
+   is drawn" is a question about a picture, not about two spinboxes. */
+.map-dialog {
+  max-width: 62rem;
+}
+
+/* The picture is the list, so it gets the room. A map is a landscape — 16:9,
+   usually — and a column down its side is width taken from the one thing being
+   looked at, so the fields go underneath. The picture takes what it needs and
+   the fields take the rest. */
+/* The rail and the picture, side by side. It was the picture over a panel of
+   fields, which cost the map half the pane — see .map-canvas. Wider than a
+   catalogue's master column because it holds a form rather than a list: four
+   numbers of a rectangle and a gate of stacked clauses. */
+.map-layout {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+
+.map-rail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border-hairline);
+  background: var(--surface-pane);
+}
+
+/* Which picture, and adding a place. Both are about the map rather than about
+   any one place, so they stay put while the fields below them scroll. */
+.map-rail__top {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+/* .panel-new draws its own bottom border for a rail that runs straight into a
+   list. Here it is one of two things inside a bordered block. */
+.map-rail__top .panel-new {
+  padding: var(--space-0);
+  border-bottom: 0;
+}
+
+/* Which map is being edited, beside the button that adds one. */
+.map-pick {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.map-pick .ic-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.map-pick .ic-iconbtn {
+  flex: none;
+}
+
+/* Either the map's own fields or the selected place's, never both: 340px will
+   not hold two forms, and two red delete buttons a hand's width apart is how a
+   map gets removed by somebody aiming at a hotspot. */
+.map-rail__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  flex: 1;
+  min-height: 0;
+  padding: 12px 0;
+  overflow-y: auto;
+}
+
+/* Knots, in the shape the plan puts them in.
+
+   A tree of checkboxes rather than a dropdown, because what an author means is
+   "the whole of chapter one" and an alphabetical list of identifiers cannot be
+   asked that. The rail is 340px, so the indent is small and the knot names are
+   allowed to run out rather than wrapping every row to two lines. */
+.knot-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-0);
+}
+
+.knot-list--top {
+  max-height: 22rem;
+  overflow-y: auto;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+  padding: var(--space-2);
+}
+
+/* Nested groups step in; the knots under a chapter step in again, so the three
+   levels read as three without a rule or a marker for each. */
+.knot-group .knot-list {
+  margin-left: var(--space-5);
+}
+
+.knot-group__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.knot-group__head .ic-check {
+  flex: 1;
+  min-width: 0;
+}
+
+/* An act is the heading of its part of the story; a chapter is a row in it. */
+.knot-group--0 > .knot-group__head .ic-check span {
+  font-weight: 600;
+}
+
+.knot-group--1 > .knot-group__head .ic-check span {
+  color: var(--text-secondary);
+}
+
+/* How much of the group is checked. Says more than the indeterminate dash, and
+   says it without a ref on every row to set a DOM property. */
+.knot-count {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A knot is an identifier the author could type into ink, so it is set in mono
+   and allowed to overflow rather than wrap. */
+.knot-row code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+}
+
+/* One decision in two controls: the kind, then what of that kind. The kind is
+   two short words and the name is a list of identifiers, so they are not the
+   same width. */
+.map-dest {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.map-dest > .ic-field__label,
+.map-dest > .ic-hint {
+  grid-column: 1 / -1;
+}
+
+/* The map is a landscape picture: it keeps its own proportions and centres in
+   whatever room the pane has, rather than stretching into a vertical strip. */
+.map-canvas-wrap {
+  display: grid;
+  place-items: start center;
+  min-height: 0;
+  padding: 16px;
+  overflow: auto;
+}
+
+.map-rail__body > :not(.ic-empty) {
+  margin: 0 12px;
+}
+
+/* The four numbers of a rectangle wrap into two pairs rather than one long
+   fall: they are one thing, and the column is not wide enough for a row. */
+.map-box {
+  flex-wrap: wrap;
+}
+
+/* The four numbers of a rectangle, in a row rather than a column: they are one
+   thing, and read as one. */
+.map-box__field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.map-box__field span {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.map-box__field input {
+  width: 5.5rem;
+}
+
+.map-canvas {
+  position: relative;
+  width: 100%;
+  /* The whole pane now. It was capped at 52vh so the fields underneath had
+     room; they are down the side instead, so nothing is below the fold and the
+     picture can be as large as the room allows. */
+  max-height: 100%;
+  max-width: 100%;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface-inset);
+  touch-action: none;
+}
+
+.map-canvas img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+}
+
+.map-canvas > .codex-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  text-align: center;
+}
+
+/* A hotspot is an area now, not a label, so the fill is a tint: you are lining
+   it up with what is under it and cannot do that through an opaque box. The
+   border carries the shape and the label carries its own background. */
+.map-hotspot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-0) var(--space-3);
+  border: 2px solid var(--state-info);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--ink-25);
+  background: color-mix(in oklab, var(--state-info) 18%, transparent);
+  cursor: grab;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.map-hotspot:hover {
+  background: color-mix(in oklab, var(--state-info) 30%, transparent);
+}
+
+/* The label is centred and clipped rather than sizing the box: a hotspot is
+   whatever rectangle was drawn for it, and a long name must not stretch it.
+   It keeps its own background because the fill behind it is a tint, and a map
+   is drawn in whatever colours a map is drawn in. */
+.map-hotspot__label {
+  max-width: 100%;
+  padding: 1px var(--space-3);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--surface-overlay) 88%, transparent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* A place with art is the art. The tint and the border belong to a rectangle
+   standing in for a picture, and there is a picture now — so they go, and what
+   is left is the outline the selection draws and the label. */
+.map-hotspot.has-art {
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+.map-hotspot.has-art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* Fill, not contain: the box is held to the art's own shape, so the two
+     agree and a letterbox would mean the constraint had failed. */
+  object-fit: fill;
+  pointer-events: none;
+}
+
+/* The label sits over the art, where it is the editor's own annotation rather
+   than part of the picture. Dimmed until the place is hovered or selected, so
+   a laid-out map reads as the map. */
+.map-hotspot.has-art .map-hotspot__label {
+  position: relative;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.map-hotspot.has-art:hover .map-hotspot__label,
+.map-hotspot.has-art.is-selected .map-hotspot__label {
+  opacity: 1;
+}
+
+/* Gated places are drawn the way the game draws them, so the map reads the same
+   here as it will there. */
+.map-hotspot.is-gated {
+  border-color: var(--ink-500);
+  border-style: dashed;
+  color: var(--text-tertiary);
+  background: color-mix(in oklab, var(--ink-500) 14%, transparent);
+}
+
+/* A place that opens another map rather than travelling into the story. Told
+   apart on the picture because the two do very different things to a reader,
+   and the label alone says nothing about which. */
+.map-hotspot.is-doorway {
+  border-color: var(--accent-branch);
+  background: color-mix(in oklab, var(--accent-branch) 14%, transparent);
+}
+
+.map-hotspot.is-selected {
+  outline: 2px solid var(--text-accent);
+  outline-offset: 2px;
+}
+
+/* The handles ride on top of the selected place rather than inside it, so a
+   corner is still grabbable on a hotspot only a few pixels tall. */
+.map-handles {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.map-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border: 1px solid var(--surface-overlay);
+  border-radius: var(--radius-xs);
+  background: var(--text-accent);
+  pointer-events: auto;
+}
+
+.map-handle--nw { top: 0; left: 0; cursor: nwse-resize; }
+.map-handle--n { top: 0; left: 50%; cursor: ns-resize; }
+.map-handle--ne { top: 0; left: 100%; cursor: nesw-resize; }
+.map-handle--e { top: 50%; left: 100%; cursor: ew-resize; }
+.map-handle--se { top: 100%; left: 100%; cursor: nwse-resize; }
+.map-handle--s { top: 100%; left: 50%; cursor: ns-resize; }
+.map-handle--sw { top: 100%; left: 0; cursor: nesw-resize; }
+.map-handle--w { top: 50%; left: 0; cursor: ew-resize; }
+
+/* The rectangle under the pointer while it is being drawn. Nothing is written
+   until the button comes up, so this is the only sign it is happening. */
+.map-drawing {
+  position: absolute;
+  border: 2px dashed var(--text-accent);
+  border-radius: var(--radius-sm);
+  background: var(--state-info-bg);
+  pointer-events: none;
+}
+
+/* Drawing is the default gesture, so the picture says so. A place says grab. */
+.map-canvas {
+  cursor: crosshair;
+}
+
+.condition-clause {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: 4px;
+}
+
+.condition-clause select,
+.condition-clause input {
+  min-width: 0;
+}
+
+.condition-clause input[type='number'] {
+  flex: 0 0 5rem;
+}
+
+.condition-join {
+  display: block;
+  margin-bottom: 6px;
+}
+} /* @layer app */

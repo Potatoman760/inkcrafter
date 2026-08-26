@@ -1,0 +1,52 @@
+/* Raw palette. Nothing in a component should reference these directly —
+   use the semantic aliases in semantic.css. Two families only:
+   an ink-toned cool neutral ramp, and five accents that share
+   lightness and chroma in oklch and differ only in hue. */
+:root {
+  /* Neutral ramp — cool, very slightly blue, never pure grey */
+  --ink-1000: #07080a;
+  --ink-975: #0b0d10;
+  --ink-950: #101317;
+  --ink-900: #14181d;
+  --ink-850: #191e24;
+  --ink-800: #1e242b;
+  --ink-750: #252c35;
+  --ink-700: #2c343e;
+  --ink-600: #3a4450;
+  --ink-500: #4e5a68;
+  --ink-400: #667080;
+  --ink-300: #8d97a3;
+  --ink-200: #b6bec8;
+  --ink-100: #d7dce2;
+  --ink-50: #e9ecf0;
+  --ink-25: #f4f6f8;
+  --ink-0: #ffffff;
+
+  /* Accents. One lightness, one chroma, five hues — so nothing shouts
+     louder than anything else and any pair can sit side by side. */
+  --hue-signal: 252; /* primary: selection, focus, active tab */
+  --hue-branch: 168; /* choices, diverts, branching structure */
+  --hue-alert: 25;   /* errors, destructive */
+  --hue-caution: 78; /* warnings, todo */
+  --hue-good: 150;   /* compiled, saved, ok */
+  /* Syntax-only hues. Code highlighting needs more distinguishable colours
+     than the UI does; they keep the same lightness and chroma, so the
+     editor never out-shouts the interface. */
+  --hue-code-keyword: 210;
+  --hue-code-operator: 300;
+  --hue-code-label: 330;
+
+  --accent-signal: oklch(0.74 0.12 var(--hue-signal));
+  --accent-branch: oklch(0.74 0.12 var(--hue-branch));
+  --accent-alert: oklch(0.72 0.15 var(--hue-alert));
+  --accent-caution: oklch(0.79 0.11 var(--hue-caution));
+  --accent-good: oklch(0.75 0.12 var(--hue-good));
+
+  /* Dimmed and strengthened variants, same hue */
+  --accent-signal-strong: oklch(0.66 0.15 var(--hue-signal));
+  --accent-signal-quiet: oklch(0.74 0.12 var(--hue-signal) / 0.16);
+  --accent-branch-quiet: oklch(0.74 0.12 var(--hue-branch) / 0.16);
+  --accent-alert-quiet: oklch(0.72 0.15 var(--hue-alert) / 0.16);
+  --accent-caution-quiet: oklch(0.79 0.11 var(--hue-caution) / 0.16);
+  --accent-good-quiet: oklch(0.75 0.12 var(--hue-good) / 0.16);
+}

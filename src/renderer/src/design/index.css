@@ -1,0 +1,33 @@
+/**
+ * The design system, in one import. `main.tsx` loads this before styles.css.
+ *
+ * Two layers, in this order: everything here is `design`, and styles.css is
+ * `app`. A later layer always wins, so the app's own rules beat the resets in
+ * tokens/base.css no matter which file the bundler emits first.
+ *
+ * Note the `layer(design)` form. @import must sit at the top of a stylesheet —
+ * one written inside a `@layer design { … }` block is invalid and gets dropped
+ * silently, which builds clean and ships an app with no tokens at all.
+ */
+/* Three layers. `reset` is below `design` so the app's bare-element rules —
+   what a plain <button> looks like — never outrank an .ic-* component class.
+   `app` is above both, so a product rule still wins where it has to. */
+@layer reset, design, app;
+
+/* Order is load-bearing: the raw ramp before the semantic aliases that
+   reference it, and base.css last because it consumes both. */
+@import './fonts.css' layer(design);
+@import './tokens/colors.css' layer(design);
+@import './tokens/typography.css' layer(design);
+@import './tokens/spacing.css' layer(design);
+@import './tokens/shape.css' layer(design);
+@import './tokens/motion.css' layer(design);
+@import './tokens/semantic.css' layer(design);
+@import './tokens/base.css' layer(design);
+
+/* The component layer: .ic-* classes, usable with or without React. */
+@import './components/controls.css' layer(design);
+@import './components/data.css' layer(design);
+@import './components/navigation.css' layer(design);
+@import './components/feedback.css' layer(design);
+@import './components/overlays.css' layer(design);

@@ -1,0 +1,128 @@
+/* The layer components actually use. Dark is the default theme;
+   [data-theme="light"] on <html> or any container flips it. */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface-canvas: var(--ink-1000);
+  --surface-pane: var(--ink-950);
+  --surface-raised: var(--ink-900);
+  --surface-overlay: var(--ink-850);
+  --surface-inset: var(--ink-975);
+  --surface-hover: var(--ink-850);
+  --surface-active: var(--ink-800);
+  --surface-selected: var(--ink-800);
+  --surface-scrim: rgb(4 5 7 / 0.62);
+
+  --border-hairline: var(--ink-850);
+  --border-default: var(--ink-800);
+  --border-strong: var(--ink-700);
+  --border-focus: var(--accent-signal);
+
+  --text-primary: var(--ink-50);
+  --text-secondary: var(--ink-200);
+  --text-tertiary: var(--ink-300);
+  --text-faint: var(--ink-400);
+  --text-inverse: var(--ink-1000);
+  --text-accent: var(--accent-signal);
+  --text-link: var(--accent-signal);
+
+  --state-error: var(--accent-alert);
+  --state-warning: var(--accent-caution);
+  --state-ok: var(--accent-good);
+  --state-info: var(--accent-signal);
+  --state-error-bg: var(--accent-alert-quiet);
+  --state-warning-bg: var(--accent-caution-quiet);
+  --state-ok-bg: var(--accent-good-quiet);
+  --state-info-bg: var(--accent-signal-quiet);
+
+  --focus-ring: var(--accent-signal);
+  --selection-bg: oklch(0.74 0.12 var(--hue-signal) / 0.26);
+
+  /* Ink source highlighting. Names match the lezer tags the app's
+     StreamLanguage emits in editor/inkLanguage.ts, one token per tag:
+     prose itself is deliberately unstyled so the story stays readable. */
+  --syntax-text: var(--ink-100);          /* prose — tag: none */
+  --syntax-heading: var(--accent-signal); /* === knot ===, = stitch */
+  --syntax-keyword: oklch(0.74 0.12 var(--hue-code-keyword)); /* * + - bullets, VAR, INCLUDE */
+  --syntax-link: var(--accent-branch);    /* -> ->-> <- <> */
+  --syntax-operator: oklch(0.74 0.12 var(--hue-code-operator)); /* ~ and { } | */
+  --syntax-meta: var(--accent-caution);   /* # tags and TODO: */
+  --syntax-label: oklch(0.74 0.12 var(--hue-code-label));       /* (choice_label) */
+  --syntax-string: var(--accent-good);
+  --syntax-number: var(--accent-alert);   /* numbers and true/false */
+  --syntax-comment: var(--ink-400);
+  --syntax-mention: var(--accent-signal); /* codex name, underlined */
+  --syntax-gutter: var(--ink-500);
+  --editor-active-line: rgb(255 255 255 / 0.028);
+
+  /* Kept as aliases: earlier drafts and the current app use these names. */
+  --syntax-knot: var(--syntax-heading);
+  --syntax-divert: var(--syntax-link);
+  --syntax-choice: var(--syntax-keyword);
+  --syntax-logic: var(--syntax-operator);
+  --syntax-tag: var(--syntax-meta);
+}
+
+:root[data-theme="light"],
+[data-theme="light"] {
+  color-scheme: light;
+
+  --surface-canvas: var(--ink-25);
+  --surface-pane: #fbfcfd;
+  --surface-raised: var(--ink-0);
+  --surface-overlay: var(--ink-0);
+  --surface-inset: #eef1f4;
+  --surface-hover: #eef1f5;
+  --surface-active: #e6eaf0;
+  --surface-selected: #e4eaf3;
+  --surface-scrim: rgb(16 19 23 / 0.28);
+
+  --border-hairline: #e6e9ee;
+  --border-default: #dbe0e7;
+  --border-strong: #c3cad4;
+
+  --text-primary: #101418;
+  --text-secondary: #2f3742;
+  --text-tertiary: #5c6673;
+  --text-faint: #7d8794;
+  --text-inverse: var(--ink-0);
+  --text-accent: oklch(0.52 0.14 var(--hue-signal));
+  --text-link: oklch(0.52 0.14 var(--hue-signal));
+
+  --state-error: oklch(0.52 0.18 var(--hue-alert));
+  --state-warning: oklch(0.55 0.13 var(--hue-caution));
+  --state-ok: oklch(0.5 0.13 var(--hue-good));
+  --state-info: oklch(0.52 0.14 var(--hue-signal));
+  --state-error-bg: oklch(0.52 0.18 var(--hue-alert) / 0.1);
+  --state-warning-bg: oklch(0.55 0.13 var(--hue-caution) / 0.12);
+  --state-ok-bg: oklch(0.5 0.13 var(--hue-good) / 0.1);
+  --state-info-bg: oklch(0.52 0.14 var(--hue-signal) / 0.1);
+
+  --focus-ring: oklch(0.55 0.15 var(--hue-signal));
+  --selection-bg: oklch(0.55 0.15 var(--hue-signal) / 0.18);
+
+  --syntax-text: #101418;
+  --syntax-heading: oklch(0.5 0.15 var(--hue-signal));
+  --syntax-keyword: oklch(0.5 0.14 var(--hue-code-keyword));
+  --syntax-link: oklch(0.48 0.12 var(--hue-branch));
+  --syntax-operator: oklch(0.5 0.14 var(--hue-code-operator));
+  --syntax-meta: oklch(0.5 0.12 var(--hue-caution));
+  --syntax-label: oklch(0.5 0.14 var(--hue-code-label));
+  --syntax-string: oklch(0.46 0.12 var(--hue-good));
+  --syntax-number: oklch(0.52 0.16 var(--hue-alert));
+  --syntax-comment: #8d97a3;
+  --syntax-mention: oklch(0.5 0.15 var(--hue-signal));
+  --syntax-gutter: #a8b1bc;
+  --syntax-knot: var(--syntax-heading);
+  --syntax-divert: var(--syntax-link);
+  --syntax-choice: var(--syntax-keyword);
+  --syntax-logic: var(--syntax-operator);
+  --syntax-tag: var(--syntax-meta);
+  --editor-active-line: rgb(16 19 23 / 0.035);
+
+  --shadow-raised: 0 1px 2px rgb(16 19 23 / 0.08);
+  --shadow-pop: 0 8px 24px -6px rgb(16 19 23 / 0.18), 0 1px 2px rgb(16 19 23 / 0.1);
+  --shadow-dialog: 0 24px 60px -12px rgb(16 19 23 / 0.24), 0 2px 6px rgb(16 19 23 / 0.12);
+  --shadow-inset-top: inset 0 1px 0 rgb(255 255 255 / 0.6);
+}

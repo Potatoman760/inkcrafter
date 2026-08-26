@@ -1,0 +1,5 @@
+/* IBM Plex is the whole type system: Sans for the interface, Mono for ink
+   source and any generated identifier, Serif for the manuscript reading view.
+   Served from Google Fonts. Swap these @font-face-equivalent imports for local
+   woff2 files before shipping an offline Electron build. */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap");

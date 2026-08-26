@@ -1,0 +1,21 @@
+<!-- @dsCard group="Brand" viewport="700x150" subtitle="Panels square, floating things rounded" name="Radii" -->
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css">
+<style>
+body{margin:0;padding:14px 16px;background:var(--surface-pane);font-family:var(--font-ui);font-size:var(--text-sm)}
+.grid{display:flex;flex-wrap:wrap;gap:10px}
+.sw{display:flex;flex-direction:column;gap:5px;min-width:88px}
+.sw i{display:block;height:40px;border-radius:var(--radius-md);border:1px solid var(--border-hairline)}
+.sw b{font-weight:var(--weight-medium);font-size:var(--text-xs);color:var(--text-secondary)}
+.sw code{font-size:var(--text-2xs);color:var(--text-faint)}
+.stack{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;align-items:center;gap:12px}
+.k{font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)}
+
+</style></head>
+<body><div class="grid">
+<div class="sw"><i style="background:var(--surface-active);border-radius:var(--radius-xs)"></i><b>xs</b><code>--radius-xs</code></div><div class="sw"><i style="background:var(--surface-active);border-radius:var(--radius-sm)"></i><b>sm</b><code>--radius-sm</code></div><div class="sw"><i style="background:var(--surface-active);border-radius:var(--radius-md)"></i><b>md</b><code>--radius-md</code></div><div class="sw"><i style="background:var(--surface-active);border-radius:var(--radius-lg)"></i><b>lg</b><code>--radius-lg</code></div>
+<div class="sw"><i style="background:var(--surface-active);border-radius:var(--radius-pill)"></i><b>pill</b><code>--radius-pill</code></div>
+</div>
+<p class="k" style="margin:12px 0 0">Panes and toolbars have radius 0 where they meet the window frame.</p></body></html>

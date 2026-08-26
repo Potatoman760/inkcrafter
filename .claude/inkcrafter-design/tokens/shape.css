@@ -1,0 +1,22 @@
+:root {
+  /* Small radii only. Panels are square where they meet the window;
+     things that float are rounded. */
+  --radius-none: 0;
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
+  --radius-pill: 999px;
+
+  --border-width: 1px;
+  --border-width-strong: 2px;
+  --focus-width: 2px;
+  --focus-offset: 1px;
+
+  /* One shadow per elevation class, all neutral-black, none coloured. */
+  --shadow-none: none;
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.28);
+  --shadow-pop: 0 6px 20px -4px rgb(0 0 0 / 0.5), 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-dialog: 0 24px 60px -12px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.35);
+  --shadow-inset-top: inset 0 1px 0 rgb(255 255 255 / 0.03);
+}

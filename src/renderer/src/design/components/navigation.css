@@ -1,0 +1,232 @@
+/* Navigation and the command surfaces. This group is the answer to
+   "buttons are scattered": there are exactly three places a command may
+   live — the window toolbar, a pane header, or the command palette. */
+
+.ic-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  height: var(--toolbar-height);
+  padding: 0 var(--space-5);
+  border-bottom: var(--border-width) solid var(--border-hairline);
+  background: var(--surface-pane);
+  font-size: var(--text-sm);
+  -webkit-app-region: drag;
+}
+
+.ic-toolbar > * { -webkit-app-region: no-drag; }
+.ic-toolbar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-primary);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+.ic-toolbar__spacer { flex: 1; }
+.ic-toolbar__file {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.ic-toolbar__group { display: flex; align-items: center; gap: var(--space-1); }
+.ic-toolbar__rule { width: 1px; height: 16px; background: var(--border-default); }
+
+/* Tabs. Underline for the primary view switch, pill-less text for panes. */
+.ic-tabs { display: flex; align-items: stretch; gap: var(--space-1); }
+
+.ic-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--tabstrip-height);
+  padding: 0 var(--space-5);
+  border: 0;
+  background: transparent;
+  color: var(--text-tertiary);
+  font: var(--weight-medium) var(--text-sm) / 1 var(--font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: var(--transition-hover);
+}
+
+.ic-tab:hover { color: var(--text-primary); }
+.ic-tab.is-active { color: var(--text-primary); }
+
+.ic-tab.is-active::after {
+  content: "";
+  position: absolute;
+  left: var(--space-4);
+  right: var(--space-4);
+  bottom: 0;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-signal);
+}
+
+.ic-tabs--pane {
+  height: var(--tabstrip-height);
+  padding: 0 var(--space-3);
+  border-bottom: var(--border-width) solid var(--border-hairline);
+  background: var(--surface-pane);
+  /* A narrow pane scrolls its strip rather than clipping the actions at
+     the right end. */
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ic-tabs--pane::-webkit-scrollbar { height: 0; }
+
+.ic-tabs--pane .ic-tab {
+  padding: 0 var(--space-4);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.ic-tabs--sub .ic-tab { height: var(--control-md); font-size: var(--text-xs); text-transform: none; letter-spacing: 0; }
+.ic-tabs__trail { margin-left: auto; display: flex; align-items: center; gap: var(--space-1); padding-right: var(--space-2); }
+
+/* Pane header: the pane's name on the left, its own actions on the right.
+   Nothing global is allowed in here. */
+.ic-pane-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--tabstrip-height);
+  padding: 0 var(--space-3) 0 var(--space-5);
+  border-bottom: var(--border-width) solid var(--border-hairline);
+  background: var(--surface-pane);
+}
+
+.ic-pane-header__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.ic-pane-header__actions { display: flex; align-items: center; gap: var(--space-1); }
+
+/* Group label inside a scrolling list. */
+.ic-group-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-5) var(--space-2);
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+/* Splitter between panes. 5px hit area, 1px of ink. */
+.ic-splitter {
+  flex: none;
+  width: var(--splitter-width);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: col-resize;
+  position: relative;
+}
+
+.ic-splitter::after {
+  content: "";
+  position: absolute;
+  inset: 0 2px;
+  background: var(--border-hairline);
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+
+.ic-splitter:hover::after,
+.ic-splitter.is-dragging::after { background: var(--accent-signal); }
+
+/* Command palette — Ctrl/Cmd+K. Every command in the app is reachable
+   from here, which is what lets toolbars stay short. */
+.ic-palette {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 520px;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-dialog);
+  overflow: hidden;
+}
+
+.ic-palette__input {
+  width: 100%;
+  height: var(--control-lg);
+  padding: 0 var(--space-5);
+  border: 0;
+  border-bottom: var(--border-width) solid var(--border-hairline);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-lg);
+}
+
+.ic-palette__input:focus { outline: none; }
+.ic-palette__list {
+  flex: 1;
+  min-height: 80px;
+  height: 320px;
+  overflow: auto;
+  padding: var(--space-2);
+}
+
+.ic-palette__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  height: var(--control-lg);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ic-palette__item.is-highlighted { background: var(--surface-hover); color: var(--text-primary); }
+.ic-palette__item .ic-kbd { margin-left: auto; }
+.ic-palette__section {
+  padding: var(--space-4) var(--space-4) var(--space-2);
+  color: var(--text-faint);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.ic-kbd {
+  display: inline-flex;
+  align-items: center;
+  height: 17px;
+  padding: 0 var(--space-2);
+  border: var(--border-width) solid var(--border-default);
+  border-radius: var(--radius-xs);
+  background: var(--surface-inset);
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+}

@@ -1,0 +1,4 @@
+# Normalise to LF in the repository; ink is line-structure-sensitive and the
+# project is built on Windows, macOS and Linux.
+* text=auto eol=lf
+*.ink text eol=lf

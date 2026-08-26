@@ -1,0 +1,24 @@
+<!-- @dsCard group="App" viewport="1440x900" subtitle="Media, stats & items, cast and map catalogues" name="Game view" -->
+<!-- @startingPoint section="App" subtitle="Media, stats & items, cast and map catalogues" viewport="1440x900" -->
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>InkCrafter — Game view</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  #root { position: absolute; inset: 0; }
+  .kit-theme { position: fixed; right: 10px; top: 42px; z-index: 70; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>window.KIT_VIEW = 'game';</script>
+<script src="kit-boot.js"></script>
+<button class="kit-theme ic-btn ic-btn--xs" type="button">Theme</button>
+</body>
+</html>

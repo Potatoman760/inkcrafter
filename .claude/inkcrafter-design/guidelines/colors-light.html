@@ -1,0 +1,22 @@
+<!-- @dsCard group="Colors" viewport="700x170" subtitle="Same tokens, flipped by data-theme="light"" name="Light theme" -->
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css">
+<style>
+body{margin:0;padding:14px 16px;background:var(--surface-pane);font-family:var(--font-ui);font-size:var(--text-sm)}
+.grid{display:flex;flex-wrap:wrap;gap:10px}
+.sw{display:flex;flex-direction:column;gap:5px;min-width:88px}
+.sw i{display:block;height:40px;border-radius:var(--radius-md);border:1px solid var(--border-hairline)}
+.sw b{font-weight:var(--weight-medium);font-size:var(--text-xs);color:var(--text-secondary)}
+.sw code{font-size:var(--text-2xs);color:var(--text-faint)}
+.stack{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;align-items:center;gap:12px}
+.k{font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)}
+
+</style></head>
+<body><div data-theme="light" style="padding:12px;border-radius:var(--radius-md);background:var(--surface-canvas)">
+<div class="grid">
+<div class="sw"><i style="background:var(--surface-canvas);"></i><b>canvas</b><code>--surface-canvas</code></div><div class="sw"><i style="background:var(--surface-pane);"></i><b>pane</b><code>--surface-pane</code></div><div class="sw"><i style="background:var(--surface-raised);"></i><b>raised</b><code>--surface-raised</code></div><div class="sw"><i style="background:var(--surface-inset);"></i><b>inset</b><code>--surface-inset</code></div><div class="sw"><i style="background:var(--surface-selected);"></i><b>selected</b><code>--surface-selected</code></div>
+</div>
+<p style="margin:10px 0 0;color:var(--text-tertiary);font-size:var(--text-xs)">Accents drop to lightness 0.52 so they hold contrast on paper-white.</p>
+</div></body></html>

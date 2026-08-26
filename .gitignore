@@ -1,0 +1,15 @@
+node_modules/
+out/
+dist/
+release/
+
+# The workspace: stories, codex entries and anything else created in the app.
+# Keep the directory, ignore its contents.
+data/*
+!data/.gitkeep
+*.tsbuildinfo
+.env
+.env.local
+.claude/settings.local.json
+.DS_Store
+Thumbs.db

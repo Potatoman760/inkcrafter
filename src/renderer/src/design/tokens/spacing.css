@@ -1,0 +1,36 @@
+:root {
+  /* 2px base. A compact IDE needs the half-step; 8px grids force
+     panels apart in a way that costs a visible line of ink. */
+  --space-0: 0;
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 12px;
+  --space-6: 16px;
+  --space-7: 20px;
+  --space-8: 24px;
+  --space-9: 32px;
+  --space-10: 40px;
+  --space-12: 56px;
+
+  /* Control heights. Every clickable row, input and button lands on one
+     of these four — that is what stops a toolbar from looking scattered. */
+  --control-xs: 20px;
+  --control-sm: 24px;
+  --control-md: 28px;
+  --control-lg: 32px;
+
+  --gutter-pane: 10px;
+  --gutter-dense: 6px;
+  --gutter-page: 20px;
+
+  --splitter-width: 5px;
+  --toolbar-height: 36px;
+  --tabstrip-height: 30px;
+  --statusbar-height: 24px;
+
+  --measure-read: 62ch;
+  --pane-side-default: 420px;
+  --pane-sidebar-default: 232px;
+}

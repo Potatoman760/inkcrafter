@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "strict": true,
+    // See tsconfig.node.json: this caught a crash that shipped.
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    // `shared/copy.json` is imported for its literal key types, so a mistyped
+    // key is a build failure rather than a blank tooltip at runtime.
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "paths": {
+      "@shared/*": ["./src/shared/*"],
+      "@/*": ["./src/renderer/src/*"]
+    }
+  },
+  // The token drift guard reads the token CSS off disk, so it is a node test
+  // living in renderer territory. tsconfig.node.json typechecks it instead;
+  // pulling "node" types in here would let renderer code reach for them too,
+  // and the renderer is sandboxed on purpose.
+  "exclude": ["src/renderer/src/design/tokens.test.ts"],
+  "include": [
+    "src/renderer/src/**/*",
+    "src/preload/index.d.ts",
+    "src/shared/**/*",
+    "src/test/**/*"
+  ]
+}

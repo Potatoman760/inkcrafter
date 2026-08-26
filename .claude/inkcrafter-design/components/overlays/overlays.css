@@ -1,0 +1,113 @@
+/* Everything that floats: dialogs, context menus, popovers. */
+
+.ic-scrim {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-9);
+  background: var(--surface-scrim);
+  backdrop-filter: blur(2px);
+  z-index: 50;
+}
+
+.ic-dialog {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 720px;
+  max-height: 100%;
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-dialog);
+  overflow: hidden;
+}
+
+.ic-dialog--sm { max-width: 440px; }
+.ic-dialog--lg { max-width: 960px; height: 100%; }
+
+.ic-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-5) var(--space-5) var(--space-6);
+  border-bottom: var(--border-width) solid var(--border-hairline);
+}
+
+.ic-dialog__title { flex: 1; margin: 0; color: var(--text-primary); font-size: var(--text-lg); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-tight); }
+.ic-dialog__subtitle { color: var(--text-faint); font-family: var(--font-mono); font-size: var(--text-xs); }
+.ic-dialog__body { flex: 1; min-height: 0; overflow: auto; padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-6); }
+.ic-dialog__body--flush { padding: 0; }
+
+/* Actions bar. Primary sits right, destructive sits left and alone. */
+.ic-dialog__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  border-top: var(--border-width) solid var(--border-hairline);
+  background: var(--surface-pane);
+}
+
+.ic-dialog__footer .ic-spacer { flex: 1; }
+
+/* Master–detail, the layout every catalogue in the app uses. */
+.ic-master-detail { display: grid; grid-template-columns: 240px 1fr; min-height: 0; flex: 1; }
+.ic-master-detail__master { display: flex; flex-direction: column; min-height: 0; border-right: var(--border-width) solid var(--border-hairline); background: var(--surface-pane); }
+.ic-master-detail__list { flex: 1; overflow: auto; padding: var(--space-2); }
+.ic-master-detail__detail { display: flex; flex-direction: column; gap: var(--space-6); min-height: 0; overflow: auto; padding: var(--space-6); }
+
+/* Context menu. Also the shape of the ink right-click menu. */
+.ic-menu {
+  min-width: 232px;
+  max-width: 340px;
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-pop);
+  font-size: var(--text-sm);
+}
+
+.ic-menu__label {
+  padding: var(--space-3) var(--space-4) var(--space-2);
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.ic-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  height: var(--control-md);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font: var(--text-sm) / 1 var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ic-menu__item:hover:not(:disabled) { background: var(--surface-hover); color: var(--text-primary); }
+.ic-menu__item:disabled { color: var(--text-faint); cursor: default; }
+.ic-menu__item code { margin-left: auto; color: var(--text-faint); font-size: var(--text-2xs); }
+.ic-menu__item--danger { color: var(--state-error); }
+.ic-menu__item--danger:hover:not(:disabled) { background: var(--state-error-bg); color: var(--state-error); }
+.ic-menu__sep { height: 1px; margin: var(--space-2) var(--space-3); background: var(--border-hairline); }
+
+/* Popover: an anchored panel, used by the model picker and filters. */
+.ic-popover {
+  min-width: 240px;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-pop);
+}

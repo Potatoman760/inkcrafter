@@ -1,0 +1,16 @@
+/* InkCrafter design system — global entry point.
+   Consumers link this one file. Import order matters: fonts, then raw
+   values, then the semantic aliases, then the component layer. */
+@import "./tokens/fonts.css";
+@import "./tokens/colors.css";
+@import "./tokens/typography.css";
+@import "./tokens/spacing.css";
+@import "./tokens/shape.css";
+@import "./tokens/motion.css";
+@import "./tokens/semantic.css";
+@import "./tokens/base.css";
+@import "./components/controls/controls.css";
+@import "./components/data/data.css";
+@import "./components/navigation/navigation.css";
+@import "./components/feedback/feedback.css";
+@import "./components/overlays/overlays.css";

@@ -1,0 +1,21 @@
+<!-- @dsCard group="Brand" viewport="700x170" subtitle="Two signals, both required for keyboard use" name="Focus & selection" -->
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css">
+<style>
+body{margin:0;padding:14px 16px;background:var(--surface-pane);font-family:var(--font-ui);font-size:var(--text-sm)}
+.grid{display:flex;flex-wrap:wrap;gap:10px}
+.sw{display:flex;flex-direction:column;gap:5px;min-width:88px}
+.sw i{display:block;height:40px;border-radius:var(--radius-md);border:1px solid var(--border-hairline)}
+.sw b{font-weight:var(--weight-medium);font-size:var(--text-xs);color:var(--text-secondary)}
+.sw code{font-size:var(--text-2xs);color:var(--text-faint)}
+.stack{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;align-items:center;gap:12px}
+.k{font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)}
+
+</style></head>
+<body><div class="stack">
+<div class="row"><input class="ic-input" style="width:200px" value="focused input" readonly autofocus><span class="k">2px --focus-ring, 1px offset</span></div>
+<div class="row" style="width:280px"><button class="ic-row is-selected"><span class="ic-row__body"><span class="ic-row__name">selected row</span></span></button></div>
+<p class="k" style="margin:0">Selection = surface change + 2px left marker. Focus = ring. A row can be selected without being focused, and both must be visible at once.</p>
+</div></body></html>

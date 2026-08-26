@@ -1,0 +1,22 @@
+<!-- @dsCard group="Brand" viewport="700x150" subtitle="Under 150ms, no bounce, no transforms on press" name="Motion" -->
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css">
+<style>
+body{margin:0;padding:14px 16px;background:var(--surface-pane);font-family:var(--font-ui);font-size:var(--text-sm)}
+.grid{display:flex;flex-wrap:wrap;gap:10px}
+.sw{display:flex;flex-direction:column;gap:5px;min-width:88px}
+.sw i{display:block;height:40px;border-radius:var(--radius-md);border:1px solid var(--border-hairline)}
+.sw b{font-weight:var(--weight-medium);font-size:var(--text-xs);color:var(--text-secondary)}
+.sw code{font-size:var(--text-2xs);color:var(--text-faint)}
+.stack{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;align-items:center;gap:12px}
+.k{font-family:var(--font-mono);font-size:var(--text-2xs);color:var(--text-faint)}
+
+</style></head>
+<body><div class="stack">
+<div class="row"><code class="k">--dur-fast 90ms</code><span style="color:var(--text-tertiary)">hover, colour changes</span></div>
+<div class="row"><code class="k">--dur-base 140ms</code><span style="color:var(--text-tertiary)">popovers, menus, tab content</span></div>
+<div class="row"><code class="k">--dur-slow 220ms</code><span style="color:var(--text-tertiary)">toasts, dialog entry</span></div>
+<div class="row"><code class="k">--ease-out</code><span style="color:var(--text-tertiary)">cubic-bezier(.2,.7,.3,1) — everything</span></div>
+</div></body></html>
