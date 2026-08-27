@@ -161,7 +161,15 @@ export function railRows(scene: SectionScene, files: MediaFile[]): RailRow[] {
       here: declaresKind(scene, 'music')
     })
   } else if (declaresKind(scene, 'music')) {
-    rows.push({ key: 'music', icon: 'music', label: 'music stopped', here: true })
+    rows.push({
+      key: 'music',
+      icon: 'music',
+      label: 'music stopped',
+      // How it stopped, when it was told to take its time. A cut says nothing,
+      // because that is what stopping has always meant.
+      detail: after.musicFade > 0 ? `over ${after.musicFade}s` : undefined,
+      here: true
+    })
   }
 
   if (after.speaker) {

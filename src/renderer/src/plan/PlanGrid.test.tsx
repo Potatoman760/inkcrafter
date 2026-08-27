@@ -191,6 +191,26 @@ describe('PlanGrid', () => {
     expect(status.closest('.ic-card__head')).toBeNull()
   })
 
+  /**
+   * A Scene says how far along it is the same way the chapter holding it does.
+   * The colour is CSS, so what is pinned here is the hook it hangs on — and
+   * that a Scene nobody has set a status on carries no hook at all, rather than
+   * an empty one that would draw a line in the fallback colour.
+   */
+  it('marks a Scene with its status, and leaves one without alone', () => {
+    const plan = planWithScenes()
+    const scenes = plan.nodes[0]!.children[0]!.children
+    scenes[0]!.status = 'drafting'
+
+    grid(plan)
+
+    const drafting = screen.getByRole('button', { name: /^Opening/ }).closest('.plan-scene')!
+    const unset = screen.getByRole('button', { name: /^The choice/ }).closest('.plan-scene')!
+
+    expect(drafting).toHaveAttribute('data-status', 'drafting')
+    expect(unset).not.toHaveAttribute('data-status')
+  })
+
   it('edits a chapter title and summary through the card', async () => {
     const { onChange } = grid()
 

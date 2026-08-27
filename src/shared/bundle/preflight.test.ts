@@ -10,7 +10,7 @@ import {
   type MapLocation
 } from './mapDoc'
 import type { GalleryDocument } from './galleryDoc'
-import { COMBATANT_STATES, newCombatMinigame } from './minigameDoc'
+import { COMBATANT_STATES, newCombatMinigame, newQuickhandsMinigame } from './minigameDoc'
 import { preflight, type PreflightInput } from './preflight'
 
 /**
@@ -291,6 +291,31 @@ describe('combat backgrounds', () => {
     combat.background = { assetId: background.id, variantId: 'missing' }
     expect(check('', { media, stats, minigames: { version: 1, minigames: [combat] } })).toContain(
       "Courtyard guard's background picture is no longer in the media catalogue."
+    )
+  })
+})
+
+describe('quick-hands configuration', () => {
+  it('accepts optional animation art and reports a stale or unsuitable look', () => {
+    let media = emptyMedia()
+    const token = newAsset('Guild token', 'animation')
+    const gold = newVariant('gold', 'animations/guild_token/gold.png')
+    media = addAsset(media, token)
+    media = addVariant(media, token.id, gold)
+
+    const quickhands = newQuickhandsMinigame('Quick hands')
+    quickhands.resultVariable = 'quickhands_result'
+    quickhands.targetArt = { assetId: token.id, variantId: gold.id }
+    const stats: StatsDocument = {
+      ...emptyStats(),
+      variables: [newVariable('Quickhands result', 'text')]
+    }
+
+    expect(check('', { media, stats, minigames: { version: 1, minigames: [quickhands] } })).toEqual([])
+
+    quickhands.targetArt = { assetId: token.id, variantId: 'missing' }
+    expect(check('', { media, stats, minigames: { version: 1, minigames: [quickhands] } })).toContain(
+      "Quick hands's target picture is no longer in the media catalogue."
     )
   })
 })

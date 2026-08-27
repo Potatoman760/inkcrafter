@@ -41,16 +41,35 @@ const CAST: NpcDocument = {
       inkId: 'abeline',
       name: 'Sister Abeline',
       sprite: 'abeline',
-      stats: [{ key: 'affection', label: 'Affection', initial: 0, min: 0, max: 10 }],
-      statuses: [
+      variables: [
+        {
+          key: 'affection',
+          label: 'Affection',
+          kind: 'number' as const,
+          initial: 0,
+          min: 0,
+          max: 10,
+          values: []
+        },
         {
           key: 'status',
           label: 'Status',
+          kind: 'text' as const,
           initial: 'single',
+          min: 0,
+          max: 10,
           values: ['single', 'married', 'widowed']
+        },
+        {
+          key: 'isPregnant',
+          label: 'Pregnant',
+          kind: 'boolean' as const,
+          initial: false,
+          min: 0,
+          max: 10,
+          values: []
         }
-      ],
-      flags: [{ key: 'isPregnant', label: 'Pregnant', initial: false }]
+      ]
     }
   ]
 }
@@ -136,9 +155,13 @@ describe('writeNpcs', () => {
       npcs: [
         {
           ...CAST.npcs[0]!,
-          statuses: [
-            { key: 'status', label: 'Status', initial: 'sa"id', values: ['sa"id'] }
-          ]
+          // Only the word variable is replaced; the others still have to be
+          // declared, because the ink below references them.
+          variables: CAST.npcs[0]!.variables.map((one) =>
+            one.kind === 'text'
+              ? { ...one, initial: 'sa"id', values: ['sa"id'] }
+              : one
+          )
         }
       ]
     })

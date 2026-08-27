@@ -246,7 +246,7 @@ function valueSuggestions(
     options.push({
       label: stop,
       insert: stop,
-      detail: key === 'music' ? 'silence' : 'take it away',
+      detail: key === 'music' ? 'silence, or `stop 5` to fade over five seconds' : 'take it away',
       more: false
     })
   }
@@ -356,11 +356,10 @@ function npcSuggestions(value: string, at: number, cat: TagCatalogues): Suggesti
     const npc = cat.npcs.npcs.find((one) => one.inkId === before)
     if (!npc) return null
 
-    const attrs = [
-      ...npc.stats.map((one) => ({ key: one.key, detail: 'a number' })),
-      ...npc.statuses.map((one) => ({ key: one.key, detail: 'a word' })),
-      ...npc.flags.map((one) => ({ key: one.key, detail: 'yes or no' }))
-    ]
+    const attrs = npc.variables.map((one) => ({
+      key: one.key,
+      detail: one.kind === 'number' ? 'a number' : one.kind === 'text' ? 'a word' : 'yes or no'
+    }))
     if (attrs.length === 0) return null
 
     return {

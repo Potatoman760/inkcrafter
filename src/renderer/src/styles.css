@@ -2027,6 +2027,7 @@ body.is-resizing {
 }
 
 .plan-scene {
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
@@ -2035,6 +2036,34 @@ body.is-resizing {
   border-radius: var(--radius-md);
   background: var(--surface-inset);
   transition: opacity var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+/* How far along the Scene is, read off its top edge — the same line, in the
+   same place, as the card of the chapter holding it. Along the top and never
+   down the left: a coloured left bar is `.ic-row`'s selection marker, and two
+   things meaning different things in the same spot is worse than neither.
+
+   Absolute rather than a border, so a Scene with no status is the same height
+   as one with; it rides inside the 1px border and takes the top corners' radius
+   so it does not square them off. */
+.plan-scene[data-status]::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.plan-scene[data-status='planned']::before {
+  background: var(--status-planned);
+}
+
+.plan-scene[data-status='drafting']::before {
+  background: var(--status-drafting);
+}
+
+.plan-scene[data-status='done']::before {
+  background: var(--status-done);
 }
 
 .plan-scene.is-drop-target {
@@ -2175,10 +2204,13 @@ body.is-resizing {
 /* Minigame catalogue ----------------------------------------------------- */
 .minigame-fields { padding: var(--space-4); display: grid; gap: var(--space-4); overflow: auto; }
 .minigame-list { display: grid; gap: var(--space-1); padding: var(--space-2); }
+.minigame-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
 .minigame-bindings, .minigame-tunings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
 .minigame-section { display: grid; gap: var(--space-2); }
 .minigame-section h3 { margin: 0; font-size: var(--font-size-sm); }
 .minigame-background-preview { width: min(100%, 42rem); aspect-ratio: 16 / 9; object-fit: cover; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-1); }
+.quickhands-art-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+.quickhands-art-preview { width: 100%; height: 8rem; object-fit: contain; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-1); }
 .minigame-tuning-base, .minigame-modifier { display: flex; align-items: center; gap: var(--space-2); }
 .minigame-tuning-base .ic-input, .minigame-modifier .ic-input { width: 7rem; }
 .minigame-modifier .ic-select { min-width: 9rem; flex: 1; }
@@ -2516,10 +2548,44 @@ body.is-resizing {
 
 .plan-outline-eyebrow {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
   font-size: var(--text-xs);
   color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: var(--tracking-label);
+}
+
+/* The status, as a dot in its colour and then the word. The three colours are
+   the board's — see --status-* — so a chapter reads the same however it is
+   being looked at. The dot carries the colour rather than the text, because
+   `planned` is the quietest of the three and would be the hardest to read. */
+.plan-outline-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.plan-outline-status::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+}
+
+.plan-outline-status[data-status='planned']::before {
+  background: var(--status-planned);
+}
+
+.plan-outline-status[data-status='drafting']::before {
+  background: var(--status-drafting);
+}
+
+.plan-outline-status[data-status='done']::before {
+  background: var(--status-done);
 }
 
 .plan-outline-chapter-heading {

@@ -91,20 +91,20 @@ export function renderStateInk(
     lines.push("// The cast, and what the story tracks about them.");
     for (const npc of npcs.npcs) {
       lines.push(`// ${npc.name}`);
-      for (const stat of npc.stats) {
-        lines.push(
-          `VAR ${npcVar(npc.inkId, stat.key)} = ${Math.round(stat.initial)}`,
-        );
-      }
-      for (const status of npc.statuses) {
-        lines.push(
-          `VAR ${npcVar(npc.inkId, status.key)} = "${inkString(status.initial)}"`,
-        );
-      }
-      for (const flag of npc.flags) {
-        lines.push(
-          `VAR ${npcVar(npc.inkId, flag.key)} = ${flag.initial ? "true" : "false"}`,
-        );
+      for (const variable of npc.variables) {
+        // One list of three kinds now, so the declaration is chosen per row
+        // rather than per loop. The names and literals are unchanged: a story
+        // written against the old three-list catalogue still compiles.
+        const literal =
+          variable.kind === "number"
+            ? String(Math.round(Number(variable.initial) || 0))
+            : variable.kind === "boolean"
+              ? variable.initial === true
+                ? "true"
+                : "false"
+              : `"${inkString(String(variable.initial))}"`;
+
+        lines.push(`VAR ${npcVar(npc.inkId, variable.key)} = ${literal}`);
       }
     }
     lines.push("");

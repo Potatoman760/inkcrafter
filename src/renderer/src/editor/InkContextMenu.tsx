@@ -44,6 +44,7 @@ import { Icon } from '../design/Icon'
 import {
   Button,
   Checkbox,
+  Field,
   Hint,
   Input,
   Menu,
@@ -209,6 +210,11 @@ export function InkContextMenu({
    * somebody nobody asked about.
    */
   const [flipped, setFlipped] = useState(false)
+  /**
+   * Seconds a music stop takes. Empty and zero are one case — the cut a stop
+   * has always been — so the tag is written without it unless it is asked for.
+   */
+  const [fade, setFade] = useState('')
   const [filter, setFilter] = useState('')
   const [chosen, setChosen] = useState<{
     trackable?: Trackable
@@ -443,7 +449,13 @@ export function InkContextMenu({
     if (action === 'autosave') return { as: 'tag', text: 'autosave' }
     // Said out loud because silence is not what a scene falls back to: the
     // track holds until something ends it.
-    if (action === 'stopMusic') return { as: 'tag', text: 'music:stop' }
+    if (action === 'stopMusic') {
+      const seconds = Number(fade)
+      return {
+        as: 'tag',
+        text: Number.isFinite(seconds) && seconds > 0 ? `music:stop ${seconds}` : 'music:stop'
+      }
+    }
     if (action === 'stopAnimations') return { as: 'tag', text: 'anim:none' }
 
     // Editing a `# stat:`/`# npc:` line. Retargeting keeps what it does; editing
@@ -836,10 +848,27 @@ export function InkContextMenu({
               so this adds a checkpoint without interrupting play.
             </Hint>
           ) : action === 'stopMusic' ? (
-            <Hint>
-              Silence from here on. A track holds across lines and knots until something ends it,
-              so this is the only way to say it.
-            </Hint>
+            <>
+              <Hint>
+                Silence from here on. A track holds across lines and knots until something ends it,
+                so this is the only way to say it.
+              </Hint>
+              {/* Left empty it cuts, which is what a stop did before it could
+                  be told otherwise. */}
+              <div className="ink-menu-config">
+                <Field label="Fade out over" note="Seconds. Leave it empty to cut.">
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.5}
+                    value={fade}
+                    placeholder="0"
+                    aria-label="Fade out over"
+                    onChange={(event) => setFade(event.target.value)}
+                  />
+                </Field>
+              </div>
+            </>
           ) : action === 'stopAnimations' ? (
             <Hint>
               Every animation stopped. They hold across lines the way the cast does, and this ends

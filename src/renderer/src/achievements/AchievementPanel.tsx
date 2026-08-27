@@ -225,19 +225,15 @@ function variableOptions(stats: StatsDocument, npcs: NpcDocument): VariableOptio
     ...stats.variables.map((one) => ({
       name: one.name, label: `Variables — ${one.name}`, kind: one.kind, initial: one.initial
     })),
-    ...npcs.npcs.flatMap((npc) => [
-      ...npc.stats.map((one) => ({
-        name: npcVar(npc.inkId, one.key), label: `${npc.name} — ${one.label}`,
-        kind: 'number' as const, initial: one.initial
-      })),
-      ...npc.statuses.map((one) => ({
-        name: npcVar(npc.inkId, one.key), label: `${npc.name} — ${one.label}`,
-        kind: 'text' as const, initial: one.initial
-      })),
-      ...npc.flags.map((one) => ({
-        name: npcVar(npc.inkId, one.key), label: `${npc.name} — ${one.label}`,
-        kind: 'boolean' as const, initial: one.initial
+    // The cast's kinds are the same three words a player stat uses, so they
+    // need no translating on the way in.
+    ...npcs.npcs.flatMap((npc) =>
+      npc.variables.map((one) => ({
+        name: npcVar(npc.inkId, one.key),
+        label: `${npc.name} — ${one.label}`,
+        kind: one.kind,
+        initial: one.initial
       }))
-    ])
+    )
   ].sort((a, b) => a.label.localeCompare(b.label))
 }

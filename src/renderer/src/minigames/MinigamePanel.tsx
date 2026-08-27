@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   minigameName,
   newCombatMinigame,
+  newQuickhandsMinigame,
   type CombatMinigame,
+  type MinigameDefinition,
   type MinigameDocument,
+  type QuickhandsMinigame,
   type TunableNumber
 } from '@shared/bundle/minigameDoc'
 import {
@@ -57,6 +60,28 @@ const TUNINGS: Array<{ key: keyof Pick<CombatMinigame,
   { key: 'strikeMs', label: 'Strike display', unit: 'ms' }
 ]
 
+const QUICKHANDS_TUNINGS: Array<{ key: keyof Pick<QuickhandsMinigame,
+  'laneCount' | 'roundDurationMs' | 'spawnIntervalMs' | 'fallDurationMs' |
+  'catchWindowMs' | 'targetChancePercent' | 'goalScore' | 'targetPoints' |
+  'hazardPenalty' | 'missedTargetPenalty'>; label: string; unit: string }> = [
+  { key: 'laneCount', label: 'Lanes', unit: 'lanes' },
+  { key: 'roundDurationMs', label: 'Round duration', unit: 'ms' },
+  { key: 'spawnIntervalMs', label: 'Spawn interval', unit: 'ms' },
+  { key: 'fallDurationMs', label: 'Fall duration', unit: 'ms' },
+  { key: 'catchWindowMs', label: 'Catch window', unit: 'ms' },
+  { key: 'targetChancePercent', label: 'Valuable token chance', unit: '%' },
+  { key: 'goalScore', label: 'Victory score', unit: 'points' },
+  { key: 'targetPoints', label: 'Caught token', unit: 'points' },
+  { key: 'hazardPenalty', label: 'Caught hazard penalty', unit: 'points' },
+  { key: 'missedTargetPenalty', label: 'Missed token penalty', unit: 'points' }
+]
+
+interface ArtworkOption {
+  ref: { assetId: string; variantId: string }
+  label: string
+  file: string
+}
+
 const refKey = (ref: { assetId: string; variantId: string }): string =>
   `${ref.assetId}:${ref.variantId}`
 
@@ -68,13 +93,25 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
   const selected = doc.minigames.find((game) => game.id === selectedId) ?? null
   const numeric = [...stats.stats, ...stats.variables].filter((one) => one.kind === 'number')
   const textual = [...stats.stats, ...stats.variables].filter((one) => one.kind === 'text')
-  const opponent = selected
+  const opponent = selected?.kind === 'combat'
     ? media.assets.find((asset) => asset.id === selected.opponentAssetId && asset.kind === 'combatant') ?? null
     : null
   const byPath = useMemo(() => new Map(files.map((file) => [file.path, file])), [files])
   const backgrounds = useMemo(
     () => media.assets
       .filter((asset) => asset.kind === 'background')
+      .flatMap((asset) => asset.variants
+        .filter((variant) => !isVideoFile(variant.file))
+        .map((variant) => ({
+          ref: { assetId: asset.id, variantId: variant.id },
+          label: `${asset.display || asset.name} — ${variant.name}`,
+          file: variant.file
+        }))),
+    [media]
+  )
+  const artwork = useMemo<ArtworkOption[]>(
+    () => media.assets
+      .filter((asset) => asset.kind === 'animation')
       .flatMap((asset) => asset.variants
         .filter((variant) => !isVideoFile(variant.file))
         .map((variant) => ({
@@ -94,15 +131,17 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
     setSelectedId(doc.minigames[0]?.id ?? null)
   }, [doc.minigames, selectedId])
 
-  const patch = (changes: Partial<CombatMinigame>): void => {
+  const patch = (changes: Partial<CombatMinigame> | Partial<QuickhandsMinigame>): void => {
     if (!selected) return
     onChange({
       ...doc,
-      minigames: doc.minigames.map((game) => game.id === selected.id ? { ...game, ...changes } : game)
+      minigames: doc.minigames.map((game) => (
+        game.id === selected.id ? { ...game, ...changes } as MinigameDefinition : game
+      ))
     })
   }
 
-  const create = (): void => {
+  const createCombat = (): void => {
     const count = doc.minigames.length + 1
     const game = newCombatMinigame(`New combat ${count}`)
     const asset = newAsset(game.name || `combat_${count}`, 'combatant')
@@ -112,13 +151,21 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
     setSelectedId(game.id)
   }
 
+  const createQuickhands = (): void => {
+    const count = doc.minigames.filter((game) => game.kind === 'quickhands').length + 1
+    const game = newQuickhandsMinigame(`New quick-hands ${count}`)
+    onChange({ ...doc, minigames: [...doc.minigames, game] })
+    setSelectedId(game.id)
+  }
+
   const remove = (): void => {
     if (!selected) return
-    const stillUsed = doc.minigames.some(
-      (game) => game.id !== selected.id && game.opponentAssetId === selected.opponentAssetId
+    const stillUsed = selected.kind === 'combat' && doc.minigames.some(
+      (game) => game.kind === 'combat' && game.id !== selected.id &&
+        game.opponentAssetId === selected.opponentAssetId
     )
     onChange({ ...doc, minigames: doc.minigames.filter((game) => game.id !== selected.id) })
-    if (!stillUsed && opponent) onMediaChange(removeAsset(media, opponent.id))
+    if (selected.kind === 'combat' && !stillUsed && opponent) onMediaChange(removeAsset(media, opponent.id))
     setSelectedId(null)
   }
 
@@ -131,12 +178,17 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
         <>
           <PaneHeader
             title="Minigames"
-            actions={<Button size="sm" icon="plus" onClick={create}>Add combat</Button>}
+            actions={
+              <div className="minigame-actions">
+                <Button size="sm" icon="plus" onClick={createQuickhands}>Add quick-hands</Button>
+                <Button size="sm" icon="plus" onClick={createCombat}>Add combat</Button>
+              </div>
+            }
           />
           {saving && <span className="saving-note">saving…</span>}
           {error && <p className="settings-error">{error}</p>}
           {doc.minigames.length === 0 ? (
-            <EmptyState title="No minigames" body="Add a combat encounter, then call it from ink with # minigame:." />
+            <EmptyState title="No minigames" body="Add an encounter, then call it from ink with # minigame:." />
           ) : (
             <div className="minigame-list">
               {doc.minigames.map((game) => (
@@ -144,7 +196,7 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
                   key={game.id}
                   selected={game.id === selectedId}
                   name={game.display || game.name}
-                  meta={`# minigame: ${game.name}`}
+                  meta={`${game.kind === 'quickhands' ? 'Quick-hands' : 'Combat'} · # minigame: ${game.name}`}
                   onClick={() => setSelectedId(game.id)}
                 />
               ))}
@@ -185,12 +237,14 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
             </Field>
 
             <div className="minigame-bindings">
-              <Field label="Player health" note="A missed parry subtracts incoming damage from this numeric variable.">
-                <Select value={selected.playerHealthVariable} onChange={(event) => patch({ playerHealthVariable: event.target.value })}>
-                  <option value="">Choose a numeric variable…</option>
-                  {numeric.map((variable) => <option key={variable.id} value={variable.name}>{variable.name}</option>)}
-                </Select>
-              </Field>
+              {selected.kind === 'combat' && (
+                <Field label="Player health" note="A missed parry subtracts incoming damage from this numeric variable.">
+                  <Select value={selected.playerHealthVariable} onChange={(event) => patch({ playerHealthVariable: event.target.value })}>
+                    <option value="">Choose a numeric variable…</option>
+                    {numeric.map((variable) => <option key={variable.id} value={variable.name}>{variable.name}</option>)}
+                  </Select>
+                </Field>
+              )}
               <Field label="Result" note="Set to victory or defeat before the story continues.">
                 <Select value={selected.resultVariable} onChange={(event) => patch({ resultVariable: event.target.value })}>
                   <option value="">Choose a text variable…</option>
@@ -199,17 +253,17 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
               </Field>
             </div>
 
-            <Field as="div" label="Tutorial prompts" note="Normally hidden; enable transient instructions and action feedback for a teaching encounter.">
+            <Field as="div" label="Tutorial prompts" note="Enable transient instructions and action feedback during the encounter.">
               <Checkbox
-                label="Show state helper text during combat"
+                label={`Show helper text during ${selected.kind === 'combat' ? 'combat' : 'quick-hands'}`}
                 checked={selected.showStateHints}
                 onChange={(event) => patch({ showStateHints: event.target.checked })}
               />
             </Field>
 
             <section className="minigame-section">
-              <h3>Battle background</h3>
-              <Field label="Background image" note="Choose one background look to fill the combat scene.">
+              <h3>Scene background</h3>
+              <Field label="Background image" note="Choose one background look to fill the minigame scene.">
                 <Select
                   value={selected.background ? refKey(selected.background) : ''}
                   onChange={(event) => {
@@ -230,37 +284,87 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
               ) : null}
             </section>
 
-            <section className="minigame-section">
-              <h3>Opponent art</h3>
-              {opponent ? (
-                <LooksField
-                  doc={media}
-                  asset={opponent}
-                  files={files}
-                  byPath={byPath}
-                  project={project}
-                  onChange={onMediaChange}
-                  onImported={onMediaRescan}
-                  note="Add idle, left/right prep, left/right strike, and vulnerable. All six use the same canvas position."
-                />
-              ) : <Hint tone="error">The combatant media entry is missing.</Hint>}
-            </section>
+            {selected.kind === 'combat' ? (
+              <>
+                <section className="minigame-section">
+                  <h3>Opponent art</h3>
+                  {opponent ? (
+                    <LooksField
+                      doc={media}
+                      asset={opponent}
+                      files={files}
+                      byPath={byPath}
+                      project={project}
+                      onChange={onMediaChange}
+                      onImported={onMediaRescan}
+                      note="Add idle, left/right prep, left/right strike, and vulnerable. All six use the same canvas position."
+                    />
+                  ) : <Hint tone="error">The combatant media entry is missing.</Hint>}
+                </section>
 
-            <section className="minigame-section">
-              <h3>Combat tuning</h3>
-              <div className="minigame-tunings">
-                {TUNINGS.map((field) => (
-                  <TuningField
-                    key={field.key}
-                    label={field.label}
-                    unit={field.unit}
-                    value={selected[field.key]}
-                    stats={numeric.map((one) => one.name)}
-                    onChange={(value) => patch({ [field.key]: value })}
-                  />
-                ))}
-              </div>
-            </section>
+                <section className="minigame-section">
+                  <h3>Combat tuning</h3>
+                  <div className="minigame-tunings">
+                    {TUNINGS.map((field) => (
+                      <TuningField
+                        key={field.key}
+                        label={field.label}
+                        unit={field.unit}
+                        value={selected[field.key]}
+                        stats={numeric.map((one) => one.name)}
+                        onChange={(value) => patch({ [field.key]: value })}
+                      />
+                    ))}
+                  </div>
+                </section>
+              </>
+            ) : (
+              <>
+                <section className="minigame-section">
+                  <h3>Quick-hands graphics</h3>
+                  <Hint>Use still Animation looks, or leave a field empty for the built-in token shapes.</Hint>
+                  <div className="quickhands-art-grid">
+                    <ArtworkField
+                      label="Valuable token"
+                      value={selected.targetArt}
+                      options={artwork}
+                      byPath={byPath}
+                      onChange={(targetArt) => patch({ targetArt })}
+                    />
+                    <ArtworkField
+                      label="Hazard"
+                      value={selected.hazardArt}
+                      options={artwork}
+                      byPath={byPath}
+                      onChange={(hazardArt) => patch({ hazardArt })}
+                    />
+                    <ArtworkField
+                      label="Catcher"
+                      value={selected.catcherArt}
+                      options={artwork}
+                      byPath={byPath}
+                      onChange={(catcherArt) => patch({ catcherArt })}
+                    />
+                  </div>
+                </section>
+
+                <section className="minigame-section">
+                  <h3>Quick-hands tuning</h3>
+                  <div className="minigame-tunings">
+                    {QUICKHANDS_TUNINGS.map((field) => (
+                      <TuningField
+                        key={field.key}
+                        label={field.label}
+                        unit={field.unit}
+                        value={selected[field.key]}
+                        stats={numeric.map((one) => one.name)}
+                        onChange={(value) => patch({ [field.key]: value })}
+                      />
+                    ))}
+                  </div>
+                </section>
+              </>
+            )}
 
             <div className="detail-row detail-row--danger">
               <Button variant="danger" icon="trash-2" onClick={remove}>Remove this minigame</Button>
@@ -269,6 +373,37 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
         </>
       )}
     />
+  )
+}
+
+function ArtworkField({ label, value, options, byPath, onChange }: {
+  label: string
+  value: { assetId: string; variantId: string } | null
+  options: ArtworkOption[]
+  byPath: Map<string, MediaFile>
+  onChange: (next: { assetId: string; variantId: string } | null) => void
+}): React.JSX.Element {
+  const selected = value
+    ? options.find((option) => refKey(option.ref) === refKey(value)) ?? null
+    : null
+  const url = selected ? byPath.get(selected.file)?.url ?? null : null
+
+  return (
+    <Field label={label}>
+      <Select
+        value={value ? refKey(value) : ''}
+        onChange={(event) => {
+          const option = options.find((one) => refKey(one.ref) === event.target.value)
+          onChange(option?.ref ?? null)
+        }}
+      >
+        <option value="">Built-in shape</option>
+        {options.map((option) => (
+          <option key={refKey(option.ref)} value={refKey(option.ref)}>{option.label}</option>
+        ))}
+      </Select>
+      {url && <img className="quickhands-art-preview" src={url} alt="" />}
+    </Field>
   )
 }
 

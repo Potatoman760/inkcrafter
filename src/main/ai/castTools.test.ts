@@ -153,8 +153,7 @@ describe('write_cast', () => {
 
     const doc = await catalogue()
     expect(doc.npcs).toHaveLength(1)
-    expect(doc.npcs[0]?.stats.map((one) => one.key)).toEqual(['trust'])
-    expect(doc.npcs[0]?.flags.map((one) => one.key)).toEqual(['knows'])
+    expect(doc.npcs[0]?.variables.map((one) => one.key)).toEqual(['trust', 'knows'])
   })
 
   it('updates an attribute in place when the key comes back', async () => {
@@ -162,8 +161,8 @@ describe('write_cast', () => {
     await cast({ cast: [{ name: 'Maren', stats: [{ key: 'trust', initial: 5, max: 20 }] }] })
 
     const doc = await catalogue()
-    expect(doc.npcs[0]?.stats).toHaveLength(1)
-    expect(doc.npcs[0]?.stats[0]).toMatchObject({ initial: 5, max: 20 })
+    expect(doc.npcs[0]?.variables).toHaveLength(1)
+    expect(doc.npcs[0]?.variables[0]).toMatchObject({ initial: 5, max: 20 })
   })
 
   it('keeps the sprite when a later call does not mention it', async () => {
@@ -176,7 +175,7 @@ describe('write_cast', () => {
   it('clamps a starting value that sits outside its own range', async () => {
     await cast({ cast: [{ name: 'Maren', stats: [{ key: 'trust', initial: 99, min: 0, max: 10 }] }] })
 
-    expect((await catalogue()).npcs[0]?.stats[0]?.initial).toBe(10)
+    expect((await catalogue()).npcs[0]?.variables[0]?.initial).toBe(10)
   })
 
   it('drops a status with no permitted words rather than writing one that cannot be set', async () => {
@@ -185,8 +184,7 @@ describe('write_cast', () => {
     })
 
     const doc = await catalogue()
-    expect(doc.npcs[0]?.statuses).toEqual([])
-    expect(doc.npcs[0]?.flags).toHaveLength(1)
+    expect(doc.npcs[0]?.variables.map((one) => one.key)).toEqual(['knows'])
   })
 
   it('falls back to the first permitted word when the initial is not one of them', async () => {
@@ -194,7 +192,7 @@ describe('write_cast', () => {
       cast: [{ name: 'Maren', statuses: [{ key: 'mood', values: ['wary', 'warm'], initial: 'furious' }] }]
     })
 
-    expect((await catalogue()).npcs[0]?.statuses[0]?.initial).toBe('wary')
+    expect((await catalogue()).npcs[0]?.variables[0]?.initial).toBe('wary')
   })
 
   it('says so rather than writing nothing when there is nothing usable', async () => {

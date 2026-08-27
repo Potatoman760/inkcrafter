@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { editorContextAt } from '@shared/inkContext'
 import {
@@ -557,6 +557,41 @@ describe('InkContextMenu', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Insert' }))
 
       expect(applied(onApply.mock.calls[0]![0])).toContain('# music:stop')
+    })
+
+    /**
+     * How long the stop takes. Left empty it cuts, which is what stopping meant
+     * before it could be told otherwise — so the field has to be able to say
+     * nothing, not just zero.
+     */
+    it('fades it out over the seconds asked for', async () => {
+      const { onApply } = menu('The door is shut.')
+
+      await choose('Audio', 'Stop music')
+      await userEvent.type(screen.getByLabelText('Fade out over'), '5')
+      await userEvent.click(screen.getByRole('button', { name: 'Insert' }))
+
+      expect(applied(onApply.mock.calls[0]![0])).toContain('# music:stop 5')
+    })
+
+    it('writes a plain stop when the fade is empty or zero', async () => {
+      for (const seconds of ['', '0']) {
+        const { onApply } = menu('The door is shut.')
+
+        await choose('Audio', 'Stop music')
+        if (seconds) await userEvent.type(screen.getByLabelText('Fade out over'), seconds)
+        await userEvent.click(screen.getByRole('button', { name: 'Insert' }))
+
+        expect(applied(onApply.mock.calls[0]![0])).toContain('# music:stop\n')
+        cleanup()
+      }
+    })
+
+    it('asks for a fade only when stopping, not when choosing a track', async () => {
+      menu('The door is shut.')
+
+      await choose('Audio', 'Set music…')
+      expect(screen.queryByLabelText('Fade out over')).toBeNull()
     })
 
     it('offers only tracks when setting music', async () => {

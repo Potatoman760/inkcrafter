@@ -123,8 +123,14 @@ export type TagCommand =
    *
    * Sound effects are deliberately separate: `# sound:` is a one-shot event,
    * while music is the persistent bed beneath the scene.
+   *
+   * `fade` is the seconds a stop takes — `# music: stop 5`. Absent and zero are
+   * the same thing and are the older behaviour: the track cuts. It belongs to
+   * the stop rather than to the track because it describes how this line ends
+   * the music, not anything about the music itself; a later `# music:` naming a
+   * track carries no fade and says nothing about one.
    */
-  | { kind: "music"; name: string | null; variant: string | null }
+  | { kind: "music"; name: string | null; variant: string | null; fade?: number }
   /**
    * A one-shot sound cue. It fires when the ink line carrying it begins and is
    * never inherited, stopped, or restored from a save.
@@ -204,6 +210,15 @@ const AUTO = "auto";
  * track has to actually stop something that is already sounding.
  */
 const STOP = "stop";
+
+/**
+ * `stop`, or `stop 5` for five seconds of fading.
+ *
+ * Fractions allowed, unlike `# stat:` where integers are the whole point: this
+ * is a duration rather than a number the story counts with, and a second and a
+ * half is an ordinary thing to want. A bare `stop` and `stop 0` are one case.
+ */
+const STOP_FADE = /^stop(?:[ 	]+(\d+(?:\.\d+)?))?$/i;
 
 /** ` at left`, on the end of a show tag's value. */
 const AT = /\s+at\s+([A-Za-z_][A-Za-z0-9_]*)\s*$/i;
@@ -377,8 +392,14 @@ export function parseTag(raw: string): TagCommand | null {
       return { kind: "clear" };
 
     case "music": {
-      if (value.toLowerCase() === STOP) {
-        return { kind: "music", name: null, variant: null };
+      const stopping = STOP_FADE.exec(value);
+      if (stopping) {
+        const fade = stopping[1] === undefined ? 0 : Number(stopping[1]);
+        // Left off when it is zero rather than written as zero: absent and zero
+        // are one case, so carrying the field would be saying nothing twice.
+        return fade > 0
+          ? { kind: "music", name: null, variant: null, fade }
+          : { kind: "music", name: null, variant: null };
       }
       const ref = parseName(value);
       return ref ? { kind: "music", ...ref } : null;
@@ -493,7 +514,12 @@ export function formatTag(command: TagCommand): string {
     case "clear":
       return "clear";
     case "music":
-      return `music: ${command.name === null ? STOP : withVariant(command.name, command.variant)}`;
+      if (command.name !== null) {
+        return `music: ${withVariant(command.name, command.variant)}`;
+      }
+      // Zero is the default and is written by leaving it out, so a stop that
+      // was never given a fade round-trips as the plain word it arrived as.
+      return `music: ${STOP}${command.fade ? ` ${command.fade}` : ""}`;
     case "sound":
       return `sound: ${withVariant(command.name, command.variant)}`;
     case "speaker":

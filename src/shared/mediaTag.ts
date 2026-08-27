@@ -178,6 +178,14 @@ export interface Scene {
    */
   music: ResolvedMedia | null
   /**
+   * Seconds the music took to fade out, when this line is what stopped it.
+   *
+   * Zero is a cut, which is what a stop was before it could be told otherwise.
+   * Reset by anything that puts a track on, because it describes how the music
+   * *ended* and there is nothing ended once something is playing again.
+   */
+  musicFade: number
+  /**
    * Every character on screen, in the order they were shown.
    *
    * A list rather than one slot: the game has always drawn several sprites at
@@ -235,6 +243,7 @@ export const EMPTY_SCENE: Scene = {
   backgroundOnce: false,
   backgroundFlipped: false,
   music: null,
+  musicFade: 0,
   characters: [],
   slots: {},
   flipped: {},
@@ -298,10 +307,11 @@ export function applyTags(doc: MediaDocument, scene: Scene, tags: string[]): Sce
       case 'music':
         next =
           command.name === null
-            ? { ...next, music: null }
+            ? { ...next, music: null, musicFade: command.fade ?? 0 }
             : place(next, resolveRef(doc, 'music', command.name, command.variant), raw, (m) => ({
                 ...next,
-                music: m
+                music: m,
+                musicFade: 0
               }))
         break
 

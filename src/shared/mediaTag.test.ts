@@ -401,6 +401,36 @@ describe('the track under a scene', () => {
     expect(scene.music?.path).toBe('media/music/the_grove/loop.mp3')
     expect(scene.unresolved).toContain('music:nowhere')
   })
+
+  /**
+   * How the music ended, carried so the rail can say it and the game can do it.
+   * It describes the stop, so anything that puts a track back on clears it.
+   */
+  describe('fading out', () => {
+    it('records the seconds a stop was given', () => {
+      const scene = sceneFrom(seededMusic(), [['music:the_grove'], ['music:stop 5']])
+
+      expect(scene.music).toBeNull()
+      expect(scene.musicFade).toBe(5)
+    })
+
+    it('is nothing at all for a stop that cuts', () => {
+      expect(sceneFrom(seededMusic(), [['music:the_grove'], ['music:stop']]).musicFade).toBe(0)
+      expect(sceneFrom(seededMusic(), []).musicFade).toBe(0)
+    })
+
+    it('holds while the music stays stopped', () => {
+      const scene = sceneFrom(seededMusic(), [['music:stop 5'], [], ['speaker:Kael']])
+      expect(scene.musicFade).toBe(5)
+    })
+
+    it('is cleared by a track starting, which has nothing to fade', () => {
+      const scene = sceneFrom(seededMusic(), [['music:stop 5'], ['music:the_storm']])
+
+      expect(scene.music?.path).toBe('media/music/the_storm/loop.mp3')
+      expect(scene.musicFade).toBe(0)
+    })
+  })
 })
 
 describe('sound cues', () => {

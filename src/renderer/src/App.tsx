@@ -687,6 +687,43 @@ export function App(): React.JSX.Element {
   };
 
   /**
+   * Re-reads the project folder, for changes made outside the app.
+   *
+   * The tree is a snapshot taken when the project opened, and nothing tells it
+   * that an editor, a script or a checkout has added, removed or rewritten a
+   * file — so until this runs, those files are simply not there. The open
+   * buffer is brought forward on the same terms as any other outside write: a
+   * dirty buffer is reported, never replaced.
+   *
+   * No toast on success. The tree and the editor are what changed, and both are
+   * on screen.
+   */
+  const refreshFromDisk = (): void => {
+    void session.refreshFiles();
+
+    const currentFile = openFileRef.current;
+    if (currentFile === null) return;
+
+    if (dirtyRef.current) {
+      toasts.show({
+        tone: "error",
+        title: `${currentFile.path} was not reloaded`,
+        detail:
+          "The editor has unsaved changes. Save or discard them, then refresh again to take the version on disk."
+      });
+      return;
+    }
+
+    void reopenFromDisk(currentFile).catch((error: unknown) =>
+      toasts.show({
+        tone: "error",
+        title: `Could not reload ${currentFile.path}`,
+        detail: error instanceof Error ? error.message : String(error)
+      })
+    );
+  };
+
+  /**
    * A catalogue regenerating `ink/state.ink` is the case toasts exist for: the
    * file is written, the story changes, and nothing on screen says so.
    */
@@ -1171,6 +1208,7 @@ export function App(): React.JSX.Element {
               }}
               onSettings={() => setProjectOpen(true)}
               onReveal={() => void window.inkcrafter.projects.reveal(project)}
+              onRefresh={refreshFromDisk}
               focusNewFile={newFileNonce}
             />
           ) : (

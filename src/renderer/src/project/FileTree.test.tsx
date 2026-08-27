@@ -32,6 +32,7 @@ interface Handlers {
   onCopy: ReturnType<typeof vi.fn>
   onSettings: ReturnType<typeof vi.fn>
   onReveal: ReturnType<typeof vi.fn>
+  onRefresh: ReturnType<typeof vi.fn>
 }
 
 function tree(overrides: Partial<Parameters<typeof FileTree>[0]> = {}): Handlers {
@@ -45,7 +46,8 @@ function tree(overrides: Partial<Parameters<typeof FileTree>[0]> = {}): Handlers
     onDelete: vi.fn(),
     onCopy: vi.fn(),
     onSettings: vi.fn(),
-    onReveal: vi.fn()
+    onReveal: vi.fn(),
+    onRefresh: vi.fn()
   }
 
   // Merged before rendering, not after: returning `handlers` while `overrides`
@@ -460,5 +462,21 @@ describe('FileTree - copy and paste', () => {
     fireEvent.keyDown(row('arrival.ink'), { key: 'v', ctrlKey: true })
 
     expect(onCopy).toHaveBeenCalledWith('ink/main.ink', 'ink/chapters')
+  })
+})
+
+describe('refreshing', () => {
+  it('offers a refresh action that re-reads the folder', async () => {
+    const handlers = tree()
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh from disk' }))
+    expect(handlers.onRefresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not disturb the project actions beside it', async () => {
+    const handlers = tree()
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh from disk' }))
+    expect(handlers.onSettings).not.toHaveBeenCalled()
+    expect(handlers.onReveal).not.toHaveBeenCalled()
+    expect(handlers.onAdd).not.toHaveBeenCalled()
   })
 })

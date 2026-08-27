@@ -2,7 +2,7 @@ import { findAsset, isVideoFile, type MediaDocument } from '../mediaDoc'
 import { scanTags, type TagUse } from '../inkTags'
 import { isKnownTag, mediaRefOf, parseTag } from './tagSpec'
 import type { StatsDocument } from '../statsDoc'
-import { attrKind, findNpc, npcVar, type NpcDocument } from './npcDoc'
+import { attrKind, findNpc, npcVar, npcVariable, type NpcDocument } from './npcDoc'
 import { referencedPaths } from './condition'
 import { findMap, mapsLinkingTo, type MapArea, type MapDocument } from './mapDoc'
 import { galleryMedia, type GalleryDocument } from './galleryDoc'
@@ -78,17 +78,6 @@ function checkMinigames(input: PreflightInput): Preflight[] {
   const variables = [...input.stats.stats, ...input.stats.variables]
   const numeric = new Set(variables.filter((one) => one.kind === 'number').map((one) => one.name))
 
-  const tunings = (game: (typeof doc.minigames)[number]): [string, TunableNumber][] => [
-    ['opponent health', game.opponentHealth],
-    ['incoming damage', game.incomingDamage],
-    ['counter damage', game.counterDamage],
-    ['prep window', game.prepWindowMs],
-    ['counter window', game.counterWindowMs],
-    ['counter chance', game.counterChancePercent],
-    ['idle time', game.idleMs],
-    ['strike time', game.strikeMs]
-  ]
-
   const names = new Set<string>()
   for (const game of doc.minigames) {
     if (names.has(game.name)) problems.push(at(`More than one minigame is called ${game.name}.`))
@@ -105,28 +94,71 @@ function checkMinigames(input: PreflightInput): Preflight[] {
       }
     }
 
-    const opponent = input.media.assets.find(
-      (asset) => asset.id === game.opponentAssetId && asset.kind === 'combatant'
-    )
-    if (!opponent) {
-      problems.push(at(`${game.display || game.name} has no combatant selected.`))
-    } else {
-      for (const state of COMBATANT_STATES) {
-        if (!opponent.variants.some((one) => one.name === state)) {
-          problems.push(at(`${game.display || game.name}'s combatant has no ${state} look.`))
+    let tunings: [string, TunableNumber][]
+    if (game.kind === 'combat') {
+      const opponent = input.media.assets.find(
+        (asset) => asset.id === game.opponentAssetId && asset.kind === 'combatant'
+      )
+      if (!opponent) {
+        problems.push(at(`${game.display || game.name} has no combatant selected.`))
+      } else {
+        for (const state of COMBATANT_STATES) {
+          if (!opponent.variants.some((one) => one.name === state)) {
+            problems.push(at(`${game.display || game.name}'s combatant has no ${state} look.`))
+          }
         }
       }
+
+      if (!numeric.has(game.playerHealthVariable)) {
+        problems.push(at(`${game.display || game.name} needs a numeric player health variable.`))
+      }
+      tunings = [
+        ['opponent health', game.opponentHealth],
+        ['incoming damage', game.incomingDamage],
+        ['counter damage', game.counterDamage],
+        ['prep window', game.prepWindowMs],
+        ['counter window', game.counterWindowMs],
+        ['counter chance', game.counterChancePercent],
+        ['idle time', game.idleMs],
+        ['strike time', game.strikeMs]
+      ]
+    } else {
+      const arts: [string, typeof game.targetArt][] = [
+        ['target', game.targetArt],
+        ['hazard', game.hazardArt],
+        ['catcher', game.catcherArt]
+      ]
+      for (const [label, ref] of arts) {
+        if (!ref) continue
+        const art = galleryMedia(input.media, ref)
+        if (!art) {
+          problems.push(at(`${game.display || game.name}'s ${label} picture is no longer in the media catalogue.`))
+        } else if (art.kind !== 'animation') {
+          problems.push(at(`${game.display || game.name}'s ${label} picture is not an animation look.`))
+        } else if (isVideoFile(art.file)) {
+          problems.push(at(`${game.display || game.name}'s ${label} picture must be an image, not a video.`))
+        }
+      }
+      tunings = [
+        ['lane count', game.laneCount],
+        ['round duration', game.roundDurationMs],
+        ['spawn interval', game.spawnIntervalMs],
+        ['fall duration', game.fallDurationMs],
+        ['catch window', game.catchWindowMs],
+        ['target chance', game.targetChancePercent],
+        ['goal score', game.goalScore],
+        ['target points', game.targetPoints],
+        ['hazard penalty', game.hazardPenalty],
+        ['missed target penalty', game.missedTargetPenalty]
+      ]
     }
 
-    if (!numeric.has(game.playerHealthVariable)) {
-      problems.push(at(`${game.display || game.name} needs a numeric player health variable.`))
-    }
     const result = variables.find((one) => one.name === game.resultVariable)
     if (!result || result.kind !== 'text') {
       problems.push(at(`${game.display || game.name} needs a text result variable.`))
     }
 
-    for (const [label, tuning] of tunings(game)) {
+    for (const [label, tuning] of tunings) {
       for (const modifier of tuning.modifiers) {
         if (!numeric.has(modifier.stat)) {
           problems.push(at(`${game.display || game.name}'s ${label} uses ${modifier.stat}, which is not a numeric variable.`))
@@ -521,20 +553,20 @@ function checkTag(use: TagUse, input: PreflightInput): string | null {
     const kind = attrKind(npc, attr)
     if (!kind) return `#${use.raw} — ${npc.name} has nothing called ${attr}.`
 
-    if (kind === 'stat' && !Number.isFinite(Number(value))) {
+    if (kind === 'number' && !Number.isFinite(Number(value))) {
       return `#${use.raw} — ${attr} is a number, and ${value} is not one.`
     }
 
-    if (kind === 'status') {
-      const status = npc.statuses.find((one) => one.key === attr)
-      if (status && !status.values.includes(value)) {
-        return `#${use.raw} — ${attr} cannot be ${value} (it can be ${status.values.join(', ')}).`
+    if (kind === 'text') {
+      const words = npcVariable(npc, attr)?.values ?? []
+      if (words.length > 0 && !words.includes(value)) {
+        return `#${use.raw} — ${attr} cannot be ${value} (it can be ${words.join(', ')}).`
       }
     }
 
-    // A flag reads as true only for exactly `true` or `1`, so anything else
+    // A yes/no reads as true only for exactly `true` or `1`, so anything else
     // quietly means false — which is never what was meant.
-    if (kind === 'flag' && !['true', 'false', '1', '0'].includes(value)) {
+    if (kind === 'boolean' && !['true', 'false', '1', '0'].includes(value)) {
       return `#${use.raw} — ${attr} is true or false, and ${value} reads as false.`
     }
 

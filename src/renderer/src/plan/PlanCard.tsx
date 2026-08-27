@@ -263,6 +263,7 @@ export function PlanCard({
           <div
             className={`plan-scene${sceneDropTarget === `scene:before:${scene.id}` ? ' is-drop-target' : ''}${draggingSceneId === scene.id ? ' is-dragging' : ''}`}
             key={scene.id}
+            data-status={scene.status ?? undefined}
             onDragOver={(event) => onSceneDragOver(event, `scene:before:${scene.id}`)}
             onDrop={(event) =>
               onSceneDropBefore(event, scene.id, node.children.map((child) => child.id))
@@ -283,8 +284,8 @@ export function PlanCard({
             </button>
             {scene.files[0] && (
               <IconButton
-                icon="file-text"
-                label={`Open ${scene.files[0]}`}
+                icon="file-pen"
+                label={`Edit ${scene.files[0]}`}
                 size="sm"
                 onClick={() => onOpenFile(scene.files[0]!)}
               />

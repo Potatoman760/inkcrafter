@@ -6,7 +6,7 @@ import {
   type ConditionLabels,
   type Term
 } from '@shared/bundle/condition'
-import type { NpcDocument } from '@shared/bundle/npcDoc'
+import type { Npc, NpcDocument, NpcVarKind } from '@shared/bundle/npcDoc'
 import type { StatsDocument } from '@shared/statsDoc'
 import { Icon } from '../design/Icon'
 import { Button, Field, Input, Select } from '../design/components'
@@ -185,12 +185,12 @@ function TermFields({
   }
 
   const npc = npcs.npcs.find((one) => one.inkId === term.npc) ?? npcs.npcs[0]
-  const attrs =
-    term.source === 'npcStat'
-      ? (npc?.stats ?? [])
-      : term.source === 'npcStatus'
-        ? (npc?.statuses ?? [])
-        : (npc?.flags ?? [])
+  // The three sources are still three, because a gate compares against a
+  // number, a word or a yes/no and each reads differently. What used to be
+  // three lists on the NPC is one now, so the kind is what picks them out.
+  const wanted: NpcVarKind =
+    term.source === 'npcStat' ? 'number' : term.source === 'npcStatus' ? 'text' : 'boolean'
+  const attrs = (npc?.variables ?? []).filter((one) => one.kind === wanted)
 
   return (
     <>
@@ -239,7 +239,8 @@ function RightHand({
   // else would be offering a gate that can never open.
   if (term.source === 'npcStatus') {
     const npc = npcs.npcs.find((one) => one.inkId === term.npc)
-    const values = npc?.statuses.find((one) => one.key === term.key)?.values ?? []
+    const values =
+      npc?.variables.find((one) => one.key === term.key && one.kind === 'text')?.values ?? []
 
     return (
       <Select value={String(value)} onChange={(event) => onChange(event.target.value)}>
@@ -262,6 +263,11 @@ function RightHand({
 }
 
 /** The clauses of a gate as a flat list, whatever shape it was stored in. */
+/** The first variable of one kind, for a source that has just been chosen. */
+function firstOfKind(npc: Npc | undefined, kind: NpcVarKind): string {
+  return npc?.variables.find((one) => one.kind === kind)?.key ?? ''
+}
+
 function flatten(condition: Condition | null): Extract<Condition, { op: 'compare' }>[] {
   if (condition === null) return []
   if (condition.op === 'compare') return [condition]
@@ -280,11 +286,11 @@ function termFor(source: string, { knots, stats, npcs }: Sources): Term {
     case 'stat':
       return { source: 'stat', key: stats.stats[0]?.name ?? stats.variables[0]?.name ?? '' }
     case 'npcStat':
-      return { source: 'npcStat', npc: npc?.inkId ?? '', key: npc?.stats[0]?.key ?? '' }
+      return { source: 'npcStat', npc: npc?.inkId ?? '', key: firstOfKind(npc, 'number') }
     case 'npcStatus':
-      return { source: 'npcStatus', npc: npc?.inkId ?? '', key: npc?.statuses[0]?.key ?? '' }
+      return { source: 'npcStatus', npc: npc?.inkId ?? '', key: firstOfKind(npc, 'text') }
     case 'npcFlag':
-      return { source: 'npcFlag', npc: npc?.inkId ?? '', key: npc?.flags[0]?.key ?? '' }
+      return { source: 'npcFlag', npc: npc?.inkId ?? '', key: firstOfKind(npc, 'boolean') }
     default:
       return { source: 'visits', path: knots[0] ?? '' }
   }

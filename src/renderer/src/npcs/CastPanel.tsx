@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import {
+  asKind,
   inkKey,
+  newNpcVariable,
+  NPC_VAR_KINDS,
   npcName,
   npcVar,
   type Npc,
   type NpcDocument,
-  type NpcFlag,
-  type NpcStat,
-  type NpcStatus
+  type NpcVariable,
+  type NpcVarKind
 } from '@shared/bundle/npcDoc'
 import { newId } from '@shared/ids'
 import {
@@ -136,9 +138,7 @@ export function CastPanel({
       inkId,
       name: draftName.trim() || 'Someone',
       sprite: '',
-      stats: [],
-      statuses: [],
-      flags: []
+      variables: []
     }
     onChange({ ...doc, npcs: [...doc.npcs, npc] })
     setSelectedId(npc.id)
@@ -199,7 +199,7 @@ export function CastPanel({
 
       <MasterList>
         {shown.map((npc) => {
-          const attributes = npc.stats.length + npc.statuses.length + npc.flags.length
+          const attributes = npc.variables.length
           return (
             <ListRow
               key={npc.id}
@@ -292,34 +292,16 @@ function NpcEditor({
   onRemove
 }: NpcEditorProps): React.JSX.Element {
   const byPath = new Map(files.map((file) => [file.path, file]))
-  const addStat = (): void =>
+  const addVariable = (): void =>
     onPatch({
-      stats: [
-        ...npc.stats,
-        { key: uniqueKey(npc, 'affection'), label: 'Affection', initial: 0, min: 0, max: 10 }
+      variables: [
+        ...npc.variables,
+        newNpcVariable('number', uniqueKey(npc, 'affection'), 'Affection')
       ]
     })
 
-  const addStatus = (): void =>
-    onPatch({
-      statuses: [
-        ...npc.statuses,
-        {
-          key: uniqueKey(npc, 'status'),
-          label: 'Status',
-          initial: 'single',
-          values: ['single', 'married']
-        }
-      ]
-    })
-
-  const addFlag = (): void =>
-    onPatch({
-      flags: [...npc.flags, { key: uniqueKey(npc, 'knows'), label: 'Knows', initial: false }]
-    })
-
-  const patchAt = <T,>(list: T[], index: number, changes: Partial<T>): T[] =>
-    list.map((one, at) => (at === index ? { ...one, ...changes } : one))
+  const patchVariable = (index: number, next: NpcVariable): void =>
+    onPatch({ variables: npc.variables.map((one, at) => (at === index ? next : one)) })
 
   return (
     <>
@@ -374,177 +356,140 @@ function NpcEditor({
         </Field>
       )}
 
-      <Field as="div" label="Numbers" about={copy('cast.attribute.clamped')}>
-        {npc.stats.map((stat, index) => (
-          <AttrRow key={index} varName={npcVar(npc.inkId, stat.key)}>
-            <Input
-              size="sm"
-              mono
-              aria-label={`Key of ${stat.label}`}
-              value={stat.key}
-              onChange={(event) =>
-                onPatch({ stats: patchAt(npc.stats, index, { key: inkKey(event.target.value) }) })
-              }
-            />
-            <Input
-              size="sm"
-              aria-label={`Label of ${stat.key}`}
-              value={stat.label}
-              onChange={(event) =>
-                onPatch({ stats: patchAt(npc.stats, index, { label: event.target.value }) })
-              }
-            />
-            {(['initial', 'min', 'max'] as const).map((field) => (
-              <Input
-                key={field}
-                size="sm"
-                type="number"
-                title={field}
-                aria-label={`${field} of ${stat.key}`}
-                value={stat[field]}
-                onChange={(event) =>
-                  onPatch({
-                    stats: patchAt<NpcStat>(npc.stats, index, {
-                      [field]: Number(event.target.value)
-                    } as Partial<NpcStat>)
-                  })
-                }
-              />
-            ))}
-            {/* Where the starting value sits in its range. The number is right
-                there beside it — a bar on its own cannot be read back. */}
-            <Meter
-              className="npc-attr-meter"
-              value={stat.initial}
-              min={stat.min}
-              max={stat.max}
-              title={`${stat.initial} of ${stat.min}–${stat.max}`}
-            />
-            <IconButton
-              icon="x"
-              size="sm"
-              label={`Remove ${stat.key}`}
-              onClick={() => onPatch({ stats: npc.stats.filter((_, at) => at !== index) })}
-            />
-          </AttrRow>
-        ))}
-        <Button variant="quiet" size="sm" icon="plus" onClick={addStat}>
-          Add a number
-        </Button>
-      </Field>
-
-      <Field
-        as="div"
-        label="Words"
-        about={copy('cast.attribute.oneOf')}
-      >
-        {npc.statuses.map((status, index) => (
-          <AttrRow key={index} varName={npcVar(npc.inkId, status.key)}>
-            <Input
-              size="sm"
-              mono
-              aria-label={`Key of ${status.label}`}
-              value={status.key}
-              onChange={(event) =>
-                onPatch({
-                  statuses: patchAt(npc.statuses, index, { key: inkKey(event.target.value) })
-                })
-              }
-            />
-            <Input
-              size="sm"
-              aria-label={`Label of ${status.key}`}
-              value={status.label}
-              onChange={(event) =>
-                onPatch({ statuses: patchAt(npc.statuses, index, { label: event.target.value }) })
-              }
-            />
-            <Input
-              size="sm"
-              title="allowed values, comma separated"
-              aria-label={`Allowed values of ${status.key}`}
-              value={status.values.join(', ')}
-              onChange={(event) => {
-                const values = event.target.value
-                  .split(',')
-                  .map((one) => one.trim())
-                  .filter((one) => one.length > 0)
-                onPatch({
-                  statuses: patchAt<NpcStatus>(npc.statuses, index, {
-                    values,
-                    // Keeping an initial that is no longer allowed would generate
-                    // ink the story could never set back.
-                    initial: values.includes(status.initial) ? status.initial : (values[0] ?? '')
-                  })
-                })
-              }}
-            />
+      {/* One list, three kinds. They were three sections once, which made
+          "affection, then whether she knows, then her standing" three places
+          for one thought — and gave no way to order them against each other.
+          The kind leads the row, the way it does on the variables screen. */}
+      <Field as="div" label="Variables" about={copy('cast.attribute.clamped')}>
+        {npc.variables.map((variable, index) => (
+          <AttrRow key={index} varName={npcVar(npc.inkId, variable.key)}>
             <Select
               size="sm"
-              aria-label={`Starts at, for ${status.key}`}
-              value={status.initial}
+              className="npc-attr-kind"
+              aria-label={`Type of ${variable.label}`}
+              value={variable.kind}
               onChange={(event) =>
-                onPatch({ statuses: patchAt(npc.statuses, index, { initial: event.target.value }) })
+                patchVariable(index, asKind(variable, event.target.value as NpcVarKind))
               }
             >
-              {status.values.map((value) => (
-                <option key={value} value={value}>
-                  {value}
+              {NPC_VAR_KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {KIND_LABELS[kind]}
                 </option>
               ))}
             </Select>
-            <IconButton
-              icon="x"
-              size="sm"
-              label={`Remove ${status.key}`}
-              onClick={() => onPatch({ statuses: npc.statuses.filter((_, at) => at !== index) })}
-            />
-          </AttrRow>
-        ))}
-        <Button variant="quiet" size="sm" icon="plus" onClick={addStatus}>
-          Add a word
-        </Button>
-      </Field>
 
-      <Field as="div" label="Yes or no" about={copy('cast.attribute.bool')}>
-        {npc.flags.map((flag, index) => (
-          <AttrRow key={index} varName={npcVar(npc.inkId, flag.key)}>
             <Input
               size="sm"
               mono
-              aria-label={`Key of ${flag.label}`}
-              value={flag.key}
+              aria-label={`Key of ${variable.label}`}
+              value={variable.key}
               onChange={(event) =>
-                onPatch({ flags: patchAt(npc.flags, index, { key: inkKey(event.target.value) }) })
+                patchVariable(index, { ...variable, key: inkKey(event.target.value) })
               }
             />
             <Input
               size="sm"
-              aria-label={`Label of ${flag.key}`}
-              value={flag.label}
+              aria-label={`Label of ${variable.key}`}
+              value={variable.label}
               onChange={(event) =>
-                onPatch({ flags: patchAt(npc.flags, index, { label: event.target.value }) })
+                patchVariable(index, { ...variable, label: event.target.value })
               }
             />
-            <Checkbox
-              label="starts true"
-              checked={flag.initial}
-              onChange={(event) =>
-                onPatch({
-                  flags: patchAt<NpcFlag>(npc.flags, index, { initial: event.target.checked })
-                })
-              }
-            />
+
+            {/* Only the fields the kind actually has. A range on a yes/no is a
+                control that cannot do anything, and reads as one that is
+                broken. */}
+            {variable.kind === 'number' && (
+              <>
+                {(['initial', 'min', 'max'] as const).map((field) => (
+                  <Input
+                    key={field}
+                    size="sm"
+                    type="number"
+                    title={field}
+                    aria-label={`${field} of ${variable.key}`}
+                    value={Number(variable[field])}
+                    onChange={(event) =>
+                      patchVariable(index, { ...variable, [field]: Number(event.target.value) })
+                    }
+                  />
+                ))}
+                {/* Where the starting value sits in its range. The number is
+                    right there beside it — a bar on its own cannot be read
+                    back. */}
+                <Meter
+                  className="npc-attr-meter"
+                  value={Number(variable.initial)}
+                  min={variable.min}
+                  max={variable.max}
+                  title={`${variable.initial} of ${variable.min}–${variable.max}`}
+                />
+              </>
+            )}
+
+            {variable.kind === 'text' && (
+              <>
+                <Input
+                  size="sm"
+                  title="allowed values, comma separated"
+                  aria-label={`Allowed values of ${variable.key}`}
+                  value={variable.values.join(', ')}
+                  onChange={(event) => {
+                    const values = event.target.value
+                      .split(',')
+                      .map((one) => one.trim())
+                      .filter((one) => one.length > 0)
+                    patchVariable(index, {
+                      ...variable,
+                      values,
+                      // Keeping an initial that is no longer allowed would
+                      // generate ink the story could never set back.
+                      initial: values.includes(String(variable.initial))
+                        ? variable.initial
+                        : (values[0] ?? '')
+                    })
+                  }}
+                />
+                <Select
+                  size="sm"
+                  aria-label={`Starts at, for ${variable.key}`}
+                  value={String(variable.initial)}
+                  onChange={(event) =>
+                    patchVariable(index, { ...variable, initial: event.target.value })
+                  }
+                >
+                  {variable.values.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </Select>
+              </>
+            )}
+
+            {variable.kind === 'boolean' && (
+              <Checkbox
+                label="starts true"
+                checked={variable.initial === true}
+                onChange={(event) =>
+                  patchVariable(index, { ...variable, initial: event.target.checked })
+                }
+              />
+            )}
+
             <IconButton
               icon="x"
               size="sm"
-              label={`Remove ${flag.key}`}
-              onClick={() => onPatch({ flags: npc.flags.filter((_, at) => at !== index) })}
+              label={`Remove ${variable.key}`}
+              onClick={() =>
+                onPatch({ variables: npc.variables.filter((_, at) => at !== index) })
+              }
             />
           </AttrRow>
         ))}
-        <Button variant="quiet" size="sm" icon="plus" onClick={addFlag}>
-          Add a yes or no
+        <Button variant="quiet" size="sm" icon="plus" onClick={addVariable}>
+          Add a variable
         </Button>
       </Field>
 
@@ -589,13 +534,16 @@ function AttrRow({
   )
 }
 
+/** The three kinds, worded for an author rather than for the ink. */
+const KIND_LABELS: Record<NpcVarKind, string> = {
+  number: 'Number',
+  boolean: 'Yes / no',
+  text: 'Word'
+}
+
 /** A key nothing else on this NPC is using — one namespace per person. */
 function uniqueKey(npc: Npc, wanted: string): string {
-  const taken = new Set([
-    ...npc.stats.map((one) => one.key),
-    ...npc.statuses.map((one) => one.key),
-    ...npc.flags.map((one) => one.key)
-  ])
+  const taken = new Set(npc.variables.map((one) => one.key))
 
   let key = wanted
   for (let suffix = 2; taken.has(key); suffix++) key = `${wanted}_${suffix}`

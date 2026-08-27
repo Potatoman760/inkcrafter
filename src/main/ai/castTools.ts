@@ -5,9 +5,8 @@ import {
   npcVar,
   type Npc,
   type NpcDocument,
-  type NpcFlag,
-  type NpcStat,
-  type NpcStatus
+  type NpcVariable,
+  type NpcVarKind
 } from '@shared/bundle/npcDoc'
 import { newId } from '@shared/ids'
 import {
@@ -60,29 +59,15 @@ function asStringList(value: unknown): string[] {
 
 /* Attributes ---------------------------------------------------------------- */
 
-function readStat(value: unknown): NpcStat | null {
-  if (typeof value !== 'object' || value === null) return null
-  const record = value as Record<string, unknown>
-
-  const key = inkKey(asText(record['key']))
-  if (key.length === 0) return null
-
-  const min = asNumber(record['min'], 0)
-  const max = Math.max(min, asNumber(record['max'], 10))
-  const initial = asNumber(record['initial'], min)
-
-  return {
-    key,
-    label: asText(record['label']) || key,
-    // Clamped rather than refused: a starting value outside its own range is a
-    // slip, and the range is the thing the author actually meant.
-    initial: Math.min(max, Math.max(min, initial)),
-    min,
-    max
-  }
-}
-
-function readStatus(value: unknown): NpcStatus | null {
+/**
+ * One variable of any of the three kinds.
+ *
+ * `kind` is taken from the row rather than from which list it arrived in — the
+ * cast holds one list now, the same as a player's variables do. A row that
+ * says nothing about its kind is read from what it carries: permitted words
+ * make it a word, `true`/`false` a yes/no, and a number otherwise.
+ */
+function readVariable(value: unknown, assume?: NpcVarKind): NpcVariable | null {
   if (typeof value !== 'object' || value === null) return null
   const record = value as Record<string, unknown>
 
@@ -90,34 +75,56 @@ function readStatus(value: unknown): NpcStatus | null {
   if (key.length === 0) return null
 
   const values = asStringList(record['values'])
-  const initial = asText(record['initial']).trim()
+  const named = asText(record['kind']).trim().toLowerCase()
+  const kind: NpcVarKind =
+    named === 'number' || named === 'boolean' || named === 'text'
+      ? named
+      : // `assume` is what one of the three older lists says its rows must be.
+        // Otherwise it is read from what the row carries.
+        (assume ??
+          (values.length > 0
+            ? 'text'
+            : typeof record['initial'] === 'boolean'
+              ? 'boolean'
+              : 'number'))
 
-  // A status with no permitted words can never be set to anything, so the
-  // initial value stands as the one member rather than leaving it unusable.
+  const min = asNumber(record['min'], 0)
+  const max = Math.max(min, asNumber(record['max'], 10))
+
+  if (kind === 'number') {
+    // Clamped rather than refused: a starting value outside its own range is a
+    // slip, and the range is the thing the author actually meant.
+    const initial = Math.min(max, Math.max(min, asNumber(record['initial'], min)))
+    return { key, label: asText(record['label']) || key, kind, initial, min, max, values }
+  }
+
+  if (kind === 'boolean') {
+    return {
+      key,
+      label: asText(record['label']) || key,
+      kind,
+      initial: record['initial'] === true,
+      min,
+      max,
+      values
+    }
+  }
+
+  const initial = asText(record['initial']).trim()
+  // A word variable with no permitted words can never be set to anything, so
+  // the initial value stands as the one member rather than leaving it unusable.
   const all = values.length > 0 ? values : initial.length > 0 ? [initial] : []
   if (all.length === 0) return null
 
   return {
     key,
     label: asText(record['label']) || key,
+    kind,
     initial: all.includes(initial) ? initial : all[0]!,
+    min,
+    max,
     values: all
   }
-}
-
-function readFlag(value: unknown): NpcFlag | null {
-  if (typeof value !== 'object' || value === null) return null
-  const record = value as Record<string, unknown>
-
-  const key = inkKey(asText(record['key']))
-  if (key.length === 0) return null
-
-  return { key, label: asText(record['label']) || key, initial: record['initial'] === true }
-}
-
-interface LookInput {
-  name: string
-  file: string
 }
 
 function readLookInput(value: unknown): LookInput | null {
@@ -132,16 +139,19 @@ function readLookInput(value: unknown): LookInput | null {
   return { name: mediaName(asText(record['name'])), file }
 }
 
+interface LookInput {
+  name: string
+  file: string
+}
+
 interface CastInput {
   inkId: string
   name: string
   sprite: string
   looks: LookInput[]
-  stats: NpcStat[]
-  statuses: NpcStatus[]
-  flags: NpcFlag[]
-  /** Which attribute lists the model actually sent, so merging can tell "none" from "unchanged". */
-  sent: { stats: boolean; statuses: boolean; flags: boolean }
+  variables: NpcVariable[]
+  /** Whether the model sent any variables at all, so merging can tell "none" from "unchanged". */
+  sent: { variables: boolean }
 }
 
 function readCastInput(value: unknown): CastInput | null {
@@ -162,13 +172,18 @@ function readCastInput(value: unknown): CastInput | null {
     name: name || inkId,
     sprite: npcName(asText(record['sprite'])),
     looks: list('looks', readLookInput),
-    stats: list('stats', readStat),
-    statuses: list('statuses', readStatus),
-    flags: list('flags', readFlag),
+    // The three older lists are still read, so a model working from an example
+    // it saw before this changed does not silently write nothing.
+    variables: [
+      ...list('variables', (one) => readVariable(one)),
+      ...list('stats', (one) => readVariable(one, 'number')),
+      ...list('statuses', (one) => readVariable(one, 'text')),
+      ...list('flags', (one) => readVariable(one, 'boolean'))
+    ],
     sent: {
-      stats: Array.isArray(record['stats']),
-      statuses: Array.isArray(record['statuses']),
-      flags: Array.isArray(record['flags'])
+      variables: ['variables', 'stats', 'statuses', 'flags'].some((one) =>
+        Array.isArray(record[one])
+      )
     }
   }
 }
@@ -196,13 +211,8 @@ interface MergeReport {
 function mergeNpc(doc: NpcDocument, input: CastInput): MergeReport {
   const existing = doc.npcs.find((npc) => npc.inkId === input.inkId)
 
-  const stats = mergeAttrs(existing?.stats ?? [], input.stats)
-  const statuses = mergeAttrs(existing?.statuses ?? [], input.statuses)
-  const flags = mergeAttrs(existing?.flags ?? [], input.flags)
-
-  const before =
-    (existing?.stats.length ?? 0) + (existing?.statuses.length ?? 0) + (existing?.flags.length ?? 0)
-  const newAttrs = stats.length + statuses.length + flags.length - before
+  const variables = mergeAttrs(existing?.variables ?? [], input.variables)
+  const newAttrs = variables.length - (existing?.variables.length ?? 0)
 
   const npc: Npc = {
     // `med` because that is what the cast panel mints (CastPanel.tsx), odd as
@@ -215,9 +225,7 @@ function mergeNpc(doc: NpcDocument, input: CastInput): MergeReport {
     // An omitted sprite means "leave it", not "clear it" — a model adding one
     // attribute should not detach the character's artwork.
     sprite: input.sprite || existing?.sprite || '',
-    stats,
-    statuses,
-    flags
+    variables
   }
 
   return {
@@ -279,48 +287,33 @@ export const writeCastTool: ToolDefinition = {
                 required: ['file']
               }
             },
-            stats: {
+            variables: {
               type: 'array',
-              description: 'Numbers with a floor and a ceiling — trust, affection, suspicion.',
+              description:
+                'What the story tracks about them, in one list. Each row says its own kind.',
               items: {
                 type: 'object',
                 properties: {
                   key: { type: 'string', description: ATTR_KEY },
                   label: { type: 'string', description: 'What an author sees in the cast panel.' },
-                  initial: { type: 'number' },
-                  min: { type: 'number', description: 'Defaults to 0.' },
-                  max: { type: 'number', description: 'Defaults to 10.' }
-                },
-                required: ['key']
-              }
-            },
-            statuses: {
-              type: 'array',
-              description: 'One of a fixed set of words — a relationship, a rank, a mood.',
-              items: {
-                type: 'object',
-                properties: {
-                  key: { type: 'string', description: ATTR_KEY },
-                  label: { type: 'string' },
+                  kind: {
+                    type: 'string',
+                    enum: ['number', 'boolean', 'text'],
+                    description:
+                      'number for a value with a floor and a ceiling — trust, affection. boolean for true or false — whether they know. text for one of a fixed set of words — a rank, a mood. Worked out from what else the row carries when omitted.'
+                  },
+                  initial: {
+                    description:
+                      'A number, true/false, or one of values — matching kind. Defaults to the floor, false, or the first word.'
+                  },
+                  min: { type: 'number', description: 'number only. Defaults to 0.' },
+                  max: { type: 'number', description: 'number only. Defaults to 10.' },
                   values: {
                     type: 'array',
                     items: { type: 'string' },
-                    description: 'Every word it may hold. Required: a status with no words is dropped.'
-                  },
-                  initial: { type: 'string', description: 'One of values. Defaults to the first.' }
-                },
-                required: ['key', 'values']
-              }
-            },
-            flags: {
-              type: 'array',
-              description: 'True or false — whether they know, whether they have left.',
-              items: {
-                type: 'object',
-                properties: {
-                  key: { type: 'string', description: ATTR_KEY },
-                  label: { type: 'string' },
-                  initial: { type: 'boolean', description: 'Defaults to false.' }
+                    description:
+                      'text only, and required for it: every word it may hold. A text variable with no words is dropped, having nothing it could ever be set to.'
+                  }
                 },
                 required: ['key']
               }
@@ -374,7 +367,12 @@ export const writeCastTool: ToolDefinition = {
     // variables now exist and can be branched on — saying so is what tells the
     // model it does not need to declare them itself.
     const sample = doc.npcs
-      .flatMap((npc) => npc.stats.slice(0, 1).map((stat) => npcVar(npc.inkId, stat.key)))
+      .flatMap((npc) =>
+        npc.variables
+          .filter((one) => one.kind === 'number')
+          .slice(0, 1)
+          .map((one) => npcVar(npc.inkId, one.key))
+      )
       .slice(0, 3)
 
     const clash = await collidingNames(project, doc)
@@ -386,7 +384,7 @@ export const writeCastTool: ToolDefinition = {
         (sprites.newLooks > 0 ? `, +${sprites.newLooks} look${sprites.newLooks === 1 ? '' : 's'}` : ''),
       content:
         `The cast now holds ${doc.npcs.length} character(s). Declarations were regenerated into ` +
-        `ink/state.ink, so the story can use them now${sample.length > 0 ? `: {${sample[0]} >= 3} to gate on one, "# npc: ${doc.npcs[0]?.inkId} ${doc.npcs[0]?.stats[0]?.key ?? 'key'} += 1" to move it` : ''}.` +
+        `ink/state.ink, so the story can use them now${sample.length > 0 ? `: {${sample[0]} >= 3} to gate on one, "# npc: ${doc.npcs[0]?.inkId} ${doc.npcs[0]?.variables[0]?.key ?? 'key'} += 1" to move it` : ''}.` +
         (clash.length > 0
           ? ` Warning: ${clash.join(', ')} ${clash.length === 1 ? 'is' : 'are'} also declared by stats.json. Rename one side or the declarations collide.`
           : '') +
@@ -417,9 +415,7 @@ async function collidingNames(
 
   return doc.npcs
     .flatMap((npc) => [
-      ...npc.stats.map((one) => npcVar(npc.inkId, one.key)),
-      ...npc.statuses.map((one) => npcVar(npc.inkId, one.key)),
-      ...npc.flags.map((one) => npcVar(npc.inkId, one.key))
+      ...npc.variables.map((one) => npcVar(npc.inkId, one.key))
     ])
     .filter((name) => taken.has(name))
 }

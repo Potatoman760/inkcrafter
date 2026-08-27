@@ -4,7 +4,8 @@ import {
   updatePlanNode,
   type PlanChanges,
   type PlanDocument,
-  type PlanNode
+  type PlanNode,
+  type PlanStatus
 } from '@shared/planDoc'
 import { Button, EmptyState, IconButton, Input, Textarea } from '../design/components'
 
@@ -170,6 +171,24 @@ function OutlineSummary({
   )
 }
 
+/**
+ * How far along a part of the story is.
+ *
+ * A dot in the status colour rather than the coloured word itself: `planned` is
+ * the quietest of the three and would be the least readable as text, which is
+ * backwards — the point is to be seen while scanning. The board draws the same
+ * three colours as a line along a card's top edge; here the column is prose and
+ * a rule across it would read as a divider.
+ */
+function StatusNote({ status }: { status: PlanStatus | null }): React.JSX.Element | null {
+  if (status === null) return null
+  return (
+    <span className="plan-outline-status" data-status={status}>
+      {status}
+    </span>
+  )
+}
+
 function OutlineScene({
   scene,
   ordinal,
@@ -188,7 +207,10 @@ function OutlineScene({
   return (
     <div className="plan-outline-scene">
       <div className="plan-outline-scene-head">
-        <span className="plan-outline-eyebrow">Scene {ordinal}</span>
+        <span className="plan-outline-eyebrow">
+          Scene {ordinal}
+          <StatusNote status={scene.status} />
+        </span>
         <OutlineTitle
           value={scene.title}
           label={`Scene ${ordinal} title`}
@@ -198,9 +220,9 @@ function OutlineScene({
         {scene.files[0] && (
           <IconButton
             className="plan-outline-action"
-            icon="file-text"
+            icon="file-pen"
             size="sm"
-            label={`Open ${scene.files[0]}`}
+            label={`Edit ${scene.files[0]}`}
             onClick={() => onOpenFile(scene.files[0]!)}
           />
         )}
@@ -305,7 +327,7 @@ export function PlanOutline({
                   <div className="plan-outline-chapter-head">
                     <span className="plan-outline-eyebrow">
                       Chapter {number}
-                      {chapter.status ? ` · ${chapter.status}` : ''}
+                      <StatusNote status={chapter.status} />
                     </span>
                     <h3 className="plan-outline-chapter-heading">
                       <OutlineTitle

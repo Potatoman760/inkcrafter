@@ -3,7 +3,13 @@ import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { emptyNpcs, npcVar, type Npc, type NpcDocument } from '@shared/bundle/npcDoc'
+import {
+  emptyNpcs,
+  newNpcVariable,
+  npcVar,
+  type Npc,
+  type NpcDocument
+} from '@shared/bundle/npcDoc'
 import {
   addAsset,
   addVariant,
@@ -46,9 +52,7 @@ function someone(over: Partial<Npc> = {}): Npc {
     inkId: 'abeline',
     name: 'Abeline',
     sprite: '',
-    stats: [],
-    statuses: [],
-    flags: [],
+    variables: [],
     ...over
   }
 }
@@ -132,35 +136,66 @@ describe('CastPanel', () => {
     expect(next.npcs.map((npc) => npc.inkId)).toEqual(['someone', 'someone_2'])
   })
 
-  it('keeps the three kinds of attribute apart, each with its own defaults', async () => {
+  /**
+   * One list of three kinds, rather than three lists.
+   *
+   * The kind leads the row and decides what the rest of it is: a range is a
+   * control a yes/no cannot use, and showing one that does nothing reads as one
+   * that is broken.
+   */
+  it('adds a number, and shows only the fields a number has', async () => {
     live()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add a number' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Add a word' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Add a yes or no' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add a variable' }))
 
+    expect(screen.getByLabelText('Type of Affection')).toHaveValue('number')
     // A number carries a range, because ink cannot clamp for itself.
-    expect(screen.getByDisplayValue('affection')).toBeInTheDocument()
     expect(screen.getByTitle('min')).toHaveValue(0)
     expect(screen.getByTitle('max')).toHaveValue(10)
+    expect(screen.queryByTitle('allowed values, comma separated')).toBeNull()
+    expect(screen.queryByRole('checkbox', { name: /starts true/ })).toBeNull()
+  })
 
-    // A word carries the set it may hold.
-    expect(screen.getByTitle('allowed values, comma separated')).toHaveValue('single, married')
+  it('swaps which fields the row has when its type changes', async () => {
+    live()
+    await userEvent.click(screen.getByRole('button', { name: 'Add a variable' }))
 
-    // A yes/no carries only its starting side.
+    await userEvent.selectOptions(screen.getByLabelText('Type of Affection'), 'text')
+    // A word carries the set it may hold, and nothing about a range.
+    expect(screen.getByTitle('allowed values, comma separated')).toHaveValue('')
+    expect(screen.queryByTitle('min')).toBeNull()
+
+    await userEvent.selectOptions(screen.getByLabelText('Type of Affection'), 'boolean')
     expect(screen.getByRole('checkbox', { name: /starts true/ })).not.toBeChecked()
+    expect(screen.queryByTitle('allowed values, comma separated')).toBeNull()
+  })
+
+  /** Switching away and back must not lose what the other kind was set to. */
+  it('keeps the range through a change of type and back', async () => {
+    live(
+      seeded([
+        someone({
+          variables: [{ ...newNpcVariable('number', 'affection', 'Affection'), max: 20 }]
+        })
+      ])
+    )
+
+    await userEvent.selectOptions(screen.getByLabelText('Type of Affection'), 'boolean')
+    await userEvent.selectOptions(screen.getByLabelText('Type of Affection'), 'number')
+
+    expect(screen.getByTitle('max')).toHaveValue(20)
   })
 
   it('numbers the second attribute rather than letting two share a key', async () => {
-    live(seeded([someone({ stats: [{ key: 'affection', label: 'Affection', initial: 0, min: 0, max: 10 }] })]))
+    live(seeded([someone({ variables: [newNpcVariable('number', 'affection', 'Affection')] })]))
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add a number' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add a variable' }))
 
     expect(screen.getByDisplayValue('affection_2')).toBeInTheDocument()
   })
 
   it('shows the ink variable each attribute becomes, and follows a rename', async () => {
-    live(seeded([someone({ flags: [{ key: 'knows', label: 'Knows', initial: false }] })]))
+    live(seeded([someone({ variables: [newNpcVariable('boolean', 'knows', 'Knows')] })]))
 
     expect(screen.getByText(npcVar('abeline', 'knows'))).toBeInTheDocument()
 
@@ -189,8 +224,12 @@ describe('CastPanel', () => {
     live(
       seeded([
         someone({
-          statuses: [
-            { key: 'status', label: 'Status', initial: 'married', values: ['single', 'married'] }
+          variables: [
+            {
+              ...newNpcVariable('text', 'status', 'Status'),
+              initial: 'married',
+              values: ['single', 'married']
+            }
           ]
         })
       ])
@@ -234,7 +273,9 @@ describe('CastPanel', () => {
       live(
         seeded([
           someone({
-            statuses: [{ key: 'status', label: 'Status', initial: 'single', values: ['single'] }]
+            variables: [
+              { ...newNpcVariable('text', 'status', 'Status'), values: ['single'] }
+            ]
           })
         ])
       )
@@ -288,9 +329,9 @@ describe('CastPanel', () => {
     live(
       seeded([
         someone({
-          stats: [
-            { key: 'affection', label: 'Affection', initial: 0, min: 0, max: 10 },
-            { key: 'trust', label: 'Trust', initial: 3, min: 0, max: 5 }
+          variables: [
+            newNpcVariable('number', 'affection', 'Affection'),
+            { ...newNpcVariable('number', 'trust', 'Trust'), initial: 3, max: 5 }
           ]
         })
       ])

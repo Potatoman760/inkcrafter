@@ -108,6 +108,11 @@ const BOX_FIELDS = [
   { key: 'height', label: 'Height' }
 ] as const
 
+type MapGesture =
+  | { kind: 'draw'; from: { x: number; y: number } }
+  | { kind: 'move'; id: string }
+  | { kind: 'resize'; id: string; handle: MapHandle }
+
 export function MapPanel({
   doc,
   saving,
@@ -136,15 +141,57 @@ export function MapPanel({
    * move, release. Keeping them apart meant three pairs of handlers that could
    * each be left running when the pointer went somewhere unexpected.
    */
-  const drag = useRef<
-    | { kind: 'draw'; from: { x: number; y: number } }
-    | { kind: 'move'; id: string }
-    | { kind: 'resize'; id: string; handle: MapHandle }
-    | null
-  >(null)
+  const drag = useRef<MapGesture | null>(null)
+
+  /**
+   * The element that owns the browser's pointer capture for `drag`.
+   *
+   * Chromium normally releases capture on pointer-up, but a view change can
+   * remove the owner first. On Electron/Windows that leaves subsequent clicks
+   * unable to focus controls until the whole window loses and regains focus.
+   */
+  const captured = useRef<{ element: HTMLElement; pointerId: number } | null>(null)
 
   /** The rectangle being drawn, in map units. Nothing is written until release. */
   const [drawing, setDrawing] = useState<MapRect | null>(null)
+
+  const releaseCapture = (): void => {
+    const held = captured.current
+    captured.current = null
+    if (!held) return
+    try {
+      held.element.releasePointerCapture(held.pointerId)
+    } catch {
+      // Pointer-up may already have released it. The ref still needed clearing.
+    }
+  }
+
+  const capturePointer = (
+    event: React.PointerEvent<HTMLElement>,
+    gesture: MapGesture
+  ): void => {
+    releaseCapture()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    captured.current = { element: event.currentTarget, pointerId: event.pointerId }
+    drag.current = gesture
+  }
+
+  // Leaving the view or the application must never leave Chromium holding a
+  // pointer on a detached map element. The latter also covers a pointer-up the
+  // OS delivered while another window was active.
+  useEffect(() => {
+    const abandon = (): void => {
+      releaseCapture()
+      drag.current = null
+      setDrawing(null)
+    }
+    window.addEventListener('blur', abandon)
+    return () => {
+      window.removeEventListener('blur', abandon)
+      releaseCapture()
+      drag.current = null
+    }
+  }, [])
 
   /**
    * The shape of each hotspot asset's art, once the browser has loaded it.
@@ -179,7 +226,7 @@ export function MapPanel({
     npcs: Object.fromEntries(npcs.npcs.map((npc) => [npc.inkId, npc.name])),
     attrs: Object.fromEntries(
       npcs.npcs.flatMap((npc) =>
-        [...npc.stats, ...npc.statuses, ...npc.flags].map((attr) => [
+        npc.variables.map((attr) => [
           `${npc.inkId}.${attr.key}`,
           attr.label
         ])
@@ -306,6 +353,7 @@ export function MapPanel({
   })
 
   const endGesture = (): void => {
+    releaseCapture()
     const gesture = drag.current
     drag.current = null
 
@@ -743,13 +791,17 @@ export function MapPanel({
               if (knots.length === 0) return
               const at = pointAt(event)
               if (!at) return
-              event.currentTarget.setPointerCapture(event.pointerId)
-              drag.current = { kind: 'draw', from: at }
+              capturePointer(event, { kind: 'draw', from: at })
               setDrawing(null)
             }}
             onPointerMove={onPointerMove}
             onPointerUp={endGesture}
             onPointerCancel={endGesture}
+            onLostPointerCapture={() => {
+              // An explicit release has already cleared the owner. Only an
+              // unexpected loss still has a gesture to finish.
+              if (captured.current !== null) endGesture()
+            }}
           >
             {image ? (
               <img src={image} alt="" draggable={false} onLoad={adoptImageSize} />
@@ -778,8 +830,7 @@ export function MapPanel({
                   onPointerDown={(event) => {
                     // Not the canvas's business: pressing a place moves it.
                     event.stopPropagation()
-                    event.currentTarget.setPointerCapture(event.pointerId)
-                    drag.current = { kind: 'move', id: location.id }
+                    capturePointer(event, { kind: 'move', id: location.id })
                     setSelectedId(location.id)
                   }}
                 >
@@ -818,8 +869,7 @@ export function MapPanel({
                     className={`map-handle map-handle--${handle}`}
                     onPointerDown={(event) => {
                       event.stopPropagation()
-                      event.currentTarget.setPointerCapture(event.pointerId)
-                      drag.current = { kind: 'resize', id: selected.id, handle }
+                      capturePointer(event, { kind: 'resize', id: selected.id, handle })
                     }}
                   />
                 ))}

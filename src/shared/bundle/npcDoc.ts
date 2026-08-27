@@ -13,30 +13,37 @@
  *
  * Three kinds, because a visual novel keeps three kinds of thing about a person
  * and flattening them into "a number" loses the check that makes each safe:
- * a *stat* is a number with a floor and a ceiling, a *status* is one of a fixed
- * set of words, and a *flag* is true or false.
+ * a number has a floor and a ceiling, a word is one of a fixed set, and a
+ * yes/no is true or false.
+ *
+ * One list holding all three, though, rather than three lists. They were three
+ * for a while and it made the editor three sections that could not be ordered
+ * against each other — "affection, then whether she knows, then her standing"
+ * is one thought and was three places. The kind is a field, exactly as it is on
+ * a player stat; see `StatKind`, whose three words these are.
  */
 
-export interface NpcStat {
+/** The same three words a player stat uses. Kept identical on purpose. */
+export type NpcVarKind = 'number' | 'boolean' | 'text'
+
+export const NPC_VAR_KINDS: readonly NpcVarKind[] = ['number', 'boolean', 'text']
+
+export interface NpcVariable {
   key: string
   label: string
-  initial: number
+  kind: NpcVarKind
+  /** Read according to `kind`: a number, true/false, or one of `values`. */
+  initial: number | boolean | string
+  /**
+   * The floor and ceiling a number is clamped to.
+   *
+   * Kept whatever the kind, so switching a variable to a word and back does not
+   * quietly lose the range somebody set. The same goes for `values`.
+   */
   min: number
   max: number
-}
-
-export interface NpcStatus {
-  key: string
-  label: string
-  initial: string
-  /** The words this may hold. An assignment outside the set is refused. */
+  /** The words a `text` variable may hold. An assignment outside the set is refused. */
   values: string[]
-}
-
-export interface NpcFlag {
-  key: string
-  label: string
-  initial: boolean
 }
 
 export interface Npc {
@@ -48,9 +55,43 @@ export interface Npc {
   name: string
   /** A `character` media asset's name, or empty — a tracked NPC need not appear. */
   sprite: string
-  stats: NpcStat[]
-  statuses: NpcStatus[]
-  flags: NpcFlag[]
+  variables: NpcVariable[]
+}
+
+/** A new variable of one kind, with defaults that make it usable immediately. */
+export function newNpcVariable(kind: NpcVarKind, key: string, label: string): NpcVariable {
+  return {
+    key,
+    label,
+    kind,
+    initial: kind === 'number' ? 0 : kind === 'boolean' ? false : 'single',
+    min: 0,
+    max: 10,
+    values: kind === 'text' ? ['single', 'married'] : []
+  }
+}
+
+/**
+ * The same variable read as another kind.
+ *
+ * Changing the kind has to change the starting value with it: `0` is not a word
+ * and `single` is not a number, and leaving the old one would generate ink the
+ * story could never set back. Everything else is left alone, so switching away
+ * and back returns what was there.
+ */
+export function asKind(variable: NpcVariable, kind: NpcVarKind): NpcVariable {
+  if (variable.kind === kind) return variable
+
+  const initial =
+    kind === 'number'
+      ? Math.min(Math.max(Number(variable.initial) || 0, variable.min), variable.max)
+      : kind === 'boolean'
+        ? variable.initial === true
+        : variable.values.includes(String(variable.initial))
+          ? String(variable.initial)
+          : (variable.values[0] ?? '')
+
+  return { ...variable, kind, initial }
 }
 
 export interface NpcDocument {
@@ -69,20 +110,16 @@ export function npcVar(inkId: string, key: string): string {
 
 /** Every ink name this document occupies, for checking a stat does not collide. */
 export function npcVarNames(doc: NpcDocument): string[] {
-  return doc.npcs.flatMap((npc) => [
-    ...npc.stats.map((stat) => npcVar(npc.inkId, stat.key)),
-    ...npc.statuses.map((status) => npcVar(npc.inkId, status.key)),
-    ...npc.flags.map((flag) => npcVar(npc.inkId, flag.key))
-  ])
+  return doc.npcs.flatMap((npc) =>
+    npc.variables.map((variable) => npcVar(npc.inkId, variable.key))
+  )
 }
 
 /** Every attribute of one NPC, as `id.key`, for validating an `# npc:` tag. */
 export function npcAttrNames(doc: NpcDocument): string[] {
-  return doc.npcs.flatMap((npc) => [
-    ...npc.stats.map((stat) => `${npc.inkId}.${stat.key}`),
-    ...npc.statuses.map((status) => `${npc.inkId}.${status.key}`),
-    ...npc.flags.map((flag) => `${npc.inkId}.${flag.key}`)
-  ])
+  return doc.npcs.flatMap((npc) =>
+    npc.variables.map((variable) => `${npc.inkId}.${variable.key}`)
+  )
 }
 
 export function findNpc(doc: NpcDocument, inkId: string): Npc | null {
@@ -119,12 +156,14 @@ export function spriteForSpeaker(doc: NpcDocument, speaker: string): string | nu
   return npc && npc.sprite.length > 0 ? npc.sprite : null
 }
 
-/** What kind of attribute this is, or null when the NPC has no such key. */
-export function attrKind(npc: Npc, key: string): 'stat' | 'status' | 'flag' | null {
-  if (npc.stats.some((one) => one.key === key)) return 'stat'
-  if (npc.statuses.some((one) => one.key === key)) return 'status'
-  if (npc.flags.some((one) => one.key === key)) return 'flag'
-  return null
+/** The variable one of an NPC's keys names, or null when they have no such key. */
+export function npcVariable(npc: Npc, key: string): NpcVariable | null {
+  return npc.variables.find((one) => one.key === key) ?? null
+}
+
+/** What kind of variable this is, or null when the NPC has no such key. */
+export function attrKind(npc: Npc, key: string): NpcVarKind | null {
+  return npcVariable(npc, key)?.kind ?? null
 }
 
 /* Persistence. Tolerant, like the other documents: a malformed entry is dropped
@@ -167,61 +206,64 @@ export function inkKey(text: string): string {
   return /^[0-9]/.test(cleaned) ? `_${cleaned}` : cleaned
 }
 
-function asStat(value: unknown): NpcStat | null {
-  if (typeof value !== 'object' || value === null) return null
-  const record = value as Record<string, unknown>
-
-  const key = inkKey(asText(record['key']))
-  if (key.length === 0) return null
-
+/**
+ * The floor, ceiling and word list a variable carries whatever its kind.
+ *
+ * Read for every kind rather than only the one that uses them, so a file whose
+ * variable was a number yesterday still has its range when it is one again.
+ */
+function asRange(record: Record<string, unknown>): { min: number; max: number } {
   const min = asNumber(record['min'], 0)
-  const max = asNumber(record['max'], 10)
-
-  return {
-    key,
-    label: asText(record['label']) || key,
-    initial: asNumber(record['initial'], min),
-    min,
-    // A ceiling below the floor would make every assignment fail silently.
-    max: Math.max(min, max)
-  }
+  // A ceiling below the floor would make every assignment fail silently.
+  return { min, max: Math.max(min, asNumber(record['max'], 10)) }
 }
 
-function asStatus(value: unknown): NpcStatus | null {
-  if (typeof value !== 'object' || value === null) return null
-  const record = value as Record<string, unknown>
-
-  const key = inkKey(asText(record['key']))
-  if (key.length === 0) return null
-
-  const values = Array.isArray(record['values'])
+function asWords(record: Record<string, unknown>): string[] {
+  return Array.isArray(record['values'])
     ? record['values'].filter((one): one is string => typeof one === 'string' && one.length > 0)
     : []
-
-  // A status with no permitted words can never be set to anything, so the
-  // initial value is kept as the one member rather than leaving it unusable.
-  const initial = asText(record['initial'])
-  const all = values.length > 0 ? values : initial.length > 0 ? [initial] : []
-
-  return {
-    key,
-    label: asText(record['label']) || key,
-    initial: all.includes(initial) ? initial : (all[0] ?? ''),
-    values: all
-  }
 }
 
-function asFlag(value: unknown): NpcFlag | null {
+function asVariable(value: unknown, assume?: NpcVarKind): NpcVariable | null {
   if (typeof value !== 'object' || value === null) return null
   const record = value as Record<string, unknown>
 
   const key = inkKey(asText(record['key']))
   if (key.length === 0) return null
 
+  const named = record['kind']
+  const kind: NpcVarKind =
+    named === 'number' || named === 'boolean' || named === 'text'
+      ? named
+      : // No kind, or one nobody recognises. `assume` is what the list it came
+        // out of says it must be, back when there were three lists; a number is
+        // the fallback otherwise, being the kind that reads most values.
+        (assume ?? 'number')
+
+  const { min, max } = asRange(record)
+  const values = asWords(record)
+  const raw = record['initial']
+
+  const initial: NpcVariable['initial'] =
+    kind === 'boolean'
+      ? raw === true
+      : kind === 'number'
+        ? asNumber(raw, min)
+        : // A word outside the permitted set could never be set back, so the
+          // list wins — and a list nobody filled in takes the word as its one
+          // member rather than leaving the variable unusable.
+          values.includes(asText(raw))
+          ? asText(raw)
+          : (values[0] ?? asText(raw))
+
   return {
     key,
     label: asText(record['label']) || key,
-    initial: record['initial'] === true
+    kind,
+    initial,
+    min,
+    max,
+    values: kind === 'text' && values.length === 0 && asText(raw).length > 0 ? [asText(raw)] : values
   }
 }
 
@@ -232,19 +274,30 @@ function asNpc(value: unknown): Npc | null {
   const inkId = npcName(asText(record['inkId']) || asText(record['name']))
   if (inkId.length === 0) return null
 
-  const list = <T>(key: string, read: (one: unknown) => T | null): T[] =>
+  const list = (key: string, assume?: NpcVarKind): NpcVariable[] =>
     Array.isArray(record[key])
-      ? (record[key] as unknown[]).map(read).filter((one): one is T => one !== null)
+      ? (record[key] as unknown[])
+          .map((one) => asVariable(one, assume))
+          .filter((one): one is NpcVariable => one !== null)
       : []
+
+  // `variables` is the shape now. A file written when there were three lists is
+  // read from those instead, in the order they were shown, so nothing an author
+  // arranged is reordered under them.
+  const variables = Array.isArray(record['variables'])
+    ? list('variables')
+    : [...list('stats', 'number'), ...list('statuses', 'text'), ...list('flags', 'boolean')]
 
   return {
     id: asText(record['id']),
     inkId,
     name: asText(record['name']) || inkId,
     sprite: npcName(asText(record['sprite'])),
-    stats: list('stats', asStat),
-    statuses: list('statuses', asStatus),
-    flags: list('flags', asFlag)
+    // One namespace per person: a key claimed twice would generate the same ink
+    // global twice, and the second declaration is a compile error.
+    variables: variables.filter(
+      (one, at) => variables.findIndex((other) => other.key === one.key) === at
+    )
   }
 }
 

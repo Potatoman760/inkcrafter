@@ -404,6 +404,55 @@ describe('music', () => {
     expect(parseTag('music: STOP')).toEqual({ kind: 'music', name: null, variant: null })
   })
 
+  /**
+   * How long the stop takes. A bare `stop` cuts, which is what it has always
+   * done, so the seconds are an addition nobody has to know about to keep
+   * writing what they were writing.
+   */
+  describe('fading out', () => {
+    it('reads the seconds off the end of a stop', () => {
+      expect(parseTag('music: stop 5')).toEqual({
+        kind: 'music',
+        name: null,
+        variant: null,
+        fade: 5
+      })
+    })
+
+    /** A duration, not a number the story counts with, so halves are allowed. */
+    it('takes a fraction of a second', () => {
+      expect(parseTag('music: stop 1.5')).toMatchObject({ fade: 1.5 })
+    })
+
+    // Absent and zero are one case, so the field is left off rather than
+    // written as a zero that means the same as saying nothing.
+    it('says nothing about a fade nobody asked for', () => {
+      expect(parseTag('music: stop')).not.toHaveProperty('fade')
+      expect(parseTag('music: stop 0')).not.toHaveProperty('fade')
+    })
+
+    it('refuses a fade that is not a count of seconds', () => {
+      expect(parseTag('music: stop soon')).toBeNull()
+      expect(parseTag('music: stop -2')).toBeNull()
+      expect(parseTag('music: stop 5 6')).toBeNull()
+    })
+
+    /** A track has no fade to take: the word is about ending, not starting. */
+    it('does not read one on a track being started', () => {
+      expect(parseTag('music: the_grove 5')).toBeNull()
+    })
+
+    it('writes it back, and round-trips', () => {
+      expect(formatTag({ kind: 'music', name: null, variant: null, fade: 5 })).toBe('music: stop 5')
+      expect(formatTag({ kind: 'music', name: null, variant: null, fade: 0 })).toBe('music: stop')
+      expect(formatTag({ kind: 'music', name: null, variant: null })).toBe('music: stop')
+
+      for (const raw of ['music: stop', 'music: stop 5', 'music: stop 1.5']) {
+        expect(formatTag(parseTag(raw)!)).toBe(raw)
+      }
+    })
+  })
+
   it('treats none as a name, since stop is the word that stops it', () => {
     // Worth being sure about: `# bg: none` clears the picture, and somebody
     // will write the same for music. It resolves to nothing and is reported,

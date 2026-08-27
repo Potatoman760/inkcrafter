@@ -138,13 +138,13 @@ describe('PlanOutline', () => {
     expect(screen.getByRole('button', { name: 'The shelves.' })).toBeInTheDocument()
   })
 
-  it('opens the ink behind a scene that has a file, and expands one that does not', async () => {
+  it('edits the ink behind a scene that has a file, and expands one that does not', async () => {
     const { onOpenFile, onExpand, plan } = outline(withScenes())
 
-    await userEvent.click(screen.getByRole('button', { name: 'Open ink/knocking.ink' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Edit ink/knocking.ink' }))
     expect(onOpenFile).toHaveBeenCalledWith('ink/knocking.ink')
 
-    expect(screen.queryByRole('button', { name: 'Open ink/the-key.ink' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit ink/the-key.ink' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Expand The key' }))
     expect(onExpand).toHaveBeenCalledWith(plan.nodes[0]!.children[0]!.children[1]!.id)
   })
@@ -155,6 +155,28 @@ describe('PlanOutline', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add an act' }))
     const next = onChange.mock.calls[0]![0] as PlanDocument
     expect(next.nodes).toHaveLength(1)
+  })
+
+  /**
+   * The outline says how far along things are too, in its own idiom: the word
+   * and a dot in the board's status colour. Scenes had neither, so a Scene half
+   * drafted read exactly like one nobody had started.
+   */
+  it('says how far along a chapter and a scene are', () => {
+    const plan = withScenes()
+    plan.nodes[0]!.children[0]!.status = 'drafting'
+    plan.nodes[0]!.children[0]!.children[0]!.status = 'done'
+
+    outline(plan)
+
+    const [chapter, scene] = screen.getAllByText(/^(drafting|done)$/)
+    expect(chapter).toHaveAttribute('data-status', 'drafting')
+    expect(scene).toHaveAttribute('data-status', 'done')
+  })
+
+  it('says nothing about a status nobody has set', () => {
+    outline(withScenes())
+    expect(screen.queryByText(/^(planned|drafting|done)$/)).not.toBeInTheDocument()
   })
 
   it('counts what hangs off each act and chapter', () => {

@@ -36,6 +36,14 @@
   --state-ok-bg: var(--accent-good-quiet);
   --state-info-bg: var(--accent-signal-quiet);
 
+  /* How far along a part of the plan is. Named here rather than written into
+     each screen because three screens draw it — the board's cards, the Scenes
+     under them, and the outline — and three copies of a colour is three
+     chances for one of them to drift. */
+  --status-planned: var(--ink-600);
+  --status-drafting: var(--accent-caution);
+  --status-done: var(--accent-good);
+
   --focus-ring: var(--accent-signal);
   --selection-bg: oklch(0.74 0.12 var(--hue-signal) / 0.26);
 

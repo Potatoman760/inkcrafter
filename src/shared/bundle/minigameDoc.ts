@@ -58,8 +58,39 @@ export interface CombatMinigame {
   strikeMs: TunableNumber
 }
 
-/** Discriminated now so a second minigame kind is an additive change. */
-export type MinigameDefinition = CombatMinigame
+export interface QuickhandsMinigame {
+  /** `mng_…`. Stable across display/name changes. */
+  id: string
+  kind: 'quickhands'
+  /** Ink-safe name used by `# minigame:`. */
+  name: string
+  display: string
+  description: string
+  /** Optional concrete background look rendered behind the lanes. */
+  background: GalleryMediaRef | null
+  /** Optional still animation looks; the player supplies readable shapes when absent. */
+  targetArt: GalleryMediaRef | null
+  hazardArt: GalleryMediaRef | null
+  catcherArt: GalleryMediaRef | null
+  /** Existing text variable set to `victory` or `defeat`. */
+  resultVariable: string
+  /** Transient instructions and catch/miss feedback. */
+  showStateHints: boolean
+  laneCount: TunableNumber
+  roundDurationMs: TunableNumber
+  spawnIntervalMs: TunableNumber
+  fallDurationMs: TunableNumber
+  /** Time on either side of the catch line during which an object can be caught. */
+  catchWindowMs: TunableNumber
+  targetChancePercent: TunableNumber
+  goalScore: TunableNumber
+  targetPoints: TunableNumber
+  hazardPenalty: TunableNumber
+  missedTargetPenalty: TunableNumber
+}
+
+/** Discriminated so each runtime can grow without making the others accept its fields. */
+export type MinigameDefinition = CombatMinigame | QuickhandsMinigame
 
 export interface MinigameDocument {
   version: 1
@@ -101,6 +132,32 @@ export function newCombatMinigame(name: string): CombatMinigame {
     counterChancePercent: tuned(100),
     idleMs: tuned(500),
     strikeMs: tuned(350)
+  }
+}
+
+export function newQuickhandsMinigame(name: string): QuickhandsMinigame {
+  return {
+    id: newId('mng'),
+    kind: 'quickhands',
+    name: minigameName(name),
+    display: name.trim(),
+    description: '',
+    background: null,
+    targetArt: null,
+    hazardArt: null,
+    catcherArt: null,
+    resultVariable: '',
+    showStateHints: true,
+    laneCount: tuned(3),
+    roundDurationMs: tuned(30_000),
+    spawnIntervalMs: tuned(900),
+    fallDurationMs: tuned(3_000),
+    catchWindowMs: tuned(550),
+    targetChancePercent: tuned(72),
+    goalScore: tuned(24),
+    targetPoints: tuned(2),
+    hazardPenalty: tuned(3),
+    missedTargetPenalty: tuned(1)
   }
 }
 
@@ -179,6 +236,36 @@ function parseCombat(value: unknown): CombatMinigame | null {
   }
 }
 
+function parseQuickhands(value: unknown): QuickhandsMinigame | null {
+  const one = record(value)
+  if (!one || one['kind'] !== 'quickhands') return null
+  const name = minigameName(text(one['name']))
+  if (name.length === 0) return null
+  return {
+    id: text(one['id']) || newId('mng'),
+    kind: 'quickhands',
+    name,
+    display: text(one['display']) || name,
+    description: text(one['description']),
+    background: mediaRef(one['background']),
+    targetArt: mediaRef(one['targetArt']),
+    hazardArt: mediaRef(one['hazardArt']),
+    catcherArt: mediaRef(one['catcherArt']),
+    resultVariable: text(one['resultVariable']),
+    showStateHints: one['showStateHints'] === true,
+    laneCount: parseTunable(one['laneCount'], 3),
+    roundDurationMs: parseTunable(one['roundDurationMs'], 30_000),
+    spawnIntervalMs: parseTunable(one['spawnIntervalMs'], 900),
+    fallDurationMs: parseTunable(one['fallDurationMs'], 3_000),
+    catchWindowMs: parseTunable(one['catchWindowMs'], 550),
+    targetChancePercent: parseTunable(one['targetChancePercent'], 72),
+    goalScore: parseTunable(one['goalScore'], 24),
+    targetPoints: parseTunable(one['targetPoints'], 2),
+    hazardPenalty: parseTunable(one['hazardPenalty'], 3),
+    missedTargetPenalty: parseTunable(one['missedTargetPenalty'], 1)
+  }
+}
+
 /** Tolerant like every other authored catalogue: one broken row does not hide the rest. */
 export function parseMinigames(json: string): MinigameDocument {
   try {
@@ -188,7 +275,7 @@ export function parseMinigames(json: string): MinigameDocument {
       version: 1,
       minigames: Array.isArray(top['minigames'])
         ? top['minigames'].flatMap((value) => {
-            const game = parseCombat(value)
+            const game = parseCombat(value) ?? parseQuickhands(value)
             return game ? [game] : []
           })
         : []

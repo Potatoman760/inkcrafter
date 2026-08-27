@@ -301,6 +301,21 @@ describe('changing the scene', () => {
     expect(onSet).toHaveBeenCalledWith({ kind: 'music', name: null, variant: null }, undefined)
   })
 
+  /**
+   * A stop can be told to take its time. The rail says so, because a section
+   * that fades out reads exactly like one that cuts otherwise.
+   */
+  it('says how long a music stop takes, when it was given a fade', () => {
+    const detail = (tag: string): string | undefined =>
+      railRows(
+        sectionScenes(seeded(), manuscript([prose('Quiet.', { tags: [tag] })]))[0]!,
+        FILES
+      ).find((row) => row.key === 'music')?.detail
+
+    expect(detail('music: stop 5')).toBe('over 5s')
+    expect(detail('music: stop')).toBeUndefined()
+  })
+
   it('sets music by track name without writing its internal file variant', async () => {
     const onSet = vi.fn()
     rail(1, true, twoSections(), { onSet })

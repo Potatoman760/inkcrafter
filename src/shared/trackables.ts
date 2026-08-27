@@ -117,14 +117,16 @@ export function trackablesOf(stats: StatsDocument, npcs: NpcDocument): Trackable
       })
     }
 
-    for (const stat of npc.stats) {
-      cast(stat.key, 'number', stat.label, { min: stat.min, max: stat.max })
-    }
-    for (const status of npc.statuses) {
-      cast(status.key, 'text', status.label, { values: status.values })
-    }
-    for (const flag of npc.flags) {
-      cast(flag.key, 'flag', flag.label, {})
+    for (const variable of npc.variables) {
+      // `flag` here, `boolean` in the catalogue: this list is shared with the
+      // player's own stats, whose yes/no rows have always been called flags.
+      if (variable.kind === 'number') {
+        cast(variable.key, 'number', variable.label, { min: variable.min, max: variable.max })
+      } else if (variable.kind === 'text') {
+        cast(variable.key, 'text', variable.label, { values: variable.values })
+      } else {
+        cast(variable.key, 'flag', variable.label, {})
+      }
     }
   }
 

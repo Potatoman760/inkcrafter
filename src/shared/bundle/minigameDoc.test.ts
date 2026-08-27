@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   newCombatMinigame,
+  newQuickhandsMinigame,
   parseMinigames,
   resolveTunable,
   serialiseMinigames
@@ -18,6 +19,21 @@ describe('minigame catalogue', () => {
     expect(parseMinigames(serialiseMinigames({ version: 1, minigames: [combat] }))).toEqual({
       version: 1,
       minigames: [combat]
+    })
+  })
+
+  it('round-trips quick-hands graphics and tuning', () => {
+    const quickhands = newQuickhandsMinigame('Broodmarket cabinet')
+    quickhands.resultVariable = 'quickhands_result'
+    quickhands.background = { assetId: 'med_market', variantId: 'med_day' }
+    quickhands.targetArt = { assetId: 'med_token', variantId: 'med_gold' }
+    quickhands.hazardArt = { assetId: 'med_token', variantId: 'med_thorn' }
+    quickhands.catcherArt = { assetId: 'med_hand', variantId: 'med_open' }
+    quickhands.spawnIntervalMs.modifiers.push({ stat: 'dexterity', perPoint: -20 })
+
+    expect(parseMinigames(serialiseMinigames({ version: 1, minigames: [quickhands] }))).toEqual({
+      version: 1,
+      minigames: [quickhands]
     })
   })
 
@@ -41,7 +57,12 @@ describe('minigame catalogue', () => {
   it('drops malformed rows and tolerates an unreadable document', () => {
     expect(parseMinigames('not json').minigames).toEqual([])
     expect(parseMinigames(JSON.stringify({
-      minigames: [null, { kind: 'puzzle', name: 'x' }, { kind: 'combat', name: '' }]
+      minigames: [
+        null,
+        { kind: 'puzzle', name: 'x' },
+        { kind: 'combat', name: '' },
+        { kind: 'quickhands', name: '' }
+      ]
     })).minigames).toEqual([])
   })
 })

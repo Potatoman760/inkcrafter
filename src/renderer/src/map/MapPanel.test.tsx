@@ -79,9 +79,12 @@ interface Options {
 }
 
 /** Controlled by the test, for asserting exactly what onChange was handed. */
-function panel(doc = seeded(), options: Options = {}): ReturnType<typeof vi.fn> {
+function mountPanel(
+  doc = seeded(),
+  options: Options = {}
+): { onChange: ReturnType<typeof vi.fn>; unmount: () => void } {
   const onChange = vi.fn()
-  render(
+  const { unmount } = render(
     <MapPanel
       doc={doc}
       saving={false}
@@ -98,7 +101,11 @@ function panel(doc = seeded(), options: Options = {}): ReturnType<typeof vi.fn> 
       onChange={onChange}
     />
   )
-  return onChange
+  return { onChange, unmount }
+}
+
+function panel(doc = seeded(), options: Options = {}): ReturnType<typeof vi.fn> {
+  return mountPanel(doc, options).onChange
 }
 
 /** Rendered against real state, for anything that types into a controlled field. */
@@ -312,6 +319,31 @@ describe('MapPanel', () => {
  * belongs to is the whole job, and none of it can be done with number fields.
  */
 describe('MapPanel - the picture', () => {
+  it('releases the pointer when a map gesture ends', () => {
+    panel(onPicture(), { backgroundUrl: () => 'app://map.png' })
+    const canvas = stubCanvas()
+    canvas.setPointerCapture = vi.fn()
+    canvas.releasePointerCapture = vi.fn()
+
+    fireEvent.pointerDown(canvas, { pointerId: 7, ...client(400, 200) })
+    fireEvent.pointerUp(canvas, { pointerId: 7 })
+
+    expect(canvas.setPointerCapture).toHaveBeenCalledWith(7)
+    expect(canvas.releasePointerCapture).toHaveBeenCalledWith(7)
+  })
+
+  it('releases the pointer when leaving the map view mid-gesture', () => {
+    const { unmount } = mountPanel(onPicture(), { backgroundUrl: () => 'app://map.png' })
+    const canvas = stubCanvas()
+    canvas.setPointerCapture = vi.fn()
+    canvas.releasePointerCapture = vi.fn()
+
+    fireEvent.pointerDown(canvas, { pointerId: 9, ...client(400, 200) })
+    unmount()
+
+    expect(canvas.releasePointerCapture).toHaveBeenCalledWith(9)
+  })
+
   it('draws a place by dragging on the picture', () => {
     const onChange = panel(onPicture(), { backgroundUrl: () => 'app://map.png' })
     const canvas = stubCanvas()

@@ -41,6 +41,14 @@ export interface FileTreeProps {
   onDelete: (path: string) => void
   onSettings: () => void
   onReveal: () => void
+  /**
+   * Re-reads the folder from disk.
+   *
+   * The tree is a snapshot taken when the project opened, and nothing tells it
+   * when a file appears beside the app — an editor, a script, a git checkout.
+   * Until this is pressed those files are simply not there.
+   */
+  onRefresh: () => void
   /** Changes when File › New File… is chosen, to focus the name input. */
   focusNewFile: number
 }
@@ -96,6 +104,7 @@ export function FileTree({
   onDelete,
   onSettings,
   onReveal,
+  onRefresh,
   focusNewFile
 }: FileTreeProps): React.JSX.Element {
   const [draft, setDraft] = useState('')
@@ -263,6 +272,12 @@ export function FileTree({
         // Lowercase, because they are small and reversible.
         actions={
           <>
+            <IconButton
+              icon="rotate-ccw"
+              label="Refresh from disk"
+              size="sm"
+              onClick={onRefresh}
+            />
             <IconButton
               icon="folder-plus"
               label="New folder"

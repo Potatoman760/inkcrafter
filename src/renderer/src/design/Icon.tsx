@@ -11,6 +11,7 @@ import clipboardPaste from 'lucide-static/icons/clipboard-paste.svg?raw'
 import copy from 'lucide-static/icons/copy.svg?raw'
 import cornerDownRight from 'lucide-static/icons/corner-down-right.svg?raw'
 import feather from 'lucide-static/icons/feather.svg?raw'
+import filePen from 'lucide-static/icons/file-pen.svg?raw'
 import fileText from 'lucide-static/icons/file-text.svg?raw'
 import folder from 'lucide-static/icons/folder.svg?raw'
 import folderOpen from 'lucide-static/icons/folder-open.svg?raw'
@@ -57,6 +58,11 @@ import x from 'lucide-static/icons/x.svg?raw'
  * weight, so it is an extension rather than a second vocabulary.  and  join
  * them for the file tree, which makes folders and renames what is in them.
  *
+ * `file-pen` joins them for opening a Scene's ink to write in it.  alone
+ * already means *rename* in the file tree, and a page with no pencil on it read
+ * as "look at this file" rather than "write here" — the plan is where the
+ * prose is actually reached from, so it is worth its own glyph.
+ *
  * The design system's Icon fetches each glyph from disk at runtime. That
  * cannot work here: the packaged renderer runs under `connect-src 'none'`, so
  * the fetch is refused and every icon silently renders as nothing. These are
@@ -82,6 +88,7 @@ const ICONS: Record<string, string> = {
   'corner-down-right': cornerDownRight,
   eye,
   feather,
+  'file-pen': filePen,
   'file-text': fileText,
   folder,
   'folder-open': folderOpen,
