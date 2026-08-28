@@ -11,7 +11,9 @@ import {
 import type { Project } from '@shared/project'
 import type { TagCommand } from '@shared/bundle/tagSpec'
 import { compileStory } from '../ink/compiler'
+import { listInkFiles } from '../project'
 import { stripBom } from '../text'
+import { firstReferences, walkBack } from './backtrack'
 import { advance, countWords } from './build'
 import {
   canReplaceSection,
@@ -283,10 +285,47 @@ function resetAndReplay(current: Session, path: PathStep[]): void {
   replay(current, path)
 }
 
+/**
+ * Rewinds and begins the reading at a knot instead of at the story's start.
+ *
+ * The fallback when nothing routes to it. A scene no path reaches is still a
+ * scene worth reading — half-written branches and knots whose only caller is
+ * not written yet are the normal state of a story in progress — so the reading
+ * begins there rather than refusing and leaving the previous page up.
+ *
+ * Returns false when ink will not go there at all, which is a knot that does
+ * not exist rather than one nothing reaches.
+ */
+function resetAndStartAt(current: Session, knot: string): boolean {
+  current.story.ResetState()
+  current.manuscript.nodes = []
+  current.manuscript.path = []
+  current.manuscript.wordCount = 0
+  current.manuscript.complete = false
+  current.nextIdCounter = 0
+  current.snapshots.clear()
+
+  try {
+    current.story.ChoosePathString(knot)
+  } catch {
+    return false
+  }
+
+  extend(current)
+  return true
+}
+
 export interface TraceOutcome {
   manuscript: Manuscript
   /** Choices it took to get there. */
   steps: number
+  /**
+   * Null when the reading runs from the story's beginning, which is the good
+   * case. Otherwise the knot it had to begin at instead, which may be some way
+   * back from the one asked for. The manuscript is real either way; this is
+   * what lets the reader be told which of the two they have.
+   */
+  startedAt: string | null
   error: string | null
 }
 
@@ -313,6 +352,7 @@ export async function traceToKnot(
     return {
       manuscript: session?.manuscript ?? emptyManuscript('', entryRelativePath),
       steps: 0,
+      startedAt: null,
       error: 'The story does not compile, so no path through it can be found.'
     }
   }
@@ -320,15 +360,46 @@ export async function traceToKnot(
   const previous = [...current.manuscript.path]
   const result = findPathToKnot(current.story, knot)
 
-  // The search left the story wherever it stopped, so either outcome has to put
-  // the reader back on a real path.
-  resetAndReplay(current, result.found ? result.path : previous)
-
-  return {
-    manuscript: current.manuscript,
-    steps: result.path.length,
-    error: result.found ? null : result.message
+  // The search left the story wherever it stopped, so every outcome below has
+  // to put the reader back on a real path.
+  if (result.found) {
+    resetAndReplay(current, result.path)
+    return { manuscript: current.manuscript, steps: result.path.length, startedAt: null, error: null }
   }
+
+  // No route was found — either none exists, or the search ran out of budget
+  // looking, which is what happens to anything deep in a long story. Fall back
+  // to reading the source backwards for somewhere to begin: whoever diverts to
+  // this knot, and whoever diverts to them, until nothing does.
+  for (const candidate of await startingPoints(current, project, knot)) {
+    if (!resetAndStartAt(current, candidate)) continue
+    return { manuscript: current.manuscript, steps: 0, startedAt: candidate, error: null }
+  }
+
+  resetAndReplay(current, previous)
+  return { manuscript: current.manuscript, steps: 0, startedAt: null, error: result.message }
+}
+
+/**
+ * Knots worth trying as an opening, best first.
+ *
+ * The head of the divert chain is what was asked for. The target itself is the
+ * fallback behind it, because a chain whose head ink refuses to jump to is
+ * still better than no reading at all.
+ */
+async function startingPoints(
+  current: Session,
+  project: Project,
+  knot: string
+): Promise<string[]> {
+  const sources: Array<[string, string[]]> = []
+  for (const file of await listInkFiles(project)) {
+    const lines = current.sources.lines(file.path)
+    if (lines) sources.push([file.path, lines])
+  }
+
+  const chain = walkBack(knot, firstReferences(sources))
+  return chain[0] === knot ? [knot] : [chain[0]!, knot]
 }
 
 /** Whether a section's span can be overwritten, for enabling the UI. */

@@ -167,12 +167,20 @@ export interface ManuscriptApi {
   /**
    * Fills the manuscript with a path that reaches `knot`. Where several routes
    * reach it, the shortest is taken.
+   *
+   * When nothing reaches it the reading begins further back instead of failing,
+   * and `startedAt` names the knot it had to begin at.
    */
   traceTo(
     project: Project,
     entryPath: string,
     knot: string
-  ): Promise<{ manuscript: Manuscript; steps: number; error: string | null }>
+  ): Promise<{
+    manuscript: Manuscript
+    steps: number
+    startedAt: string | null
+    error: string | null
+  }>
   /** Whether a section's source span can be overwritten wholesale. */
   sectionReplaceable(sectionIndex: number): Promise<{ safe: boolean; reason: string | null }>
   /**

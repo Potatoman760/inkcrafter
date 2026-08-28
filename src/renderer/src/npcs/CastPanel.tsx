@@ -363,39 +363,49 @@ function NpcEditor({
       <Field as="div" label="Variables" about={copy('cast.attribute.clamped')}>
         {npc.variables.map((variable, index) => (
           <AttrRow key={index} varName={npcVar(npc.inkId, variable.key)}>
-            <Select
-              size="sm"
-              className="npc-attr-kind"
-              aria-label={`Type of ${variable.label}`}
-              value={variable.kind}
-              onChange={(event) =>
-                patchVariable(index, asKind(variable, event.target.value as NpcVarKind))
-              }
-            >
-              {NPC_VAR_KINDS.map((kind) => (
-                <option key={kind} value={kind}>
-                  {KIND_LABELS[kind]}
-                </option>
-              ))}
-            </Select>
+            {/* Every control keeps its `aria-label` as well as the visible one.
+                Five variables mean five fields called "Key", and the row each
+                belongs to is what tells them apart — for a screen reader and
+                for a test alike. The visible label leads the accessible name so
+                the two still agree. */}
+            <Field label="Type" className="npc-attr-field npc-attr-field--kind">
+              <Select
+                size="sm"
+                aria-label={`Type of ${variable.label}`}
+                value={variable.kind}
+                onChange={(event) =>
+                  patchVariable(index, asKind(variable, event.target.value as NpcVarKind))
+                }
+              >
+                {NPC_VAR_KINDS.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {KIND_LABELS[kind]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
 
-            <Input
-              size="sm"
-              mono
-              aria-label={`Key of ${variable.label}`}
-              value={variable.key}
-              onChange={(event) =>
-                patchVariable(index, { ...variable, key: inkKey(event.target.value) })
-              }
-            />
-            <Input
-              size="sm"
-              aria-label={`Label of ${variable.key}`}
-              value={variable.label}
-              onChange={(event) =>
-                patchVariable(index, { ...variable, label: event.target.value })
-              }
-            />
+            <Field label="Key" className="npc-attr-field">
+              <Input
+                size="sm"
+                mono
+                aria-label={`Key of ${variable.label}`}
+                value={variable.key}
+                onChange={(event) =>
+                  patchVariable(index, { ...variable, key: inkKey(event.target.value) })
+                }
+              />
+            </Field>
+            <Field label="Name" className="npc-attr-field">
+              <Input
+                size="sm"
+                aria-label={`Label of ${variable.key}`}
+                value={variable.label}
+                onChange={(event) =>
+                  patchVariable(index, { ...variable, label: event.target.value })
+                }
+              />
+            </Field>
 
             {/* Only the fields the kind actually has. A range on a yes/no is a
                 control that cannot do anything, and reads as one that is
@@ -403,17 +413,21 @@ function NpcEditor({
             {variable.kind === 'number' && (
               <>
                 {(['initial', 'min', 'max'] as const).map((field) => (
-                  <Input
+                  <Field
                     key={field}
-                    size="sm"
-                    type="number"
-                    title={field}
-                    aria-label={`${field} of ${variable.key}`}
-                    value={Number(variable[field])}
-                    onChange={(event) =>
-                      patchVariable(index, { ...variable, [field]: Number(event.target.value) })
-                    }
-                  />
+                    label={NUMBER_LABELS[field]}
+                    className="npc-attr-field npc-attr-field--number"
+                  >
+                    <Input
+                      size="sm"
+                      type="number"
+                      aria-label={`${field} of ${variable.key}`}
+                      value={Number(variable[field])}
+                      onChange={(event) =>
+                        patchVariable(index, { ...variable, [field]: Number(event.target.value) })
+                      }
+                    />
+                  </Field>
                 ))}
                 {/* Where the starting value sits in its range. The number is
                     right there beside it — a bar on its own cannot be read
@@ -430,9 +444,13 @@ function NpcEditor({
 
             {variable.kind === 'text' && (
               <>
+                <Field
+                  label="Allowed values"
+                  note="comma separated"
+                  className="npc-attr-field npc-attr-field--wide"
+                >
                 <Input
                   size="sm"
-                  title="allowed values, comma separated"
                   aria-label={`Allowed values of ${variable.key}`}
                   value={variable.values.join(', ')}
                   onChange={(event) => {
@@ -451,20 +469,23 @@ function NpcEditor({
                     })
                   }}
                 />
-                <Select
-                  size="sm"
-                  aria-label={`Starts at, for ${variable.key}`}
-                  value={String(variable.initial)}
-                  onChange={(event) =>
-                    patchVariable(index, { ...variable, initial: event.target.value })
-                  }
-                >
-                  {variable.values.map((value) => (
-                    <option key={value} value={value}>
-                      {value}
-                    </option>
-                  ))}
-                </Select>
+                </Field>
+                <Field label="Starts at" className="npc-attr-field">
+                  <Select
+                    size="sm"
+                    aria-label={`Starts at, for ${variable.key}`}
+                    value={String(variable.initial)}
+                    onChange={(event) =>
+                      patchVariable(index, { ...variable, initial: event.target.value })
+                    }
+                  >
+                    {variable.values.map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
               </>
             )}
 
@@ -518,6 +539,9 @@ function NpcEditor({
     </>
   )
 }
+
+/** Spelled out above each spinbox; `initial` is not what an author calls it. */
+const NUMBER_LABELS = { initial: 'Starts at', min: 'Min', max: 'Max' } as const
 
 function AttrRow({
   varName,

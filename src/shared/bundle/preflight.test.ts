@@ -305,7 +305,7 @@ describe('quick-hands configuration', () => {
 
     const quickhands = newQuickhandsMinigame('Quick hands')
     quickhands.resultVariable = 'quickhands_result'
-    quickhands.targetArt = { assetId: token.id, variantId: gold.id }
+    quickhands.targetArt = [{ assetId: token.id, variantId: gold.id }]
     const stats: StatsDocument = {
       ...emptyStats(),
       variables: [newVariable('Quickhands result', 'text')]
@@ -313,7 +313,16 @@ describe('quick-hands configuration', () => {
 
     expect(check('', { media, stats, minigames: { version: 1, minigames: [quickhands] } })).toEqual([])
 
-    quickhands.targetArt = { assetId: token.id, variantId: 'missing' }
+    quickhands.targetArt = [{ assetId: token.id, variantId: 'missing' }]
+    expect(check('', { media, stats, minigames: { version: 1, minigames: [quickhands] } })).toContain(
+      "Quick hands's target picture is no longer in the media catalogue."
+    )
+
+    // Every look in the set is checked, not just the first one.
+    quickhands.targetArt = [
+      { assetId: token.id, variantId: gold.id },
+      { assetId: token.id, variantId: 'missing' }
+    ]
     expect(check('', { media, stats, minigames: { version: 1, minigames: [quickhands] } })).toContain(
       "Quick hands's target picture is no longer in the media catalogue."
     )

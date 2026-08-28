@@ -429,6 +429,69 @@ describe('MediaPanel', () => {
     confirm.mockRestore()
   })
 
+  /**
+   * Batch work on the unfiled grid.
+   *
+   * An empty catalogue claims nothing, so every file in the folder is unfiled
+   * and there is more than one to tick.
+   */
+  it('deletes every ticked file on one confirmation and one rescan', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const api = installApi()
+    const { onRescan } = dialog(emptyMedia())
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select bg/cove.png' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select bg/unfiled.png' }))
+    expect(screen.getByText('2 selected')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /Delete selected/ }))
+
+    // One prompt for the batch, naming the count rather than a path.
+    expect(confirm).toHaveBeenCalledOnce()
+    expect(confirm.mock.calls[0]![0]).toMatch(/2 files/)
+    expect(api.media.deleteFile).toHaveBeenCalledTimes(2)
+    expect(api.media.deleteFile).toHaveBeenCalledWith(PROJECT, 'bg/cove.png')
+    expect(api.media.deleteFile).toHaveBeenCalledWith(PROJECT, 'bg/unfiled.png')
+    // The folder is read once however many went.
+    expect(onRescan).toHaveBeenCalledOnce()
+    confirm.mockRestore()
+  })
+
+  it('ticks and clears the whole grid from one control', async () => {
+    dialog(emptyMedia())
+
+    const all = () => screen.getByRole('checkbox', { name: /Select all|Clear selection/ })
+
+    await userEvent.click(all())
+    expect(screen.getByText(`${FILES.length} selected`)).toBeInTheDocument()
+    expect(all()).toHaveAccessibleName('Clear selection')
+
+    await userEvent.click(all())
+    expect(screen.queryByText(/selected/)).toBeNull()
+    expect(screen.queryByRole('button', { name: /Delete selected/ })).toBeNull()
+  })
+
+  it('carries on through a file it cannot delete, and says which', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const api = installApi({
+      media: {
+        deleteFile: vi.fn(async (_project: unknown, path: unknown) => {
+          if (path === 'bg/cove.png') throw new Error('in use')
+        })
+      }
+    })
+    dialog(emptyMedia())
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select bg/cove.png' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select bg/unfiled.png' }))
+    await userEvent.click(screen.getByRole('button', { name: /Delete selected/ }))
+
+    // The second one still went, and the failure is named rather than swallowed.
+    expect(api.media.deleteFile).toHaveBeenCalledWith(PROJECT, 'bg/unfiled.png')
+    expect(await screen.findByText(/bg\/cove\.png — in use/)).toBeInTheDocument()
+    confirm.mockRestore()
+  })
+
   it('adds a background and selects it, ready to be filled in', async () => {
     live(emptyMedia())
 
@@ -702,9 +765,9 @@ describe('uploading a look', () => {
  * Taking the white card out.
  *
  * The panel's part of it is small and easy to get wrong in a way nothing would
- * report: the look has to end up pointing at the *new* file. Main writes a new
- * picture and leaves the original alone, so a repoint that silently did not
- * happen would look like a cutout that silently did nothing.
+ * report: every look on the old file has to end up pointing at the *new* one.
+ * Main deletes the original once the cutout is written, so a repoint that
+ * silently did not happen leaves a look pointing at a file that is gone.
  */
 describe('cutting a background out', () => {
   const cutout = (file: string): MediaDocument => {
@@ -744,6 +807,66 @@ describe('cutting a background out', () => {
     const next = onChange.mock.calls.at(-1)![0] as MediaDocument
     expect(next.assets[0]!.variants[0]!.file).toBe('bg/cove-cutout.png')
     expect(screen.getByText(/Took #fbfaf7 out of plate/)).toBeInTheDocument()
+  })
+
+  // Two looks can share one file, and only one of them is the look the scissors
+  // were clicked on. The original does not survive the cutout, so the other has
+  // to follow it too.
+  it('repoints every look that shared the file, not just the one clicked', async () => {
+    installApi({
+      media: {
+        cutout: vi.fn(async () => ({
+          ok: true,
+          file: 'bg/cove-cutout.png',
+          colour: '#ffffff',
+          cleared: 10,
+          feathered: 0,
+          enclosed: 0,
+          message: ''
+        }))
+      }
+    })
+
+    let doc = cutout('bg/cove.png')
+    const other = newAsset('The Other', 'background')
+    doc = addAsset(doc, other)
+    doc = addVariant(doc, other.id, newVariant('same', 'bg/cove.png'))
+
+    const { onChange } = dialog(doc)
+    await userEvent.click(screen.getByText('the_card'))
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Take the white background out of plate' })
+    )
+    await userEvent.click(screen.getByRole('menuitem', { name: 'From the edge' }))
+
+    const next = onChange.mock.calls.at(-1)![0] as MediaDocument
+    expect(next.assets[0]!.variants[0]!.file).toBe('bg/cove-cutout.png')
+    expect(next.assets[1]!.variants[0]!.file).toBe('bg/cove-cutout.png')
+  })
+
+  it('says so when the original outlived the cutout', async () => {
+    installApi({
+      media: {
+        cutout: vi.fn(async () => ({
+          ok: true,
+          file: 'bg/cove-cutout.png',
+          colour: '#ffffff',
+          cleared: 10,
+          feathered: 0,
+          enclosed: 0,
+          message: 'Kept bg/cove.png: it could not be deleted (EPERM).'
+        }))
+      }
+    })
+
+    dialog(cutout('bg/cove.png'))
+    await userEvent.click(screen.getByText('the_card'))
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Take the white background out of plate' })
+    )
+    await userEvent.click(screen.getByRole('menuitem', { name: 'From the edge' }))
+
+    expect(screen.getByText(/could not be deleted \(EPERM\)/)).toBeInTheDocument()
   })
 
   it('says what colour the border actually was, and changes nothing', async () => {

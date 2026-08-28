@@ -26,14 +26,65 @@ describe('minigame catalogue', () => {
     const quickhands = newQuickhandsMinigame('Broodmarket cabinet')
     quickhands.resultVariable = 'quickhands_result'
     quickhands.background = { assetId: 'med_market', variantId: 'med_day' }
-    quickhands.targetArt = { assetId: 'med_token', variantId: 'med_gold' }
-    quickhands.hazardArt = { assetId: 'med_token', variantId: 'med_thorn' }
+    quickhands.targetArt = [
+      { assetId: 'med_token', variantId: 'med_gold' },
+      { assetId: 'med_token', variantId: 'med_silver' }
+    ]
+    quickhands.hazardArt = [{ assetId: 'med_token', variantId: 'med_thorn' }]
     quickhands.catcherArt = { assetId: 'med_hand', variantId: 'med_open' }
     quickhands.spawnIntervalMs.modifiers.push({ stat: 'dexterity', perPoint: -20 })
 
     expect(parseMinigames(serialiseMinigames({ version: 1, minigames: [quickhands] }))).toEqual({
       version: 1,
       minigames: [quickhands]
+    })
+  })
+
+  // The field held one picture before it held a set, and those projects are
+  // still on disk.
+  it('reads a single picture written by the older editor as a set of one', () => {
+    const legacy = JSON.stringify({
+      version: 1,
+      minigames: [
+        {
+          id: 'mng_legacy',
+          kind: 'quickhands',
+          name: 'cabinet',
+          targetArt: { assetId: 'med_token', variantId: 'med_gold' },
+          hazardArt: { assetId: 'med_token', variantId: 'med_thorn' },
+          catcherArt: { assetId: 'med_hand', variantId: 'med_open' }
+        }
+      ]
+    })
+
+    const [game] = parseMinigames(legacy).minigames
+    expect(game).toMatchObject({
+      targetArt: [{ assetId: 'med_token', variantId: 'med_gold' }],
+      hazardArt: [{ assetId: 'med_token', variantId: 'med_thorn' }],
+      // The catcher is one picture and stays one.
+      catcherArt: { assetId: 'med_hand', variantId: 'med_open' }
+    })
+  })
+
+  it('drops entries in a set that name nothing, rather than the whole set', () => {
+    const partial = JSON.stringify({
+      version: 1,
+      minigames: [
+        {
+          id: 'mng_partial',
+          kind: 'quickhands',
+          name: 'cabinet',
+          targetArt: [
+            { assetId: 'med_token', variantId: 'med_gold' },
+            { assetId: '', variantId: 'med_silver' },
+            null
+          ]
+        }
+      ]
+    })
+
+    expect(parseMinigames(partial).minigames[0]).toMatchObject({
+      targetArt: [{ assetId: 'med_token', variantId: 'med_gold' }]
     })
   })
 

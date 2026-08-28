@@ -2202,14 +2202,39 @@ body.is-resizing {
 /* Gallery catalogue ------------------------------------------------------ */
 
 /* Minigame catalogue ----------------------------------------------------- */
-.minigame-fields { padding: var(--space-4); display: grid; gap: var(--space-4); overflow: auto; }
-.minigame-list { display: grid; gap: var(--space-1); padding: var(--space-2); }
-.minigame-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+/* Sections carry the structure here, so they are separated on the same scale
+   as every other panel's. At --space-4 a control at the end of one section
+   sat 8px under the next section's heading and read as belonging to it. */
+.minigame-fields { padding: var(--space-4); display: grid; gap: var(--space-6); overflow: auto; }
+/* minmax(0,…) rather than the default auto: an auto track sizes to the longest
+   row, so one long `# minigame:` name widened the whole list past the pane
+   instead of being ellipsised by .ic-row, which already knows how. */
+.minigame-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1); padding: var(--space-2); }
+.minigame-add { position: relative; }
+/* Under the button rather than beside it, so a 270px header does not have to
+   find room for the menu as well.
+
+   The step down from the button is this wrapper's padding, not a gap: padding
+   is part of the hover group, and a gap is a strip belonging to neither the
+   button nor the menu, so crossing it closed the menu on the way in. */
+/* z-index here rather than on .ic-menu: that rule carries one, but the menu is
+   left static for its caller to place, and z-index on a static element does
+   nothing. The list rows below are position:relative and come later in the DOM,
+   so without this they paint over the menu. 80 is the menu layer. */
+.minigame-add__pop {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 80;
+  padding-top: var(--space-2);
+}
 .minigame-bindings, .minigame-tunings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
 .minigame-section { display: grid; gap: var(--space-2); }
 .minigame-section h3 { margin: 0; font-size: var(--font-size-sm); }
 .minigame-background-preview { width: min(100%, 42rem); aspect-ratio: 16 / 9; object-fit: cover; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-1); }
 .quickhands-art-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+/* The rows of one set, stacked under a single label. */
+.quickhands-art-list { display: flex; flex-direction: column; gap: var(--space-2); }
 .quickhands-art-preview { width: 100%; height: 8rem; object-fit: contain; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-1); }
 .minigame-tuning-base, .minigame-modifier { display: flex; align-items: center; gap: var(--space-2); }
 .minigame-tuning-base .ic-input, .minigame-modifier .ic-input { width: 7rem; }
@@ -4215,6 +4240,51 @@ body.is-resizing {
   gap: 3px;
 }
 
+/* Selecting and the count sit above the grid, on the same line, because they
+   are one thought: what is ticked and what can be done to it. */
+.media-grid__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  margin-top: var(--space-4);
+}
+
+.media-grid__count {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* Opposite corner from the delete, so a tick and a one-off delete never sit
+   under the same pointer. */
+.media-grid__pick {
+  position: absolute;
+  z-index: 1;
+  top: 5px;
+  left: 5px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 35%);
+}
+
+/* The path is already printed under the tile, so the checkbox's own name is
+   for announcing it rather than for reading — but it has to exist to be
+   announced at all. */
+.media-grid__pick span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.media-grid li.is-picked img,
+.media-grid li.is-picked .media-grid__clip {
+  outline: 2px solid var(--state-info);
+  outline-offset: 1px;
+}
+
 .media-grid__delete {
   position: absolute;
   z-index: 1;
@@ -4501,29 +4571,39 @@ body.is-resizing {
 
 .npc-attr {
   display: flex;
-  align-items: center;
+  /* Bottom, not centre: every control carries a label above it now, and the
+     controls are what the eye reads across. */
+  align-items: flex-end;
   /* Wraps rather than squeezing. In a dialog this row had 900px; in the Game
      view it has whatever is left beside the dock, and `min-width: 0` let the
      key and label collapse to slivers. */
   flex-wrap: wrap;
   gap: var(--space-3);
-  margin-bottom: 4px;
+  /* Room to read one variable as one thing, now that each is two lines tall. */
+  margin-bottom: var(--space-6);
 }
 
-.npc-attr input[type='text'],
-.npc-attr input:not([type]) {
-  flex: 1 1 7rem;
-  min-width: 5rem;
-}
+/* Tighter than a form's: these are columns in a row of them rather than a
+   stack of separate questions. */
+.npc-attr .ic-field { gap: var(--space-1); }
 
-.npc-attr input[type='number'] {
-  flex: 0 0 4.5rem;
-}
+/* Sizing moved off the inputs and onto the fields that now wrap them — the
+   input no longer sits in the row's flex line, its label does too. */
+.npc-attr-field { flex: 1 1 7rem; min-width: 5rem; }
+.npc-attr-field--kind { flex: 0 0 8rem; }
+.npc-attr-field--number { flex: 0 0 5.5rem; }
+.npc-attr-field--wide { flex: 2 1 12rem; }
+.npc-attr .ic-field .ic-input,
+.npc-attr .ic-field .ic-select { width: 100%; }
 
-.npc-attr label {
+/* The checkbox brings its own label, so it is the one control here that is
+   already named and needs no field around it. */
+.npc-attr .ic-check {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  /* Sits on the controls' line rather than the labels'. */
+  min-height: var(--control-sm);
   white-space: nowrap;
   font-size: var(--text-xs);
   color: var(--text-tertiary);

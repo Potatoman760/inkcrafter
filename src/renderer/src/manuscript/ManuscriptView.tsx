@@ -213,8 +213,18 @@ export function ManuscriptView({
           </p>
           {session.traced && (
             <p className="manuscript-traced">
-              Traced to <code>{session.traced.knot}</code> in {session.traced.steps} choice
-              {session.traced.steps === 1 ? '' : 's'}. Other routes may reach it too.
+              {session.traced.startedAt === null ? (
+                <>
+                  Traced to <code>{session.traced.knot}</code> in {session.traced.steps} choice
+                  {session.traced.steps === 1 ? '' : 's'}. Other routes may reach it too.
+                </>
+              ) : (
+                <>
+                  No route to <code>{session.traced.knot}</code> from the beginning of the story
+                  was found, so the reading begins at <code>{session.traced.startedAt}</code> —
+                  the furthest back the diverts lead.
+                </>
+              )}
             </p>
           )}
         </header>

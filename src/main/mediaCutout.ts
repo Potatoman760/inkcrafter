@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, sep } from 'node:path'
 import { nativeImage } from 'electron'
 import { isKeyableFile, MEDIA_DIR } from '@shared/mediaDoc'
@@ -160,8 +160,14 @@ function inMedia(project: Project, file: string): string | null {
  * Takes the white card out from behind one look, into a new file beside it.
  *
  * Never overwrites: `neutral.png` becomes `neutral-cutout.png`, and the caller
- * repoints the look. The original is what the author has if this was not what
- * they wanted, and there is no undo in a workspace.
+ * repoints the look — every look on the old file, not just the one asked about,
+ * because the old file does not survive this.
+ *
+ * The original is deleted once the cutout is safely written. It is the same
+ * picture with the card still behind it, and leaving it turned every cutout
+ * into a second file for the author to find and clear out of `media/` by hand.
+ * A failed delete is reported but does not fail the cutout: the new file is
+ * good, and an original left behind is untidy rather than broken.
  */
 export async function cutoutLook(
   project: Project,
@@ -239,6 +245,20 @@ export async function cutoutLook(
     }
   }
 
+  // Only after the new file is on disk. Losing the original to a cutout that
+  // then failed to write would leave nothing at all.
+  let message = ''
+  const original = inMedia(project, request.file)
+  if (original) {
+    try {
+      await rm(original)
+    } catch (cause) {
+      message = `Kept ${request.file}: it could not be deleted (${
+        cause instanceof Error ? cause.message : String(cause)
+      }).`
+    }
+  }
+
   return {
     ok: true,
     file,
@@ -246,6 +266,6 @@ export async function cutoutLook(
     cleared: outcome.cleared,
     feathered: outcome.feathered,
     enclosed: outcome.enclosed,
-    message: ''
+    message
   }
 }

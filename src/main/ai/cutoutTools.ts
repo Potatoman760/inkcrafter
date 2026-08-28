@@ -133,7 +133,9 @@ export const removeBackgroundTool: ToolDefinition = {
         result.enclosed > 0
           ? `Took ${result.colour} out from behind ${found.file} into ${result.file}: ${result.cleared.toLocaleString()} pixels cleared — ${result.enclosed.toLocaleString()} of them gaps the art had closed around — and ${result.feathered.toLocaleString()} softened at the edge.`
           : `Took ${result.colour} out from behind ${found.file} into ${result.file}: ${result.cleared.toLocaleString()} pixels cleared and ${result.feathered.toLocaleString()} softened at the edge, with white inside the picture kept.`,
-        `The original is still at ${found.file}.`,
+        // The cutout replaces the original rather than sitting beside it, and
+        // the model must not go looking for a file that is gone.
+        result.message || `${found.file} has been removed.`,
         moved
           ? 'The look now points at the new file — do not call write_media or write_cast for it.'
           : 'Nothing in the catalogue pointed at that file, so nothing was repointed; catalogue the new file if the story needs it.'

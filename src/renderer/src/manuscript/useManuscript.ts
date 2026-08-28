@@ -30,8 +30,11 @@ export interface ManuscriptSession {
   setTag(sectionIndex: number, command: TagCommand, replacing?: string): Promise<void>
   /** Takes one tag out of a section, named by exactly the text in the file. */
   clearTag(sectionIndex: number, raw: string): Promise<void>
-  /** Set after a successful trace, for a note in the header. */
-  traced: { knot: string; steps: number } | null
+  /**
+   * Set after a successful trace, for a note in the header. `startedAt` names
+   * the knot the reading had to begin at when no route to `knot` was found.
+   */
+  traced: { knot: string; steps: number; startedAt: string | null } | null
   reload(): Promise<void>
 }
 
@@ -50,7 +53,9 @@ export function useManuscript(
   const [manuscript, setManuscript] = useState<Manuscript>(() => emptyManuscript('', ''))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [traced, setTraced] = useState<{ knot: string; steps: number } | null>(null)
+  const [traced, setTraced] = useState<
+    { knot: string; steps: number; startedAt: string | null } | null
+  >(null)
 
   // Read inside callbacks that must not close over a stale project.
   const projectRef = useRef(project)
@@ -119,7 +124,11 @@ export function useManuscript(
       )
       setManuscript(outcome.manuscript)
       setError(outcome.error)
-      setTraced(outcome.error === null ? { knot, steps: outcome.steps } : null)
+      setTraced(
+        outcome.error === null
+          ? { knot, steps: outcome.steps, startedAt: outcome.startedAt }
+          : null
+      )
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     } finally {

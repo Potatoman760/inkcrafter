@@ -283,12 +283,18 @@ export function LooksField({
         return
       }
 
-      onChange(updateVariant(doc, asset.id, variant.id, { file: result.file }))
+      // Every look on the old file follows it, not just this one: the original
+      // is deleted by the cutout, so a look left pointing at it would be
+      // pointing at nothing.
+      onChange(relocateMediaFiles(doc, [{ from: variant.file, to: result.file }]))
       setCutoutNote(
         `Took ${result.colour} out of ${variant.name || asset.name} into ${result.file} — ${result.cleared.toLocaleString()} pixels cleared, ${result.feathered.toLocaleString()} softened at the edge. ` +
           (result.enclosed > 0
-            ? `${result.enclosed.toLocaleString()} of them were gaps the art had closed around.`
-            : 'White inside the picture was kept.')
+            ? `${result.enclosed.toLocaleString()} of them were gaps the art had closed around. `
+            : 'White inside the picture was kept. ') +
+          // Empty unless the original outlived the cutout, which is worth
+          // saying: there is a stray file left in the folder if so.
+          result.message
       )
       onImported?.()
     } catch (cause) {

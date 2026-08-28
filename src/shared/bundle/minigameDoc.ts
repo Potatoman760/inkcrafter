@@ -68,9 +68,18 @@ export interface QuickhandsMinigame {
   description: string
   /** Optional concrete background look rendered behind the lanes. */
   background: GalleryMediaRef | null
-  /** Optional still animation looks; the player supplies readable shapes when absent. */
-  targetArt: GalleryMediaRef | null
-  hazardArt: GalleryMediaRef | null
+  /**
+   * Still animation looks for the falling objects. Empty means the player draws
+   * its own readable shapes, which is what an unfinished cabinet gets.
+   *
+   * A set rather than one picture because a lane full of identical tokens reads
+   * as a test pattern. Given several, the game picks one of each kind for the
+   * round, so the same cabinet looks different twice running without the author
+   * scripting any of it.
+   */
+  targetArt: GalleryMediaRef[]
+  hazardArt: GalleryMediaRef[]
+  /** The catcher is the player's own hand, so it stays a single picture. */
   catcherArt: GalleryMediaRef | null
   /** Existing text variable set to `victory` or `defeat`. */
   resultVariable: string
@@ -143,8 +152,8 @@ export function newQuickhandsMinigame(name: string): QuickhandsMinigame {
     display: name.trim(),
     description: '',
     background: null,
-    targetArt: null,
-    hazardArt: null,
+    targetArt: [],
+    hazardArt: [],
     catcherArt: null,
     resultVariable: '',
     showStateHints: true,
@@ -189,6 +198,22 @@ function mediaRef(value: unknown): GalleryMediaRef | null {
   const assetId = text(one['assetId']).trim()
   const variantId = text(one['variantId']).trim()
   return assetId && variantId ? { assetId, variantId } : null
+}
+
+/**
+ * A set of looks, from either spelling.
+ *
+ * The field held one picture before it held a set, and projects written by the
+ * older editor are still on disk. A bare object reads as a set of one rather
+ * than being dropped, so nothing has to be migrated and a file half of each
+ * shape still comes back whole — the same tolerance the other catalogues use.
+ */
+function mediaRefList(value: unknown): GalleryMediaRef[] {
+  const many = Array.isArray(value) ? value : [value]
+  return many.flatMap((one) => {
+    const ref = mediaRef(one)
+    return ref ? [ref] : []
+  })
 }
 
 function parseTunable(value: unknown, fallback: number): TunableNumber {
@@ -248,8 +273,8 @@ function parseQuickhands(value: unknown): QuickhandsMinigame | null {
     display: text(one['display']) || name,
     description: text(one['description']),
     background: mediaRef(one['background']),
-    targetArt: mediaRef(one['targetArt']),
-    hazardArt: mediaRef(one['hazardArt']),
+    targetArt: mediaRefList(one['targetArt']),
+    hazardArt: mediaRefList(one['hazardArt']),
     catcherArt: mediaRef(one['catcherArt']),
     resultVariable: text(one['resultVariable']),
     showStateHints: one['showStateHints'] === true,

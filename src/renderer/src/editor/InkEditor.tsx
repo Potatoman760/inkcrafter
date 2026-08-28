@@ -3,6 +3,7 @@ import { Annotation, EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { indentWithTab } from '@codemirror/commands'
 import { setDiagnostics, type Diagnostic } from '@codemirror/lint'
+import { search } from '@codemirror/search'
 import { basicSetup } from 'codemirror'
 import type { Mention } from '@shared/mentions'
 import type { TagCatalogues } from '@shared/tagSuggest'
@@ -77,6 +78,17 @@ interface InkEditorProps {
  * basicSetup draws itself (lint tooltip, search panel, autocomplete); every
  * surface below is set explicitly.
  */
+/**
+ * Find-and-replace, opened above the document rather than below it.
+ *
+ * `basicSetup` ships the search *keymap* but never calls `search()`, so the
+ * panel takes the library default and mounts at the bottom — the far end of a
+ * file from the line being read, and on a long ink file a long way from the
+ * caret it just moved. Exported like the theme so the editor and its test
+ * configure the same panel rather than two that resemble each other.
+ */
+export const editorSearch = search({ top: true })
+
 export const editorTheme = EditorView.theme(
   {
     '&': {
@@ -232,6 +244,7 @@ export function InkEditor({
         doc: value,
         extensions: [
           basicSetup,
+          editorSearch,
           keymap.of([indentWithTab]),
           ink(),
           tagComplete(),

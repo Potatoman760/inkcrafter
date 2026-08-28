@@ -25,6 +25,7 @@ import type { Project } from '@shared/project'
 import { Icon } from '../design/Icon'
 import {
   Button,
+  Checkbox,
   Chip,
   ChipRow,
   Field,
@@ -122,29 +123,65 @@ export function MediaPanel({
   const [draftName, setDraftName] = useState('')
   const [deleting, setDeleting] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  /** Unfiled paths ticked for a batch operation. */
+  const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set())
 
   const byPath = useMemo(() => new Map(files.map((file) => [file.path, file])), [files])
   const claimed = useMemo(() => claimedFiles(doc), [doc])
   const unfiled = useMemo(() => files.filter((file) => !claimed.has(file.path)), [files, claimed])
 
-  const deleteUnfiled = async (file: MediaFile): Promise<void> => {
-    if (project === null) return
-    if (!window.confirm(`Permanently delete "${file.path}" from media/? This cannot be undone.`)) {
-      return
+  /**
+   * Deletes one file or a ticked batch of them.
+   *
+   * One confirmation for the whole batch and one rescan after it: the folder is
+   * read once however many went, and a prompt per file would train the author to
+   * click through them. Failures are collected rather than thrown, so one file
+   * held open by something else does not abandon the rest.
+   */
+  const deleteFiles = async (targets: MediaFile[]): Promise<void> => {
+    if (project === null || targets.length === 0) return
+
+    const what = targets.length === 1 ? `"${targets[0]!.path}"` : `${targets.length} files`
+    if (!window.confirm(`Permanently delete ${what} from media/? This cannot be undone.`)) return
+
+    setDeleteError(null)
+    const failed: string[] = []
+
+    for (const file of targets) {
+      setDeleting(file.path)
+      try {
+        await window.inkcrafter.media.deleteFile(project, file.path)
+      } catch (caught) {
+        failed.push(`${file.path} — ${caught instanceof Error ? caught.message : String(caught)}`)
+      }
     }
 
-    setDeleting(file.path)
-    setDeleteError(null)
-    try {
-      await window.inkcrafter.media.deleteFile(project, file.path)
-      setPreview(null)
-      onRescan()
-    } catch (caught) {
-      setDeleteError(caught instanceof Error ? caught.message : String(caught))
-    } finally {
-      setDeleting(null)
-    }
+    setDeleting(null)
+    setPicked(new Set())
+    setPreview(null)
+    onRescan()
+
+    if (failed.length > 0) setDeleteError(failed.join('; '))
   }
+
+  const pick = (path: string, on: boolean): void =>
+    setPicked((current) => {
+      const next = new Set(current)
+      if (on) next.add(path)
+      else next.delete(path)
+      return next
+    })
+
+  // A rescan can take a ticked file away — deleted here, or filed from another
+  // panel — and a selection holding paths that are gone would delete nothing
+  // and count wrong.
+  useEffect(() => {
+    const present = new Set(unfiled.map((file) => file.path))
+    setPicked((current) => {
+      const kept = new Set([...current].filter((path) => present.has(path)))
+      return kept.size === current.size ? current : kept
+    })
+  }, [unfiled])
 
   /** An asset's looks, for stepping through from its row. */
   const itemsOf = (asset: MediaAsset): PreviewItem[] =>
@@ -322,7 +359,15 @@ export function MediaPanel({
               total={files.length}
               onReveal={onReveal}
               deleting={deleting}
-              onDelete={(file) => void deleteUnfiled(file)}
+              picked={picked}
+              onPick={pick}
+              onPickAll={(on) =>
+                setPicked(on ? new Set(unfiled.map((file) => file.path)) : new Set())
+              }
+              onDelete={(file) => void deleteFiles([file])}
+              onDeletePicked={() =>
+                void deleteFiles(unfiled.filter((file) => picked.has(file.path)))
+              }
               onPreview={(at) =>
                 setPreview({
                   items: unfiled.map((file) => ({
@@ -360,14 +405,22 @@ function Unfiled({
   total,
   onReveal,
   deleting,
+  picked,
+  onPick,
+  onPickAll,
   onDelete,
+  onDeletePicked,
   onPreview
 }: {
   unfiled: MediaFile[]
   total: number
   onReveal: () => void
   deleting: string | null
+  picked: ReadonlySet<string>
+  onPick: (path: string, on: boolean) => void
+  onPickAll: (on: boolean) => void
   onDelete: (file: MediaFile) => void
+  onDeletePicked: () => void
   onPreview: (index: number) => void
 }): React.JSX.Element {
   if (total === 0) {
@@ -395,9 +448,42 @@ function Unfiled({
       label="Not filed yet"
       note={copy('media.unfiled', { count: unfiled.length })}
     >
+      {/* The bar is always here rather than appearing with the first tick: a
+          control that arrives when you act cannot be found before you act, and
+          "select all" is how most batches start. */}
+      <div className="media-grid__bar">
+        <Checkbox
+          label={picked.size === unfiled.length ? 'Clear selection' : 'Select all'}
+          checked={picked.size === unfiled.length}
+          disabled={deleting !== null}
+          onChange={(event) => onPickAll(event.target.checked)}
+        />
+        {picked.size > 0 && (
+          <>
+            <span className="media-grid__count">{picked.size} selected</span>
+            <Button
+              variant="danger"
+              size="sm"
+              icon="trash-2"
+              disabled={deleting !== null}
+              onClick={onDeletePicked}
+            >
+              Delete selected
+            </Button>
+          </>
+        )}
+      </div>
+
       <ul className="media-grid">
         {unfiled.map((file, index) => (
-          <li key={file.path}>
+          <li key={file.path} className={picked.has(file.path) ? 'is-picked' : undefined}>
+            <Checkbox
+              className="media-grid__pick"
+              label={`Select ${file.path}`}
+              checked={picked.has(file.path)}
+              disabled={deleting !== null}
+              onChange={(event) => onPick(file.path, event.target.checked)}
+            />
             <Peek label={file.path} onClick={() => onPreview(index)}>
               {/* A clip has no still to draw, and an <img> pointed at one
                   renders as a broken icon that explains nothing. */}

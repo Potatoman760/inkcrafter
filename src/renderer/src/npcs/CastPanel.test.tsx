@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
   emptyNpcs,
@@ -150,10 +150,29 @@ describe('CastPanel', () => {
 
     expect(screen.getByLabelText('Type of Affection')).toHaveValue('number')
     // A number carries a range, because ink cannot clamp for itself.
-    expect(screen.getByTitle('min')).toHaveValue(0)
-    expect(screen.getByTitle('max')).toHaveValue(10)
-    expect(screen.queryByTitle('allowed values, comma separated')).toBeNull()
+    expect(screen.getByLabelText('min of affection')).toHaveValue(0)
+    expect(screen.getByLabelText('max of affection')).toHaveValue(10)
+    expect(screen.queryByLabelText('Allowed values of affection')).toBeNull()
     expect(screen.queryByRole('checkbox', { name: /starts true/ })).toBeNull()
+  })
+
+  // Every control used to be named only by an aria-label, which is no name at
+  // all for anyone looking at the screen.
+  it('names each field on screen, not only to a screen reader', async () => {
+    live()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add a variable' }))
+
+    // Scoped to the row: the panel names other things "Name" too.
+    const row = () => within(document.querySelector('.npc-attr') as HTMLElement)
+
+    for (const label of ['Type', 'Key', 'Name', 'Starts at', 'Min', 'Max']) {
+      expect(row().getByText(label)).toBeInTheDocument()
+    }
+
+    await userEvent.selectOptions(screen.getByLabelText('Type of Affection'), 'text')
+    expect(row().getByText('Allowed values')).toBeInTheDocument()
+    expect(row().queryByText('Min')).toBeNull()
   })
 
   it('swaps which fields the row has when its type changes', async () => {
@@ -162,12 +181,12 @@ describe('CastPanel', () => {
 
     await userEvent.selectOptions(screen.getByLabelText('Type of Affection'), 'text')
     // A word carries the set it may hold, and nothing about a range.
-    expect(screen.getByTitle('allowed values, comma separated')).toHaveValue('')
-    expect(screen.queryByTitle('min')).toBeNull()
+    expect(screen.getByLabelText('Allowed values of affection')).toHaveValue('')
+    expect(screen.queryByLabelText('min of affection')).toBeNull()
 
     await userEvent.selectOptions(screen.getByLabelText('Type of Affection'), 'boolean')
     expect(screen.getByRole('checkbox', { name: /starts true/ })).not.toBeChecked()
-    expect(screen.queryByTitle('allowed values, comma separated')).toBeNull()
+    expect(screen.queryByLabelText('Allowed values of affection')).toBeNull()
   })
 
   /** Switching away and back must not lose what the other kind was set to. */
@@ -183,7 +202,7 @@ describe('CastPanel', () => {
     await userEvent.selectOptions(screen.getByLabelText('Type of Affection'), 'boolean')
     await userEvent.selectOptions(screen.getByLabelText('Type of Affection'), 'number')
 
-    expect(screen.getByTitle('max')).toHaveValue(20)
+    expect(screen.getByLabelText('max of affection')).toHaveValue(20)
   })
 
   it('numbers the second attribute rather than letting two share a key', async () => {
@@ -235,7 +254,7 @@ describe('CastPanel', () => {
       ])
     )
 
-    fireEvent.change(screen.getByTitle('allowed values, comma separated'), {
+    fireEvent.change(screen.getByLabelText('Allowed values of status'), {
       target: { value: 'single, engaged' }
     })
 
@@ -280,7 +299,7 @@ describe('CastPanel', () => {
         ])
       )
 
-      const values = screen.getByTitle('allowed values, comma separated')
+      const values = screen.getByLabelText('Allowed values of status')
       await userEvent.clear(values)
       await userEvent.type(values, 'single, engaged')
 

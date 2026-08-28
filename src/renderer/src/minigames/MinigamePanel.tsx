@@ -12,6 +12,7 @@ import {
 import {
   addAsset,
   isVideoFile,
+  mediaName,
   newAsset,
   removeAsset,
   type MediaDocument
@@ -27,6 +28,8 @@ import {
   Input,
   ListRow,
   MasterDetail,
+  Menu,
+  MenuItem,
   PaneHeader,
   Select,
   Textarea
@@ -90,6 +93,8 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
     onMediaRescan, onTest } = props
   const [selectedId, setSelectedId] = useState<string | null>(doc.minigames[0]?.id ?? null)
   const [testing, setTesting] = useState(false)
+  /** Whether the kind menu under Add is showing. */
+  const [adding, setAdding] = useState(false)
   const selected = doc.minigames.find((game) => game.id === selectedId) ?? null
   const numeric = [...stats.stats, ...stats.variables].filter((one) => one.kind === 'number')
   const textual = [...stats.stats, ...stats.variables].filter((one) => one.kind === 'text')
@@ -121,6 +126,18 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
         }))),
     [media]
   )
+  /**
+   * The animation asset this cabinet keeps its own pictures in, if it has one.
+   *
+   * Named after the minigame so the folder on disk matches what the author sees
+   * in the panel. Looks are still chosen from every animation above — this only
+   * gives a picture somewhere to land without leaving for the Media panel.
+   */
+  const cabinetArt = selected?.kind === 'quickhands'
+    ? media.assets.find(
+        (one) => one.kind === 'animation' && one.name === mediaName(selected.name)
+      ) ?? null
+    : null
   const selectedBackground = selected?.background
     ? backgrounds.find((one) => refKey(one.ref) === refKey(selected.background!)) ?? null
     : null
@@ -179,9 +196,56 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
           <PaneHeader
             title="Minigames"
             actions={
-              <div className="minigame-actions">
-                <Button size="sm" icon="plus" onClick={createQuickhands}>Add quick-hands</Button>
-                <Button size="sm" icon="plus" onClick={createCombat}>Add combat</Button>
+              /* One button rather than one per kind: the header is 270px wide
+                 and two labels pushed the pane's own title into an ellipsis.
+                 Hover opens it, and so does a click, because keyboard and touch
+                 cannot hover. Deliberately not a toggle: a pointer click is
+                 preceded by its own mouseenter, so toggling would open the menu
+                 and immediately shut it again. Leaving, choosing, or Escape
+                 closes it. */
+              <div
+                className="minigame-add"
+                onMouseEnter={() => setAdding(true)}
+                onMouseLeave={() => setAdding(false)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') setAdding(false)
+                }}
+              >
+                <Button
+                  size="sm"
+                  icon="plus"
+                  aria-haspopup="menu"
+                  aria-expanded={adding}
+                  onClick={() => setAdding(true)}
+                >
+                  Add
+                </Button>
+                {adding && (
+                  /* The offset from the button is this wrapper's padding rather
+                     than a gap, so it is hoverable. A real gap belongs to
+                     neither element, and crossing it fires mouseleave on the
+                     group — the menu shut before the pointer reached it. */
+                  <div className="minigame-add__pop">
+                    <Menu aria-label="Add a minigame">
+                      <MenuItem
+                        onClick={() => {
+                          createQuickhands()
+                          setAdding(false)
+                        }}
+                      >
+                        Quick-hands
+                      </MenuItem>
+                      <MenuItem
+                        onClick={() => {
+                          createCombat()
+                          setAdding(false)
+                        }}
+                      >
+                        Combat
+                      </MenuItem>
+                    </Menu>
+                  </div>
+                )}
               </div>
             }
           />
@@ -322,17 +386,17 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
               <>
                 <section className="minigame-section">
                   <h3>Quick-hands graphics</h3>
-                  <Hint>Use still Animation looks, or leave a field empty for the built-in token shapes.</Hint>
+                  <Hint>Use still Animation looks, or leave a field empty for the built-in token shapes. Give a token or hazard more than one look and the game picks one of them for each round.</Hint>
                   <div className="quickhands-art-grid">
-                    <ArtworkField
-                      label="Valuable token"
+                    <ArtworkListField
+                      label="Valuable tokens"
                       value={selected.targetArt}
                       options={artwork}
                       byPath={byPath}
                       onChange={(targetArt) => patch({ targetArt })}
                     />
-                    <ArtworkField
-                      label="Hazard"
+                    <ArtworkListField
+                      label="Hazards"
                       value={selected.hazardArt}
                       options={artwork}
                       byPath={byPath}
@@ -346,6 +410,32 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
                       onChange={(catcherArt) => patch({ catcherArt })}
                     />
                   </div>
+
+                  {/* Choosing above is only possible once there is something to
+                      choose. This is the Media panel's own look list, pointed at
+                      an animation of this cabinet's, so a picture can be brought
+                      in here rather than in another panel and back. */}
+                  {cabinetArt ? (
+                    <LooksField
+                      doc={media}
+                      asset={cabinetArt}
+                      files={files}
+                      byPath={byPath}
+                      project={project}
+                      onChange={onMediaChange}
+                      onImported={onMediaRescan}
+                      note="Pictures brought in here become choices in the lists above."
+                    />
+                  ) : (
+                    <Button
+                      icon="folder-plus"
+                      onClick={() =>
+                        onMediaChange(addAsset(media, newAsset(selected.name, 'animation')))
+                      }
+                    >
+                      Add artwork for this cabinet
+                    </Button>
+                  )}
                 </section>
 
                 <section className="minigame-section">
@@ -373,6 +463,46 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
         </>
       )}
     />
+  )
+}
+
+/**
+ * A set of looks, edited as the rows themselves.
+ *
+ * One row per picture plus a blank one on the end, so adding and removing are
+ * the same gesture — choose in the blank row to add, choose "Built-in shape" in
+ * a filled row to drop it. No buttons to explain, and no way to leave a hole in
+ * the middle of the set.
+ *
+ * Every row is numbered rather than only the first being labelled: `Field` drops
+ * an empty label, and a select with no accessible name is one a screen reader
+ * cannot announce and a test cannot find.
+ */
+function ArtworkListField({ label, value, options, byPath, onChange }: {
+  label: string
+  value: { assetId: string; variantId: string }[]
+  options: ArtworkOption[]
+  byPath: Map<string, MediaFile>
+  onChange: (next: { assetId: string; variantId: string }[]) => void
+}): React.JSX.Element {
+  const rows: ({ assetId: string; variantId: string } | null)[] = [...value, null]
+
+  return (
+    <div className="quickhands-art-list">
+      {rows.map((ref, index) => (
+        <ArtworkField
+          key={`${index}:${ref ? refKey(ref) : 'add'}`}
+          label={`${label} ${index + 1}`}
+          value={ref}
+          options={options}
+          byPath={byPath}
+          onChange={(next) => {
+            const kept = value.filter((_, at) => at !== index)
+            onChange(next ? [...value.slice(0, index), next, ...value.slice(index + 1)] : kept)
+          }}
+        />
+      ))}
+    </div>
   )
 }
 

@@ -5,7 +5,7 @@ import type { StatsDocument } from '../statsDoc'
 import { attrKind, findNpc, npcVar, npcVariable, type NpcDocument } from './npcDoc'
 import { referencedPaths } from './condition'
 import { findMap, mapsLinkingTo, type MapArea, type MapDocument } from './mapDoc'
-import { galleryMedia, type GalleryDocument } from './galleryDoc'
+import { galleryMedia, type GalleryDocument, type GalleryMediaRef } from './galleryDoc'
 import {
   COMBATANT_STATES,
   emptyMinigames,
@@ -123,13 +123,14 @@ function checkMinigames(input: PreflightInput): Preflight[] {
         ['strike time', game.strikeMs]
       ]
     } else {
-      const arts: [string, typeof game.targetArt][] = [
-        ['target', game.targetArt],
-        ['hazard', game.hazardArt],
-        ['catcher', game.catcherArt]
+      // The falling objects are a set and the catcher is one picture, so they
+      // are flattened to the same shape here rather than checked twice.
+      const arts: [string, GalleryMediaRef][] = [
+        ...game.targetArt.map((ref): [string, GalleryMediaRef] => ['target', ref]),
+        ...game.hazardArt.map((ref): [string, GalleryMediaRef] => ['hazard', ref]),
+        ...(game.catcherArt ? [['catcher', game.catcherArt] as [string, GalleryMediaRef]] : [])
       ]
       for (const [label, ref] of arts) {
-        if (!ref) continue
         const art = galleryMedia(input.media, ref)
         if (!art) {
           problems.push(at(`${game.display || game.name}'s ${label} picture is no longer in the media catalogue.`))
