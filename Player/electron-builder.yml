@@ -1,0 +1,26 @@
+appId: com.inkcrafter.player
+productName: InkCrafter Player
+directories:
+  output: release
+files:
+  - dist/**
+  - desktop-dist/**
+  - package.json
+extraResources:
+  - from: .
+    to: .
+    filter:
+      - steam_appid.txt
+asarUnpack:
+  - node_modules/steamworks.js/dist/**
+win:
+  target:
+    - nsis
+mac:
+  target:
+    - dmg
+  category: public.app-category.games
+linux:
+  target:
+    - AppImage
+  category: Game
