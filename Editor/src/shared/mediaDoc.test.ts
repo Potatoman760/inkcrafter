@@ -68,29 +68,29 @@ describe('music files', () => {
 describe('sound-effect files', () => {
   it('writes one direct file and restores the runtime compatibility entry', () => {
     let doc = emptyMedia()
-    const sound = newAsset('Door slam', 'sound')
+    const sound = newAsset('Door slam', 'music')
     doc = addAsset(doc, sound)
-    doc = setMediaFile(doc, sound.id, 'sounds/door_slam/effect.ogg')
+    doc = setMediaFile(doc, sound.id, 'music/door_slam/effect.ogg')
 
     const stored = JSON.parse(serialiseMedia(doc)).assets[0]
     expect(stored).toMatchObject({
-      kind: 'sound',
+      kind: 'music',
       name: 'door_slam',
-      file: 'sounds/door_slam/effect.ogg'
+      file: 'music/door_slam/effect.ogg'
     })
     expect(stored).not.toHaveProperty('variants')
     expect(parseMedia(JSON.stringify({ version: 1, assets: [stored] })).assets[0]!.variants[0])
-      .toMatchObject({ name: 'default', file: 'sounds/door_slam/effect.ogg' })
+      .toMatchObject({ name: 'default', file: 'music/door_slam/effect.ogg' })
   })
 
   it('keeps an old explicit sound suffix compatible while removing the looks array', () => {
     let doc = emptyMedia()
-    const sound = newAsset('Door slam', 'sound')
+    const sound = newAsset('Door slam', 'music')
     doc = addAsset(doc, sound)
-    doc = addVariant(doc, sound.id, newVariant('heavy', 'sounds/door_slam/heavy.ogg'))
+    doc = addVariant(doc, sound.id, newVariant('heavy', 'music/door_slam/heavy.ogg'))
 
     const stored = JSON.parse(serialiseMedia(doc)).assets[0]
-    expect(stored).toMatchObject({ file: 'sounds/door_slam/heavy.ogg', legacyVariant: 'heavy' })
+    expect(stored).toMatchObject({ file: 'music/door_slam/heavy.ogg', legacyVariant: 'heavy' })
     expect(parseMedia(JSON.stringify({ version: 1, assets: [stored] })).assets[0]!.variants[0]!.name)
       .toBe('heavy')
   })

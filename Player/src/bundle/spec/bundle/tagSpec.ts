@@ -133,12 +133,13 @@ export type TagCommand =
    * the music, not anything about the music itself; a later `# music:` naming a
    * track carries no fade and says nothing about one.
    */
-  | { kind: "music"; name: string | null; variant: string | null; fade?: number }
-  /**
-   * A one-shot sound cue. It fires when the ink line carrying it begins and is
-   * never inherited, stopped, or restored from a save.
-   */
-  | { kind: "sound"; name: string; variant: string | null }
+  | {
+      kind: "music";
+      name: string | null;
+      variant: string | null;
+      fade?: number;
+      loop?: boolean;
+    }
   /** `name: ""` clears the speaker. */
   | { kind: "speaker"; name: string }
   | { kind: "stat"; stat: string; op: TagOp; value: number }
@@ -179,7 +180,6 @@ export const TAG_KEYS = [
   "hide",
   "clear",
   "music",
-  "sound",
   "speaker",
   "who",
   "stat",
@@ -237,6 +237,15 @@ const FLIPPED = /\s+flipped\s*$/i;
 
 /** A video background that plays through once and holds on its final frame. */
 const ONCE = /\s+once\s*$/i;
+
+/**
+ * `# music: theme loop` — the track repeats until something else replaces it.
+ *
+ * Opt-in, because most audio in a scene is a cue: a door, a chime, one bar of
+ * something under a line. Looping used to be the only behaviour, which is why
+ * the same catalogue needed a second kind for one-shots; it does not now.
+ */
+const LOOP = /\s+loop\s*$/i;
 
 interface NameRef {
   name: string;
@@ -404,13 +413,12 @@ export function parseTag(raw: string): TagCommand | null {
           ? { kind: "music", name: null, variant: null, fade }
           : { kind: "music", name: null, variant: null };
       }
-      const ref = parseName(value);
-      return ref ? { kind: "music", ...ref } : null;
-    }
-
-    case "sound": {
-      const ref = parseName(value);
-      return ref ? { kind: "sound", ...ref } : null;
+      const loop = LOOP.test(value);
+      const ref = parseName(loop ? value.replace(LOOP, "") : value);
+      if (!ref) return null;
+      // Written only when true: absent and false are one case, and carrying the
+      // field would be saying nothing twice.
+      return loop ? { kind: "music", ...ref, loop: true } : { kind: "music", ...ref };
     }
 
     // Free text, not an identifier: it is shown to a reader, not looked up.
@@ -518,13 +526,11 @@ export function formatTag(command: TagCommand): string {
       return "clear";
     case "music":
       if (command.name !== null) {
-        return `music: ${withVariant(command.name, command.variant)}`;
+        return `music: ${withVariant(command.name, command.variant)}${command.loop ? " loop" : ""}`;
       }
       // Zero is the default and is written by leaving it out, so a stop that
       // was never given a fade round-trips as the plain word it arrived as.
       return `music: ${STOP}${command.fade ? ` ${command.fade}` : ""}`;
-    case "sound":
-      return `sound: ${withVariant(command.name, command.variant)}`;
     case "speaker":
       return `speaker: ${command.name}`;
     // `+1` reads as one thing and `= married` as two, which is how each is
@@ -569,7 +575,7 @@ export function isKnownTag(raw: string): boolean {
 export function mediaRefOf(
   command: TagCommand
 ): {
-  kind: "background" | "character" | "animation" | "music" | "sound";
+  kind: "background" | "character" | "animation" | "music";
   name: string;
   variant: string | null;
 } | null {
@@ -590,8 +596,6 @@ export function mediaRefOf(
       return command.name === null
         ? null
         : { kind: "music", name: command.name, variant: command.variant };
-    case "sound":
-      return { kind: "sound", name: command.name, variant: command.variant };
     // `hide` and `active` both name a character but ask for no file, so there is
     // nothing to load for either.
     case "hide":

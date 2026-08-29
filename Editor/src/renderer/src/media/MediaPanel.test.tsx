@@ -29,12 +29,6 @@ const MUSIC_FILES: MediaFile[] = [
   { path: 'music/night.ogg', bytes: 100, url: 'app://media/p/media/music/night.ogg' }
 ]
 
-const SOUND_FILES: MediaFile[] = [
-  ...FILES,
-  { path: 'sounds/door.ogg', bytes: 100, url: 'app://media/p/media/sounds/door.ogg' },
-  { path: 'sounds/bell.wav', bytes: 100, url: 'app://media/p/media/sounds/bell.wav' }
-]
-
 /**
  * Backgrounds, not characters. A character's sprites are edited in the cast now
  * — this panel has no tab for them — so the generic behaviour that used to be
@@ -63,13 +57,6 @@ function seeded(): MediaDocument {
   doc = addVariant(doc, grove.id, newVariant('loop', 'music/grove.mp3'))
 
   return doc
-}
-
-function seededSound(): MediaDocument {
-  let doc = seeded()
-  const sound = newAsset('Door slam', 'sound')
-  doc = addAsset(doc, sound)
-  return addVariant(doc, sound.id, newVariant('heavy', 'sounds/door.ogg'))
 }
 
 interface Harness {
@@ -131,8 +118,10 @@ describe('MediaPanel', () => {
     // two together — the number is what this asserts either way.
     expect(screen.getByRole('tab', { name: /^Backgrounds\s*\(2\)/ })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /^Animations\s*\(0\)/ })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /^Sound effects\s*\(0\)/ })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /^Music\s*\(1\)/ })).toBeInTheDocument()
+    // One audio kind, score and cue alike: there was a Sound effects tab
+    // beside this one until `# music:` learned to play once.
+    expect(screen.getByRole('tab', { name: /^Music\/Sound\s*\(1\)/ })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: /Sound effects/ })).not.toBeInTheDocument()
 
     // The clips a `# play:` tag used to run are backgrounds and animations now.
     expect(screen.queryByRole('tab', { name: /Video/ })).not.toBeInTheDocument()
@@ -547,49 +536,6 @@ describe('MediaPanel', () => {
     expect(next.assets.find((asset) => asset.name === 'the_grove')!.variants).toHaveLength(1)
   })
 
-  it('manages a sound effect as one file without looks', async () => {
-    const { onChange } = dialog(seededSound(), SOUND_FILES)
-    await userEvent.click(screen.getByRole('tab', { name: /^Sound effects/ }))
-
-    expect(screen.getByText('sounds/door.ogg')).toBeInTheDocument()
-    expect(screen.queryByText(/1 look/)).not.toBeInTheDocument()
-
-    await userEvent.click(screen.getByText('door_slam'))
-    expect(screen.getByLabelText('File for door_slam')).toHaveValue('sounds/door.ogg')
-    expect(screen.getByText('#sound:door_slam')).toBeInTheDocument()
-    expect(screen.queryByLabelText('Name of look 1')).not.toBeInTheDocument()
-
-    await userEvent.selectOptions(screen.getByLabelText('File for door_slam'), 'sounds/bell.wav')
-    const next = onChange.mock.calls.at(-1)![0] as MediaDocument
-    const sound = next.assets.find((asset) => asset.name === 'door_slam')!
-    expect(sound.variants).toHaveLength(1)
-    expect(sound.variants[0]!.file).toBe('sounds/bell.wav')
-  })
-
-  it('uploads a sound effect without asking for a look name', async () => {
-    const api = installApi({
-      media: {
-        importLook: vi.fn(async () => ({
-          ok: true,
-          cancelled: false,
-          file: 'sounds/door_slam/effect.ogg',
-          moved: [],
-          message: ''
-        }))
-      }
-    })
-    const { onChange } = dialog(seededSound(), SOUND_FILES)
-    await userEvent.click(screen.getByRole('tab', { name: /^Sound effects/ }))
-    await userEvent.click(screen.getByText('door_slam'))
-    await userEvent.click(screen.getByRole('button', { name: 'Upload…' }))
-
-    expect(api.media.importLook).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ kind: 'sound', asset: 'door_slam', look: 'effect' })
-    )
-    const next = onChange.mock.calls.at(-1)![0] as MediaDocument
-    expect(next.assets.find((asset) => asset.name === 'door_slam')!.variants).toHaveLength(1)
-  })
 })
 
 /**

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
 /**
  * Whether a folder is the player.
@@ -16,11 +16,13 @@ import { join } from 'node:path'
  */
 
 vi.mock('electron', () => ({
-  app: { on: () => {}, getPath: () => '' },
+  // The editor package, as `app.getAppPath()` reports it in development. The
+  // player is derived from it as a sibling rather than configured.
+  app: { on: () => {}, getPath: () => '', getAppPath: () => join('/repo', 'Editor') },
   shell: { openExternal: async () => {} }
 }))
 
-const { checkPlayer, playerUrl, previewDir, PREVIEW_GAME } = await import('./player')
+const { checkPlayer, playerDir, playerUrl, previewDir, PREVIEW_GAME } = await import('./player')
 
 let root = ''
 
@@ -101,11 +103,19 @@ describe('checkPlayer', () => {
   })
 })
 
+// The two packages of one repository, so the player is where the editor is not
+// — this used to be a folder the author picked in Settings.
+describe('playerDir', () => {
+  it('is the editor package’s sibling', () => {
+    expect(playerDir()).toBe(resolve('/repo', 'Player'))
+  })
+})
+
 describe('previewDir', () => {
   it('is one game inside the player’s static root', () => {
     // The player serves game/<id>/ at /<id>/ and finds it with ?game=<id>, so
     // the preview is a game like any other rather than a special case.
-    expect(previewDir('/p')).toBe(join('/p', 'game', PREVIEW_GAME))
+    expect(previewDir()).toBe(join(resolve('/repo', 'Player'), 'game', PREVIEW_GAME))
   })
 })
 

@@ -26,9 +26,9 @@ function catalogues(): TagCatalogues {
   media = addAsset(media, rain)
   media = addVariant(media, rain.id, newVariant('heavy', 'anim/rain.webm'))
 
-  const door = newAsset('Door slam', 'sound')
+  const door = newAsset('Door slam', 'music')
   media = addAsset(media, door)
-  media = addVariant(media, door.id, newVariant('heavy', 'sounds/door-slam.ogg'))
+  media = addVariant(media, door.id, newVariant('heavy', 'music/door-slam.ogg'))
 
   return {
     media,
@@ -204,10 +204,10 @@ describe('suggestTag', () => {
       expect(labels('# music: ')).toContain('stop')
     })
 
-    it('offers sound effects and their variants without a standing-state tail', () => {
-      expect(labels('# sound: ')).toEqual(['door_slam'])
-      expect(labels('# sound: door_slam ')).toEqual(['/heavy'])
-      expect(apply('# sound: door_slam ', '/heavy')).toBe('# sound: door_slam/heavy ')
+    it('offers audio assets and their variants', () => {
+      expect(labels('# music: ')).toEqual(['door_slam', 'stop'])
+      expect(labels('# music: door_slam ')).toEqual(['/heavy'])
+      expect(apply('# music: door_slam ', '/heavy')).toBe('# music: door_slam/heavy ')
     })
 
     it('offers on and off to a map tag', () => {

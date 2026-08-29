@@ -56,8 +56,7 @@ const KIND_LABELS: Record<MediaKind, string> = {
   character: 'Characters',
   animation: 'Animations',
   background: 'Backgrounds',
-  music: 'Music',
-  sound: 'Sound effects',
+  music: 'Music/Sound',
   hotspot: 'Hotspots',
   combatant: 'Combatants'
 }
@@ -78,7 +77,6 @@ const SINGULAR: Record<MediaKind, string> = {
   animation: 'animation',
   background: 'background',
   music: 'track',
-  sound: 'sound effect',
   hotspot: 'hotspot',
   combatant: 'combatant'
 }

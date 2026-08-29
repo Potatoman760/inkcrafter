@@ -93,7 +93,7 @@ const SERVED = [
   // no more of a problem here than a large background.
   '.mp4',
   '.webm',
-  // Music and one-shot sound effects. Streamed the same way as a clip.
+  // Audio, score or cue. Streamed the same way as a clip.
   '.mp3',
   '.ogg',
   '.wav',

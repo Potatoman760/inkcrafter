@@ -41,8 +41,7 @@ export const TAG_PREFIX: Partial<Record<MediaKind, string>> = {
   character: 'char',
   animation: 'anim',
   background: 'bg',
-  music: 'music',
-  sound: 'sound'
+  music: 'music'
 }
 
 /** Keys that were trying to name media, whether or not they succeeded. */
@@ -54,8 +53,7 @@ const MEDIA_KEYS = [
   'anim',
   'animation',
   'hide',
-  'music',
-  'sound'
+  'music'
 ]
 
 export interface MediaTagRef {
@@ -305,22 +303,22 @@ export function applyTags(doc: MediaDocument, scene: Scene, tags: string[]): Sce
         break
 
       case 'music':
-        next =
-          command.name === null
-            ? { ...next, music: null, musicFade: command.fade ?? 0 }
-            : place(next, resolveRef(doc, 'music', command.name, command.variant), raw, (m) => ({
-                ...next,
-                music: m,
-                musicFade: 0
-              }))
-        break
-
-      case 'sound':
-        // A cue is an event, not standing scene state. Resolve it here only so
-        // the editor can report a misspelt or unfiled sound on the line that
-        // wrote it; the player performs the actual one-shot playback.
-        if (!resolveRef(doc, 'sound', command.name, command.variant)) {
-          next = withUnresolved(next, raw)
+        if (command.name === null) {
+          next = { ...next, music: null, musicFade: command.fade ?? 0 }
+        } else if (command.loop === true) {
+          next = place(next, resolveRef(doc, 'music', command.name, command.variant), raw, (m) => ({
+            ...next,
+            music: m,
+            musicFade: 0
+          }))
+        } else {
+          // A cue is an event, not standing scene state: it plays once and is
+          // over, so it must not become the track the scene is carrying.
+          // Resolved anyway, so the editor can still report a misspelt or
+          // unfiled one on the line that wrote it.
+          if (!resolveRef(doc, 'music', command.name, command.variant)) {
+            next = withUnresolved(next, raw)
+          }
         }
         break
 

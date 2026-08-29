@@ -43,7 +43,6 @@ vi.mock('../settings', () => ({
   loadSettings: async () => ({
     providers: [],
     activeProviderId: null,
-    playerDir: null,
     comfy: { ...emptyComfySettings(), workflowDir: workflows, promptPrefixes },
     encryptionAvailable: true
   })

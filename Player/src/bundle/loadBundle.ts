@@ -26,6 +26,7 @@ import {
   parseAchievements,
   type AchievementDocument,
 } from "@/bundle/spec/bundle/achievementDoc";
+import { emptyGame, parseGame, type GameDocument } from "@/bundle/spec/bundle/gameDoc";
 import {
   emptyMinigames,
   parseMinigames,
@@ -68,6 +69,7 @@ export interface LoadedBundle {
   /** Steam achievements and the Ink-global conditions that earn them. */
   achievements: AchievementDocument;
   minigames: MinigameDocument;
+  game: GameDocument;
   /** An absolute URL for a bundle-relative path such as `media/bg/day.png`. */
   url(path: string): string;
   /** Plain URL immediately, or a lazily decrypted Blob URL for protected media. */
@@ -170,6 +172,7 @@ export async function loadBundle(
       gallery: parseGallery(payload.documents.gallery),
       achievements: parseAchievements(payload.documents.achievements ?? "{}"),
       minigames: parseMinigames(payload.documents.minigames ?? "{}"),
+      game: parseGame(payload.documents.game ?? "{}"),
       url,
       assetUrl: (path) => assets.prepare(path),
       cachedAssetUrl: (path) => assets.cached(path),
@@ -186,7 +189,7 @@ export async function loadBundle(
   // hand-edited file degrades to a missing sprite rather than a crash. The
   // story is the only one that has to be there — a bundle exported before a
   // catalogue existed simply has none, and the game runs without it.
-  const [storyJson, media, catalogue, npcs, map, gallery, achievements, minigames] = await Promise.all([
+  const [storyJson, media, catalogue, npcs, map, gallery, achievements, minigames, game] = await Promise.all([
     fetchText(url(BUNDLE_FILES.story)),
     optional(url(BUNDLE_FILES.media), parseMedia, emptyMedia()),
     optional(url(BUNDLE_FILES.catalogue), parseCatalogue, emptyCatalogue()),
@@ -195,6 +198,7 @@ export async function loadBundle(
     optional(url(BUNDLE_FILES.gallery), parseGallery, emptyGallery()),
     optional(url(BUNDLE_FILES.achievements), parseAchievements, emptyAchievements()),
     optional(url(BUNDLE_FILES.minigames), parseMinigames, emptyMinigames()),
+    optional(url(BUNDLE_FILES.game), parseGame, emptyGame()),
   ]);
 
   return {
@@ -207,6 +211,7 @@ export async function loadBundle(
     gallery,
     achievements,
     minigames,
+    game,
     url,
     assetUrl: async (path) => url(path),
     cachedAssetUrl: (path) => url(path),

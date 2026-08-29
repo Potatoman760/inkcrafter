@@ -1,0 +1,15 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_INPUTS_DEFAULT$", "$TURBO_ROOT$/Editor/src/shared/**"],
+      "outputs": ["dist/**"]
+    },
+    "spec:check": {
+      "inputs": ["$TURBO_INPUTS_DEFAULT$", "$TURBO_ROOT$/Editor/src/shared/**"],
+      "outputs": []
+    }
+  }
+}

@@ -42,9 +42,9 @@ function seeded(): MediaDocument {
   doc = addAsset(doc, theme)
   doc = addVariant(doc, theme.id, newVariant('loop', 'music/theme.mp3'))
 
-  const door = newAsset('Door slam', 'sound')
+  const door = newAsset('Door slam', 'music')
   doc = addAsset(doc, door)
-  doc = addVariant(doc, door.id, newVariant('heavy', 'sounds/door_slam/heavy.ogg'))
+  doc = addVariant(doc, door.id, newVariant('heavy', 'music/door_slam/heavy.ogg'))
 
   return doc
 }
@@ -182,7 +182,11 @@ describe('sectionScenes', () => {
   it('holds music across sections until a section stops it', () => {
     const scenes = sectionScenes(
       seeded(),
-      reading([prose('It begins.', ['music: theme'])], [prose('It goes on.')], [prose('Silence.', ['music: stop'])])
+      reading(
+        [prose('It begins.', ['music: theme loop'])],
+        [prose('It goes on.')],
+        [prose('Silence.', ['music: stop'])]
+      )
     )
 
     expect(scenes[0]!.after.music?.asset.name).toBe('theme')
@@ -221,11 +225,11 @@ describe('sectionScenes', () => {
   it('keeps a sound cue as an event only in the section that fires it', () => {
     const scenes = sectionScenes(
       seeded(),
-      reading([prose('The door slams.', ['sound: door_slam'])], [prose('After.')])
+      reading([prose('The door slams.', ['music: door_slam'])], [prose('After.')])
     )
 
     expect(eventsOf(scenes[0]!)).toEqual([
-      { kind: 'sound', name: 'door_slam', variant: null }
+      { kind: 'music', name: 'door_slam', variant: null }
     ])
     expect(eventsOf(scenes[1]!)).toEqual([])
   })

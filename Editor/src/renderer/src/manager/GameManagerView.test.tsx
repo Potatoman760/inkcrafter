@@ -6,6 +6,7 @@ import { emptyMap } from "@shared/bundle/mapDoc";
 import { emptyNpcs } from "@shared/bundle/npcDoc";
 import { emptyMedia } from "@shared/mediaDoc";
 import { emptyGallery } from "@shared/bundle/galleryDoc";
+import { emptyGame } from "@shared/bundle/gameDoc";
 import { emptyAchievements } from "@shared/bundle/achievementDoc";
 import { emptyMinigames } from "@shared/bundle/minigameDoc";
 import { addStat, emptyStats, newStat } from "@shared/statsDoc";
@@ -75,6 +76,7 @@ function manager(section: ManagerSection = "media") {
         error: null,
         onChange: vi.fn(),
       }}
+      game={{ doc: emptyGame(), saving: false, error: null, onChange: vi.fn() }}
       minigames={{
         doc: emptyMinigames(),
         saving: false,
@@ -92,9 +94,25 @@ describe("GameManagerView", () => {
   it("offers every catalogue as a section", () => {
     manager();
 
-    for (const label of ["Media", "Variables", "Cast", "Map", "Gallery", "Steam", "Minigames"]) {
+    for (const label of ["Media", "Variables", "Cast", "Map", "Gallery", "Config", "Minigames"]) {
       expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     }
+
+    // Steam moved a level down: it is something you configure about the game
+    // rather than one of the catalogues the story is made of.
+    expect(screen.queryByRole("tab", { name: "Steam" })).not.toBeInTheDocument();
+  });
+
+  // Two levels, as the Media section already has: Steam is a thing you
+  // configure about the game, not one of the catalogues the story is made of.
+  it("puts Steam and Game Settings inside Config", async () => {
+    manager("config");
+
+    expect(screen.getByRole("tab", { name: "Steam" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Game Settings" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("tab", { name: "Game Settings" }));
+    expect(screen.getByText("Startup background")).toBeInTheDocument();
   });
 
   it("asks for the section rather than switching itself, so the app can deep-link", async () => {
@@ -154,7 +172,7 @@ describe("SECTION_FILES", () => {
       cast: "npcs.json",
       map: "map.json",
       gallery: "gallery.json",
-      steam: "achievements.json",
+      config: "game.json",
       minigames: "minigames.json",
     });
   });

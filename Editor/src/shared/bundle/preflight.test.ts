@@ -218,18 +218,18 @@ describe('a tag naming who the frame leans on', () => {
 describe('a sound cue', () => {
   const SOUNDS = (() => {
     let doc = emptyMedia()
-    const door = newAsset('Door slam', 'sound')
+    const door = newAsset('Door slam', 'music')
     doc = addAsset(doc, door)
-    return addVariant(doc, door.id, newVariant('heavy', 'sounds/door_slam/heavy.ogg'))
+    return addVariant(doc, door.id, newVariant('heavy', 'music/door_slam/heavy.ogg'))
   })()
 
-  it('accepts a catalogued sound and variant anywhere in the ink', () => {
-    expect(check('# sound: door_slam/heavy\nThe door slams.\n', { media: SOUNDS })).toEqual([])
+  it('accepts a catalogued cue and variant anywhere in the ink', () => {
+    expect(check('# music: door_slam/heavy\nThe door slams.\n', { media: SOUNDS })).toEqual([])
   })
 
-  it('reports an unknown sound by its media kind', () => {
-    expect(check('# sound: glass_break\nGlass breaks.\n', { media: SOUNDS })[0]).toContain(
-      'there is no sound called glass_break'
+  it('reports an unknown cue by its media kind', () => {
+    expect(check('# music: glass_break\nGlass breaks.\n', { media: SOUNDS })[0]).toContain(
+      'there is no music called glass_break'
     )
   })
 })

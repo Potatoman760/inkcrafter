@@ -75,13 +75,6 @@ export interface AppSettings {
   /** Id of the provider requests will use, or null when none is chosen. */
   activeProviderId: string | null
   /**
-   * A checkout of InkCrafter Player to preview into, or null.
-   *
-   * A path rather than a credential, so it is stored in the clear beside the
-   * rest — it is machine configuration in the same way the base URL is.
-   */
-  playerDir: string | null
-  /**
    * The author's local ComfyUI, and what their workflows bind to.
    *
    * Whole rather than stripped, because unlike a provider there is nothing in

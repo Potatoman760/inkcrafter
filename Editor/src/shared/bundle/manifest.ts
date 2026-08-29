@@ -15,6 +15,7 @@
  *       media.json      MediaDocument, copied from the project
  *       gallery.json    unlockable background and animation groups
  *       achievements.json  Steam API names and Ink-global unlock conditions
+ *       game.json       settings the player reads before the story starts
  *       media/…         the image and video files themselves
  *
  * Deliberately one directory of plain files rather than an archive. A player in
@@ -33,6 +34,8 @@ export const BUNDLE_FILES = {
   gallery: 'gallery.json',
   achievements: 'achievements.json',
   minigames: 'minigames.json',
+  /** Settings the player needs before the story starts. */
+  game: 'game.json',
   /** Present only in a connected-player preview export. */
   preview: 'preview-save.json'
 } as const

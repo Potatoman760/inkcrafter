@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { AiProvidersTab } from './AiProvidersTab'
-import { ConnectedPlayerTab } from './ConnectedPlayerTab'
 import { ComfyUiTab } from './ComfyUiTab'
 import { PromptsTab } from './PromptsTab'
 import { AppearanceTab } from './AppearanceTab'
@@ -11,12 +10,11 @@ interface SettingsDialogProps {
   onClose: () => void
 }
 
-type Tab = 'appearance' | 'providers' | 'player' | 'comfy' | 'prompts'
+type Tab = 'appearance' | 'providers' | 'comfy' | 'prompts'
 
 const TABS: ReadonlyArray<{ id: Tab; label: string }> = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'providers', label: 'AI providers' },
-  { id: 'player', label: 'Connected player' },
   { id: 'comfy', label: 'ComfyUI' },
   { id: 'prompts', label: 'Prompts' }
 ]
@@ -55,7 +53,6 @@ export function SettingsDialog({ onClose }: SettingsDialogProps): React.JSX.Elem
           {settings.loading && <Hint>Loading…</Hint>}
           {!settings.loading && tab === 'appearance' && <AppearanceTab settings={settings} />}
           {!settings.loading && tab === 'providers' && <AiProvidersTab settings={settings} />}
-          {!settings.loading && tab === 'player' && <ConnectedPlayerTab settings={settings} />}
           {!settings.loading && tab === 'comfy' && <ComfyUiTab settings={settings} />}
           {!settings.loading && tab === 'prompts' && <PromptsTab settings={settings} />}
         </div>

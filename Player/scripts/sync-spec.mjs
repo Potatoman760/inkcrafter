@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PLAYER = resolve(HERE, '..')
 
-const EDITOR = resolve(PLAYER, process.env['INKCRAFTER_DIR'] ?? '../InkCrafter')
+const EDITOR = resolve(PLAYER, process.env['INKCRAFTER_DIR'] ?? '../Editor')
 const FROM = join(EDITOR, 'src', 'shared')
 const TO = join(PLAYER, 'src', 'bundle', 'spec')
 
@@ -46,6 +46,7 @@ const FILES = [
   'bundle/condition.ts',
   'bundle/mapDoc.ts',
   'bundle/galleryDoc.ts',
+  'bundle/gameDoc.ts',
   'bundle/achievementDoc.ts',
   'bundle/minigameDoc.ts'
 ]

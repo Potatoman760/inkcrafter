@@ -42,7 +42,12 @@ import type {
   NameUse
 } from '@shared/types'
 import type { BundleExportResult } from '@shared/bundle/result'
-import type { MentionCountRequest, SearchRequest, SearchResult } from '@shared/types'
+import type {
+  MentionCountRequest,
+  ProjectCheck,
+  SearchRequest,
+  SearchResult
+} from '@shared/types'
 import {
   createLibrary,
   deleteEntry,
@@ -94,16 +99,18 @@ import { chooseUploadFile } from './uploadPicker'
 import { cutoutLook } from './mediaCutout'
 import { countMentionsAcross } from './mentions'
 import { searchInk } from './search'
+import { checkProject } from './check'
+import { readGame, writeGame } from './game'
+import type { GameDocument } from '@shared/bundle/gameDoc'
 import { exportBundle } from './bundle'
 import { generateProjectProtection, installProjectProtection } from './releaseProtection'
 import {
   checkPlayer,
   openPlayer,
   playerUrl,
-  playerStatus,
+  playerDir,
   previewDir,
-  startPlayer,
-  stopPlayer
+  startPlayer
 } from './player'
 import { readNpcs, writeNpcs, type WriteNpcsResult } from './npcs'
 import type { KnotSource } from '@shared/inkKnots'
@@ -129,7 +136,6 @@ import {
   setComfyTimeout,
   setComfyWorkflowDir,
   setInterfaceScale,
-  setPlayerDir,
   setPrompt,
   testProvider
 } from './settings'
@@ -142,11 +148,7 @@ import type {
   WorkflowListResult,
   WorkflowRole
 } from '@shared/comfy'
-import type {
-  PlayerCheck,
-  PlayerStatus,
-  PreviewResult
-} from '@shared/player'
+import type { PreviewResult } from '@shared/player'
 import { stripBom } from './text'
 import { dataDir, ensureWorkspace, librariesDir, projectsDir } from './workspace'
 
@@ -493,6 +495,15 @@ export function registerIpcHandlers(): void {
     listDestinations(project)
   )
 
+  ipcMain.handle('game:read', (_event, project: Project): Promise<GameDocument> =>
+    readGame(project)
+  )
+
+  ipcMain.handle(
+    'game:write',
+    (_event, project: Project, doc: GameDocument): Promise<void> => writeGame(project, doc)
+  )
+
   ipcMain.handle('gallery:read', (_event, project: Project): Promise<GalleryDocument> =>
     readGallery(project)
   )
@@ -520,6 +531,11 @@ export function registerIpcHandlers(): void {
     'minigames:write',
     (_event, project: Project, doc: MinigameDocument): Promise<void> =>
       writeMinigames(project, doc)
+  )
+
+  ipcMain.handle(
+    'project:check',
+    (_event, project: Project): Promise<ProjectCheck> => checkProject(project)
   )
 
   ipcMain.handle(
@@ -572,10 +588,6 @@ export function registerIpcHandlers(): void {
     event.sender.setZoomFactor(settings.interfaceScale)
     return settings
   })
-
-  ipcMain.handle('settings:setPlayerDir', (_event, dir: string | null): Promise<AppSettings> =>
-    setPlayerDir(dir)
-  )
 
   ipcMain.handle('settings:setComfyBaseUrl', (_event, url: string): Promise<AppSettings> =>
     setComfyBaseUrl(url)
@@ -663,20 +675,6 @@ export function registerIpcHandlers(): void {
 
   /* The connected player ------------------------------------------------- */
 
-  ipcMain.handle('player:choose', async (): Promise<string | null> => {
-    const chosen = await dialog.showOpenDialog({
-      title: 'Choose the InkCrafter Player folder',
-      properties: ['openDirectory']
-    })
-    return chosen.canceled ? null : (chosen.filePaths[0] ?? null)
-  })
-
-  ipcMain.handle('player:check', (_event, dir: string): Promise<PlayerCheck> => checkPlayer(dir))
-
-  ipcMain.handle('player:status', (): PlayerStatus => playerStatus())
-
-  ipcMain.handle('player:stop', (): Promise<PlayerStatus> => stopPlayer())
-
   ipcMain.handle(
     'player:open',
     (_event, previewId?: string | null, minigame?: string | null): Promise<void> =>
@@ -695,23 +693,12 @@ export function registerIpcHandlers(): void {
     async (_event, project: Project, target: string | null = null): Promise<PreviewResult> => {
       let outDir: string | null = null
       try {
-        const { playerDir } = await loadSettings()
-        if (!playerDir) {
-          return {
-            ok: false,
-            outDir: null,
-            url: null,
-            previewId: null,
-            problem: 'No player folder is set.'
-          }
-        }
-
-        const check = await checkPlayer(playerDir)
+        const check = await checkPlayer(playerDir())
         if (!check.ok) {
           return { ok: false, outDir: null, url: null, previewId: null, problem: check.problem }
         }
 
-        outDir = previewDir(playerDir)
+        outDir = previewDir()
         const previewId = randomUUID()
         const exported = await exportBundle(project, outDir, { preview: { id: previewId, target } })
         if (!exported.ok) {
@@ -722,7 +709,7 @@ export function registerIpcHandlers(): void {
           return { ok: false, outDir, url: null, previewId: null, problem: first }
         }
 
-        const status = await startPlayer(playerDir)
+        const status = await startPlayer(playerDir())
         if (!status.url) {
           return {
             ok: false,

@@ -90,14 +90,14 @@ describe('importLook', () => {
     expect(result.file).toBe('music/the_grove/loop.mp3')
   })
 
-  it('files a one-shot cue under sounds', async () => {
+  it('files a one-shot cue under music', async () => {
     const result = await importLook(
       project(),
-      { kind: 'sound', asset: 'door_slam', look: 'heavy', gather: [] },
+      { kind: 'music', asset: 'door_slam', look: 'heavy', gather: [] },
       await source('door slam final.ogg')
     )
 
-    expect(result.file).toBe('sounds/door_slam/heavy.ogg')
+    expect(result.file).toBe('music/door_slam/heavy.ogg')
   })
 
   it('keeps the extension it was given', async () => {

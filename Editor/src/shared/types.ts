@@ -7,7 +7,9 @@ import type {
 import type { ChatProgress, ChatTurnRequest, ChatTurnResult } from './chat'
 import type { KnotSource } from './inkKnots'
 import type { InkReference } from './inkRefs'
-import type { PlayerCheck, PlayerStatus, PreviewResult } from './player'
+import type { PreviewResult } from './player'
+import type { Preflight } from './bundle/preflight'
+import type { GameDocument } from './bundle/gameDoc'
 import type {
   BindingSlot,
   ComfyTestResult,
@@ -48,6 +50,19 @@ export interface InkDiagnostic {
   line: number | null
   /** The original, unparsed message from the compiler. */
   raw: string
+}
+
+/** What a whole-project check found, from `project:check`. */
+export interface ProjectCheck {
+  /** The compiler's own errors and warnings: whether the ink is ink. */
+  diagnostics: InkDiagnostic[]
+  /**
+   * Whether what the ink names exists — sprites, stats, cast, minigames.
+   * These compile perfectly and fail at runtime, so nothing else reports them.
+   */
+  problems: Preflight[]
+  /** How many ink files the compile reached, for saying what was checked. */
+  files: number
 }
 
 export interface CompileRequest {
@@ -401,6 +416,12 @@ export interface MapApi {
   destinations(project: Project): Promise<KnotSource[]>
 }
 
+export interface GameApi {
+  read(project: Project): Promise<GameDocument>
+  /** Generates no ink; the player reads this from the exported bundle. */
+  write(project: Project, doc: GameDocument): Promise<void>
+}
+
 export interface GalleryApi {
   read(project: Project): Promise<GalleryDocument>
   /** Generates no ink; the player reads this catalogue from the exported bundle. */
@@ -476,7 +497,6 @@ export interface SettingsApi {
   /** The provider's available models, for the model picker. */
   listModels(providerId: string): Promise<ModelListResult>
   /** Points the app at a player checkout, or clears it with null. */
-  setPlayerDir(dir: string | null): Promise<AppSettings>
   /** Where ComfyUI answers. A malformed address is refused, not stored. */
   setComfyBaseUrl(url: string): Promise<AppSettings>
   /** The folder of exported workflows, or null to forget it. */
@@ -541,14 +561,14 @@ export interface ComfyApi {
  * than any one of them.
  */
 export interface PlayerApi {
-  /** Native folder picker. Null when cancelled. */
-  choose(): Promise<string | null>
-  /** Whether a folder is a player checkout, and what is wrong when it is not. */
-  check(dir: string): Promise<PlayerCheck>
-  status(): Promise<PlayerStatus>
-  /** Exports the project into the player's game/preview and makes sure it runs. */
+  /**
+   * Exports the project into the player's game/preview and makes sure it runs.
+   *
+   * The only way in. `check`, `status` and `stop` were here for the Connected
+   * player settings tab; with it gone, previewing reports its own problems and
+   * the server is stopped on quit.
+   */
   preview(project: Project, target?: string | null): Promise<PreviewResult>
-  stop(): Promise<PlayerStatus>
   /** Opens the running preview in the default browser. */
   open(previewId?: string | null, minigame?: string | null): Promise<void>
 }
@@ -599,10 +619,13 @@ export interface InkCrafterApi {
   media: MediaApi
   npcs: NpcsApi
   map: MapApi
+  game: GameApi
   gallery: GalleryApi
   achievements: AchievementsApi
   minigames: MinigamesApi
   bundle: BundleApi
+  /** Whole-project checks that do not write anything. */
+  project: { check(project: Project): Promise<ProjectCheck> }
   search: SearchApi
   ai: AiApi
   settings: SettingsApi

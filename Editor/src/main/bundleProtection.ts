@@ -59,6 +59,7 @@ export async function protectStagingBundle(
     readFile(join(staging, BUNDLE_FILES.gallery), 'utf8'),
     readFile(join(staging, BUNDLE_FILES.achievements), 'utf8'),
     readFile(join(staging, BUNDLE_FILES.minigames), 'utf8'),
+    readFile(join(staging, BUNDLE_FILES.game), 'utf8'),
     optionalText(join(staging, BUNDLE_FILES.preview))
   ])
 
@@ -73,7 +74,8 @@ export async function protectStagingBundle(
       gallery: documents[5],
       achievements: documents[6],
       minigames: documents[7],
-      preview: documents[8]
+      game: documents[8],
+      preview: documents[9]
     },
     assets: assetFiles
   }

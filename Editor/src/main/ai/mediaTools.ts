@@ -113,13 +113,13 @@ function mergeVariants(existing: MediaVariant[], incoming: VariantInput[]): Medi
 export const writeMediaTool: ToolDefinition = {
   name: 'write_media',
   description:
-    'Catalogue backgrounds, animations, music, sound effects, and hotspots already in the open project’s media/ folder. Music and sound effects each have one direct audio file; visual assets may have variants. Characters are not here: their sprites belong to the character, so they go through write_cast. This only files assets that exist: list media/ first and catalogue what is there. To make new art, use generate_image, which files what it draws itself. Checks every file named against what is actually on disk. Merges by kind and name, so send only what is new or changed.',
+    'Catalogue backgrounds, animations, music, and hotspots already in the open project’s media/ folder. Music is all audio, score or cue, and has one direct file; visual assets may have variants. Characters are not here: their sprites belong to the character, so they go through write_cast. This only files assets that exist: list media/ first and catalogue what is there. To make new art, use generate_image, which files what it draws itself. Checks every file named against what is actually on disk. Merges by kind and name, so send only what is new or changed.',
   parameters: {
     type: 'object',
     properties: {
       assets: {
         type: 'array',
-        description: 'The backgrounds, animations, music, sound effects, and hotspots to catalogue.',
+        description: 'The backgrounds, animations, music, and hotspots to catalogue.',
         items: {
           type: 'object',
           properties: {
@@ -138,7 +138,7 @@ export const writeMediaTool: ToolDefinition = {
             file: {
               type: 'string',
               description:
-                'For music and sound effects: the one audio file under media/, exactly as list_files reports it.'
+                'For music: the one audio file under media/, exactly as list_files reports it.'
             },
             variants: {
               type: 'array',

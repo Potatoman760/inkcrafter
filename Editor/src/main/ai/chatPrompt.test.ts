@@ -123,12 +123,12 @@ describe('the formats the assistant is shown', () => {
     expect(story.currentChoices.map((choice) => choice.text)).toEqual(['Unlock'])
   })
 
-  it('media.json loads one-shot sound effects as their own kind', () => {
+  it('media.json loads a one-shot cue as music', () => {
     const doc = parseMedia(MEDIA_EXAMPLE)
 
     expect(doc.assets.find((asset) => asset.name === 'door_slam')).toMatchObject({
-      kind: 'sound',
-      variants: [{ name: 'heavy', file: 'sounds/door_slam/heavy.ogg' }]
+      kind: 'music',
+      variants: [{ name: 'heavy', file: 'music/door_slam/heavy.ogg' }]
     })
   })
 

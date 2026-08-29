@@ -70,7 +70,7 @@ function twoSections(second: string[] = []) {
   return sectionScenes(
     seeded(),
     manuscript([
-      prose('The cove.', { tags: ['bg: the_cove', 'show: wren at left', 'music: theme'] }),
+      prose('The cove.', { tags: ['bg: the_cove', 'show: wren at left', 'music: theme loop'] }),
       junction(['On'], 0),
       prose('Still there.', { tags: second })
     ])

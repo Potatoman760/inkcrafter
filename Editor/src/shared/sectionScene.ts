@@ -35,6 +35,12 @@ import type { MediaDocument } from './mediaDoc'
 const STANDING = ['bg', 'show', 'hide', 'clear', 'music', 'speaker', 'active', 'map'] as const
 
 export function isStanding(command: TagCommand): boolean {
+  // A looping track is a setting and is inherited; the same tag without `loop`
+  // is a cue that plays once and is over, which is not a thing that can still
+  // be true three sections later. Stopping is standing either way — it is the
+  // setting being turned off, and the silence does carry forward.
+  if (command.kind === 'music') return command.name === null || command.loop === true
+
   return (STANDING as readonly string[]).includes(command.kind)
 }
 

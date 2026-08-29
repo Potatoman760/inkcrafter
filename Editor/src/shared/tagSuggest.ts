@@ -82,8 +82,7 @@ const KEYS: { key: string; detail: string; takesValue: boolean }[] = [
   { key: 'hide', detail: 'take somebody off', takesValue: true },
   { key: 'clear', detail: 'background gone, everyone off, every effect stopped', takesValue: false },
   { key: 'anim', detail: 'an effect over the whole scene', takesValue: true },
-  { key: 'music', detail: 'the track under the scene', takesValue: true },
-  { key: 'sound', detail: 'a one-shot cue when this line begins', takesValue: true },
+  { key: 'music', detail: 'audio for the scene; add loop to repeat it', takesValue: true },
   { key: 'speaker', detail: 'who is talking', takesValue: true },
   { key: 'stat', detail: 'change something tracked', takesValue: true },
   { key: 'npc', detail: 'change something about somebody', takesValue: true },
@@ -98,8 +97,7 @@ const KIND_OF: Record<string, MediaKind> = {
   show: 'character',
   hide: 'character',
   anim: 'animation',
-  music: 'music',
-  sound: 'sound'
+  music: 'music'
 }
 
 /** The word that means "stop", where the key has one. */

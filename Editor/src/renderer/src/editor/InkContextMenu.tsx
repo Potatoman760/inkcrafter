@@ -87,7 +87,6 @@ type Action =
   | 'clear'
   | 'autosave'
   | 'music'
-  | 'sound'
   | 'stopMusic'
   | 'stopAnimations'
   | 'retarget'
@@ -110,7 +109,7 @@ const CATEGORY_ACTIONS: Record<ActionCategory, Action[]> = {
   item: ['give', 'take'],
   stat: ['change'],
   stage: ['background', 'character', 'clear', 'animation', 'stopAnimations'],
-  audio: ['sound', 'music', 'stopMusic']
+  audio: ['music', 'stopMusic']
 }
 
 /** Short inside a submenu: the category already supplies the missing noun. */
@@ -123,7 +122,6 @@ const SUBMENU_LABELS: Partial<Record<Action, string>> = {
   clear: 'Clear everything',
   animation: 'Show animation…',
   stopAnimations: 'Stop animations',
-  sound: 'Play sound effect…',
   music: 'Set music…',
   stopMusic: 'Stop music'
 }
@@ -140,7 +138,6 @@ const ACTION_LABELS: Record<Action, string> = {
   clear: 'Clear everything',
   autosave: 'Add autosave checkpoint…',
   music: 'Set music…',
-  sound: 'Play sound effect…',
   stopMusic: 'Stop the music',
   retarget: 'Change which…',
   variant: 'Change the look…',
@@ -354,9 +351,7 @@ export function InkContextMenu({
           ? 'animation'
           : action === 'music'
             ? 'music'
-            : action === 'sound'
-              ? 'sound'
-              : action === 'retarget'
+            : action === 'retarget'
                 ? (onMedia?.tag.ref.kind ?? null)
                 : null
 
@@ -506,7 +501,6 @@ export function InkContextMenu({
       action === 'character' ||
       action === 'animation' ||
       action === 'music' ||
-      action === 'sound' ||
       action === 'retarget'
     ) {
       const asset = chosen?.asset
@@ -619,7 +613,6 @@ export function InkContextMenu({
               'character',
               'clear',
               'animation',
-              'sound',
               'music'
             ]
           : [
@@ -629,7 +622,6 @@ export function InkContextMenu({
               'animation',
               'stopAnimations',
               'clear',
-              'sound',
               'music',
               'stopMusic',
               'give',
@@ -884,12 +876,6 @@ export function InkContextMenu({
             </Hint>
           ) : (
             <>
-              {action === 'sound' && (
-                <Hint>
-                  Play this cue once when the tagged paragraph begins. It does not loop or carry
-                  into later lines.
-                </Hint>
-              )}
               {/* Before the list, because picking somebody closes this step —
                   asked afterwards it would be asked too late. */}
               {(action === 'character' ||

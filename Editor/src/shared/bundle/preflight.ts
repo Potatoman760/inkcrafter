@@ -6,6 +6,7 @@ import { attrKind, findNpc, npcVar, npcVariable, type NpcDocument } from './npcD
 import { referencedPaths } from './condition'
 import { findMap, mapsLinkingTo, type MapArea, type MapDocument } from './mapDoc'
 import { galleryMedia, type GalleryDocument, type GalleryMediaRef } from './galleryDoc'
+import type { GameDocument } from './gameDoc'
 import {
   COMBATANT_STATES,
   emptyMinigames,
@@ -42,6 +43,7 @@ export interface PreflightInput {
   map: MapDocument
   gallery?: GalleryDocument
   minigames?: MinigameDocument
+  game?: GameDocument
   /**
    * The pixel size of each media file, by its path under `media/`.
    *
@@ -66,6 +68,7 @@ export function preflight(input: PreflightInput): Preflight[] {
   problems.push(...checkTiming(input))
   problems.push(...checkMap(input))
   problems.push(...checkGallery(input))
+  problems.push(...checkGame(input))
   problems.push(...checkMinigames(input))
 
   return problems
@@ -187,6 +190,44 @@ function checkMinigames(input: PreflightInput): Preflight[] {
       }
     }
   }
+  return problems
+}
+
+/**
+ * The startup background, which nothing else would notice was missing.
+ *
+ * It is not named by any tag, so the tag checks never see it, and the reader
+ * meets it before the story begins — a broken one is the first thing they see.
+ */
+function checkGame(input: PreflightInput): Preflight[] {
+  const game = input.game
+  if (!game) return []
+
+  const at = (message: string): Preflight => ({ file: 'game.json', line: null, message })
+  const problems: Preflight[] = []
+
+  if (game.startupBackground) {
+    const art = galleryMedia(input.media, game.startupBackground)
+    if (!art) {
+      problems.push(at('The startup background is no longer in the media catalogue.'))
+    } else if (art.kind !== 'background') {
+      problems.push(at(`The startup background is ${art.assetDisplay}, which is not a background.`))
+    } else if (isVideoFile(art.file)) {
+      problems.push(at('The startup background must be an image, not a video.'))
+    }
+  }
+
+  // The wordmark replaces the title text, so a broken one leaves the menu with
+  // no name on it at all rather than falling back to the words.
+  if (game.title.art) {
+    const art = galleryMedia(input.media, game.title.art)
+    if (!art) {
+      problems.push(at('The title graphic is no longer in the media catalogue.'))
+    } else if (isVideoFile(art.file)) {
+      problems.push(at('The title graphic must be an image, not a video.'))
+    }
+  }
+
   return problems
 }
 

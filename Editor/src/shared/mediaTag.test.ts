@@ -100,18 +100,18 @@ describe('formatMediaTag', () => {
     })
   })
 
-  it('writes music as the track name without exposing its compatibility variant', () => {
+  // One kind for score and cue alike, each a single file. The tag names the
+  // asset and never its compatibility variant; `loop` is the author's to add.
+  it('writes audio as the asset name without exposing its compatibility variant', () => {
     const track = newAsset('The grove', 'music')
-    const file = newVariant('default', 'music/the_grove/track.mp3')
+    expect(formatMediaTag(track, newVariant('default', 'music/the_grove/track.mp3'))).toBe(
+      'music:the_grove'
+    )
 
-    expect(formatMediaTag(track, file)).toBe('music:the_grove')
-  })
-
-  it('writes a sound effect without exposing its compatibility variant', () => {
-    const sound = newAsset('Door slam', 'sound')
-    const file = newVariant('heavy', 'sounds/door_slam/heavy.ogg')
-
-    expect(formatMediaTag(sound, file)).toBe('sound:door_slam')
+    const cue = newAsset('Door slam', 'music')
+    expect(formatMediaTag(cue, newVariant('heavy', 'music/door_slam/heavy.ogg'))).toBe(
+      'music:door_slam'
+    )
   })
 })
 
@@ -374,32 +374,32 @@ describe('the track under a scene', () => {
   }
 
   it('starts a track', () => {
-    const scene = sceneFrom(seededMusic(), [['music:the_grove']])
+    const scene = sceneFrom(seededMusic(), [['music:the_grove loop']])
     expect(scene.music?.path).toBe('media/music/the_grove/loop.mp3')
   })
 
   it('keeps playing across lines and knots that say nothing', () => {
-    const scene = sceneFrom(seededMusic(), [['music:the_grove'], [], ['speaker:Kael'], []])
+    const scene = sceneFrom(seededMusic(), [['music:the_grove loop'], [], ['speaker:Kael'], []])
     expect(scene.music?.path).toBe('media/music/the_grove/loop.mp3')
   })
 
   it('changes to another track without needing to be stopped first', () => {
-    const scene = sceneFrom(seededMusic(), [['music:the_grove'], ['music:the_storm']])
+    const scene = sceneFrom(seededMusic(), [['music:the_grove loop'], ['music:the_storm loop']])
     expect(scene.music?.path).toBe('media/music/the_storm/loop.mp3')
   })
 
   it('stops when told to, and stays stopped', () => {
-    const scene = sceneFrom(seededMusic(), [['music:the_grove'], ['music:stop'], []])
+    const scene = sceneFrom(seededMusic(), [['music:the_grove loop'], ['music:stop'], []])
     expect(scene.music).toBeNull()
   })
 
   it('reports a track that is not in the catalogue rather than falling silent', () => {
-    const scene = sceneFrom(seededMusic(), [['music:the_grove'], ['music:nowhere']])
+    const scene = sceneFrom(seededMusic(), [['music:the_grove loop'], ['music:nowhere loop']])
 
     // The one already playing is left alone: a tag that resolved to nothing
     // asked for something, and silence would look like it had worked.
     expect(scene.music?.path).toBe('media/music/the_grove/loop.mp3')
-    expect(scene.unresolved).toContain('music:nowhere')
+    expect(scene.unresolved).toContain('music:nowhere loop')
   })
 
   /**
@@ -408,14 +408,14 @@ describe('the track under a scene', () => {
    */
   describe('fading out', () => {
     it('records the seconds a stop was given', () => {
-      const scene = sceneFrom(seededMusic(), [['music:the_grove'], ['music:stop 5']])
+      const scene = sceneFrom(seededMusic(), [['music:the_grove loop'], ['music:stop 5']])
 
       expect(scene.music).toBeNull()
       expect(scene.musicFade).toBe(5)
     })
 
     it('is nothing at all for a stop that cuts', () => {
-      expect(sceneFrom(seededMusic(), [['music:the_grove'], ['music:stop']]).musicFade).toBe(0)
+      expect(sceneFrom(seededMusic(), [['music:the_grove loop'], ['music:stop']]).musicFade).toBe(0)
       expect(sceneFrom(seededMusic(), []).musicFade).toBe(0)
     })
 
@@ -425,7 +425,7 @@ describe('the track under a scene', () => {
     })
 
     it('is cleared by a track starting, which has nothing to fade', () => {
-      const scene = sceneFrom(seededMusic(), [['music:stop 5'], ['music:the_storm']])
+      const scene = sceneFrom(seededMusic(), [['music:stop 5'], ['music:the_storm loop']])
 
       expect(scene.music?.path).toBe('media/music/the_storm/loop.mp3')
       expect(scene.musicFade).toBe(0)
@@ -433,21 +433,26 @@ describe('the track under a scene', () => {
   })
 })
 
-describe('sound cues', () => {
+/*
+ * A bare `# music:` is a one-shot: it plays and is over, so it never becomes
+ * the track the scene is carrying. There was a separate `# sound:` tag and a
+ * separate media kind for this, back when music could only loop.
+ */
+describe('one-shot cues', () => {
   function seededSounds(): MediaDocument {
     let doc = emptyMedia()
-    const door = newAsset('Door slam', 'sound')
+    const door = newAsset('Door slam', 'music')
     doc = addAsset(doc, door)
-    return addVariant(doc, door.id, newVariant('heavy', 'sounds/door_slam/heavy.ogg'))
+    return addVariant(doc, door.id, newVariant('heavy', 'music/door_slam/heavy.ogg'))
   }
 
   it('validates a cue without carrying it into scene state', () => {
-    expect(sceneFrom(seededSounds(), [['sound:door_slam/heavy'], []])).toEqual(EMPTY_SCENE)
+    expect(sceneFrom(seededSounds(), [['music:door_slam/heavy'], []])).toEqual(EMPTY_SCENE)
   })
 
   it('reports a cue that names nothing', () => {
-    expect(sceneFrom(seededSounds(), [['sound:glass_break']]).unresolved).toEqual([
-      'sound:glass_break'
+    expect(sceneFrom(seededSounds(), [['music:glass_break']]).unresolved).toEqual([
+      'music:glass_break'
     ])
   })
 })

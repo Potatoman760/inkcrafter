@@ -47,7 +47,7 @@ The door is shut.
 # npc: abeline affection +2
 # npc: cordelia affection +2
 # music:the_grove/loop
-# sound:door_slam/heavy
+# music:door_slam/heavy
 Later.
 `
 
@@ -84,9 +84,9 @@ function mediaCatalogue(): MediaDocument {
   doc = addAsset(doc, grove)
   doc = addVariant(doc, grove.id, newVariant('loop', 'music/the_grove/loop.mp3'))
 
-  const door = newAsset('Door slam', 'sound')
+  const door = newAsset('Door slam', 'music')
   doc = addAsset(doc, door)
-  doc = addVariant(doc, door.id, newVariant('heavy', 'sounds/door_slam/heavy.ogg'))
+  doc = addVariant(doc, door.id, newVariant('heavy', 'music/door_slam/heavy.ogg'))
 
   return doc
 }
@@ -459,13 +459,6 @@ describe('InkContextMenu', () => {
       expect(screen.queryByRole('menuitem', { name: 'Change the look…' })).not.toBeInTheDocument()
     })
 
-    it('does not offer a look operation for a sound effect', () => {
-      menu('# sound:door_slam/heavy')
-
-      expect(screen.getByRole('menuitem', { name: 'Change which…' })).toBeInTheDocument()
-      expect(screen.queryByRole('menuitem', { name: 'Change the look…' })).not.toBeInTheDocument()
-    })
-
   })
 
   /* Writing media tags ----------------------------------------------------- */
@@ -602,15 +595,17 @@ describe('InkContextMenu', () => {
       expect(screen.queryByRole('button', { name: /the_cove/ })).not.toBeInTheDocument()
     })
 
-    it('attaches a one-shot sound effect to the clicked paragraph', async () => {
+    // A cue is `# music:` without `loop` now; there was a Play sound effect
+    // item and a separate media kind behind it.
+    it('attaches audio to the clicked paragraph', async () => {
       const { onApply } = menu('The door is shut.')
 
-      await choose('Audio', 'Play sound effect…')
+      await choose('Audio', 'Set music…')
       await userEvent.click(screen.getByRole('button', { name: /door_slam/ }))
       await userEvent.click(screen.getByRole('button', { name: 'Insert' }))
 
       const result = applied(onApply.mock.calls[0]![0])
-      expect(result).toContain('# sound:door_slam\nThe door is shut.')
+      expect(result).toContain('# music:door_slam\nThe door is shut.')
     })
 
     it('writes the middle by default, said out loud', async () => {

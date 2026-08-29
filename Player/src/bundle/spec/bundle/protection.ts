@@ -57,6 +57,8 @@ export interface ProtectedBundlePayload {
     achievements?: string
     /** Optional so protected bundles exported before minigames still load. */
     minigames?: string
+    /** Optional so protected bundles exported before game settings still load. */
+    game?: string
     preview: string | null
   }
   assets: ProtectedAssetFile[]

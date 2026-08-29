@@ -369,7 +369,7 @@ describe('the music bar', () => {
   )
 
   it('names the track a scene set', () => {
-    render(scene('music:the_grove'))
+    render(scene('music:the_grove loop'))
     expect(screen.getByText(/The grove/)).toBeInTheDocument()
   })
 
@@ -379,7 +379,7 @@ describe('the music bar', () => {
   })
 
   it('starts silent, and offers to play', () => {
-    const { container } = render(scene('music:the_grove'))
+    const { container } = render(scene('music:the_grove loop'))
 
     const audio = container.querySelector('audio')
     expect(audio).toHaveAttribute('src', 'app://media/p/media/music/the_grove/loop.mp3')
@@ -393,7 +393,7 @@ describe('the music bar', () => {
   it('says nothing to play when the file is not in the folder', () => {
     render(
       <StoryPlayer
-        storyJson={story('Arriving.\n#music:the_grove\n-> END\n')}
+        storyJson={story('Arriving.\n#music:the_grove loop\n-> END\n')}
         media={withTrack()}
         mediaFiles={[]}
       />

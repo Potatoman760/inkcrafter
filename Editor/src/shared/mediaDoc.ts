@@ -37,7 +37,6 @@ export type MediaKind =
   | 'animation'
   | 'background'
   | 'music'
-  | 'sound'
   | 'hotspot'
   | 'combatant'
 
@@ -46,7 +45,6 @@ export const MEDIA_KINDS: readonly MediaKind[] = [
   'animation',
   'background',
   'music',
-  'sound',
   'hotspot',
   'combatant'
 ]
@@ -135,7 +133,6 @@ export const KIND_FOLDERS: Record<MediaKind, string> = {
   animation: 'animations',
   background: 'backgrounds',
   music: 'music',
-  sound: 'sounds',
   hotspot: 'hotspots',
   combatant: 'combatants'
 }
@@ -168,7 +165,15 @@ export interface MediaVariant {
 }
 
 /** Audio assets are named files, not collections of visual-style looks. */
-export const SINGLE_FILE_MEDIA_KINDS: readonly MediaKind[] = ['music', 'sound']
+/**
+ * Audio is one named file, not a set of looks.
+ *
+ * `sound` was a second kind here, for one-shot cues, back when music always
+ * looped and a cue could not be expressed as music. `# music:` plays once by
+ * default now and loops only when asked, so a cue *is* music and one kind
+ * covers both.
+ */
+export const SINGLE_FILE_MEDIA_KINDS: readonly MediaKind[] = ['music']
 
 export function isSingleFileMediaKind(kind: MediaKind): boolean {
   return SINGLE_FILE_MEDIA_KINDS.includes(kind)

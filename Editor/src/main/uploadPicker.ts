@@ -6,7 +6,7 @@ import { lastUploadDir, setLastUploadDir } from './settings'
  * Opens a file picker in the directory used by the previous media upload.
  *
  * Kept here rather than at the one current call site so every kind of media —
- * pictures, clips, music and sound effects — shares one app-specific history,
+ * pictures, clips and audio — shares one app-specific history,
  * and another upload picker cannot accidentally start forgetting again.
  */
 export async function chooseUploadFile(

@@ -47,7 +47,7 @@ The gate is shut.
 const CHAPTER = `=== the_hall ===
 # bg: courtyard
 # char: abeline/happy
-# sound: door_slam/heavy
+# music: door_slam/heavy
 Someone is waiting.
 
 -> inside
@@ -105,12 +105,12 @@ const MEDIA: MediaDocument = {
     },
     {
       id: 'med_0000000009',
-      kind: 'sound',
+      kind: 'music',
       name: 'door_slam',
       display: 'Door slam',
       description: '',
       tags: [],
-      variants: [{ id: 'med_0000000010', name: 'heavy', file: 'sounds/door_slam/heavy.ogg' }]
+      variants: [{ id: 'med_0000000010', name: 'heavy', file: 'music/door_slam/heavy.ogg' }]
     }
   ]
 }
@@ -155,8 +155,8 @@ beforeEach(async () => {
   await writeFile(join(root, 'project', 'media', 'sprites', 'abeline-happy.png'), 'png', 'utf8')
   await mkdir(join(root, 'project', 'media', 'music', 'the_grove'), { recursive: true })
   await writeFile(join(root, 'project', 'media', 'music', 'the_grove', 'loop.mp3'), 'mp3', 'utf8')
-  await mkdir(join(root, 'project', 'media', 'sounds', 'door_slam'), { recursive: true })
-  await writeFile(join(root, 'project', 'media', 'sounds', 'door_slam', 'heavy.ogg'), 'ogg', 'utf8')
+  await mkdir(join(root, 'project', 'media', 'music', 'door_slam'), { recursive: true })
+  await writeFile(join(root, 'project', 'media', 'music', 'door_slam', 'heavy.ogg'), 'ogg', 'utf8')
 
   project = {
     id: 'prj_0000000000',
@@ -349,7 +349,7 @@ describe('exportBundle', () => {
     story.state.LoadJson(checkpoint!.inkState)
     expect(story.Continue()?.trim()).toBe('Someone is waiting.')
     expect(story.currentTags).toEqual(
-      expect.arrayContaining(['bg: courtyard', 'char: abeline/happy', 'sound: door_slam/heavy'])
+      expect.arrayContaining(['bg: courtyard', 'char: abeline/happy', 'music: door_slam/heavy'])
     )
 
     const ordinary = join(root, 'ordinary')
@@ -399,7 +399,7 @@ describe('exportBundle', () => {
       'bg_courtyard_storm',
       'char_abeline_happy',
       'music_the_grove_loop',
-      'sound_door_slam_heavy'
+      'music_door_slam_heavy'
     ])
 
     // How it is loaded, read from the file rather than from the kind of asset

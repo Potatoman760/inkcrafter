@@ -5,17 +5,18 @@ import { AudioSettings } from "@/audio/AudioSettings";
 /**
  * The track under the scene.
  *
- * Music is a *setting* rather than an event: `# music: harbour` holds across
- * every line and every knot until something says otherwise, which is why
- * `# music: stop` has to exist at all — silence is not what a scene falls back
- * to. That makes this the audio counterpart of the background rather than of
- * `# sound:`, which fires a cue and is over.
+ * All of the story's audio, cues included. `# music: harbour loop` is a
+ * *setting*: it holds across every line and every knot until something says
+ * otherwise, which is why `# music: stop` has to exist at all — silence is not
+ * what a scene falls back to. Without `loop` the same tag is an event: it plays
+ * once and is over, which is what a separate `SoundPlayer` and a separate
+ * `sound` media kind used to be for.
  *
- * It sits outside `MediaLayer` because sound is not a visual layer and does not
+ * It sits outside `MediaLayer` because audio is not a visual layer and does not
  * behave like one. Phaser's sound manager belongs to the game rather than to a
  * scene, so a track keeps playing while the map or the menu is open over a
  * paused `VNScene` — which is what you want, and the opposite of what happens
- * to anything on the display list. One-shot cues live in SoundPlayer instead.
+ * to anything on the display list.
  */
 export class MusicPlayer {
   private readonly scene: Phaser.Scene;
@@ -46,11 +47,15 @@ export class MusicPlayer {
    * Start a track, or leave it alone if it is already the one playing.
    *
    * The same rule as re-showing a character: a story that opens three knots
-   * with `# music: harbour` means "this is the harbour theme", not "start the
-   * harbour theme again" — and restarting it from the top on every re-entry is
-   * audible in a way a re-textured sprite is not.
+   * with `# music: harbour loop` means "this is the harbour theme", not "start
+   * the harbour theme again" — and restarting it from the top on every re-entry
+   * is audible in a way a re-textured sprite is not.
+   *
+   * `loop` is off by default, which makes a bare `# music:` a one-shot cue: a
+   * door, a chime, one bar under a line. Cues used to be a second media kind
+   * for exactly that, because looping was the only thing this could do.
    */
-  play(name: string, variant: string | null = null): void {
+  play(name: string, variant: string | null = null, loop = false): void {
     const key = this.assets.resolve("music", name, variant)?.key;
     if (!key) {
       console.warn(`Unknown music "${variant === null ? name : `${name}/${variant}`}"`);
@@ -71,9 +76,12 @@ export class MusicPlayer {
 
     this.cut();
     this.track = this.scene.sound.add(key, {
-      loop: true,
+      loop,
       volume: AudioSettings.musicVolume,
     });
+    // A cue that has finished is not playing any more, so a later tag naming it
+    // again starts it rather than being taken for the same track still running.
+    if (!loop) this.track.once("complete", () => this.forget(key));
     this.track.play();
     this.playing = key;
   }
@@ -147,6 +155,19 @@ export class MusicPlayer {
     if (!this.fading) return;
     this.fading = null;
     this.scene.game.events.off(Phaser.Core.Events.POST_STEP, this.stepFade, this);
+  }
+
+  /**
+   * Let go of a cue that has played itself out.
+   *
+   * Only when it is still the current one: a cue finishing after something else
+   * has already replaced it must not clear the track that replaced it.
+   */
+  private forget(key: string): void {
+    if (this.playing !== key) return;
+    this.track?.destroy();
+    this.track = undefined;
+    this.playing = null;
   }
 
   /** Silence now, with no ramp: the teardown every other path ends in. */

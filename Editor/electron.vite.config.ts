@@ -59,6 +59,28 @@ export default defineConfig({
   },
   renderer: {
     root: 'src/renderer',
+    /*
+     * The workspace is data, not source.
+     *
+     * `data/` is where the app writes the author's projects — ink, media,
+     * catalogues — and in development that is this very folder, because
+     * `workspace.ts` resolves it against `app.getAppPath()`. Every keystroke
+     * saved in the editor lands there, and none of it belongs to the build.
+     *
+     * Belt and braces rather than a fix for something observed: the renderer's
+     * root is `src/renderer`, so `data/` is already outside what the dev server
+     * walks. Stated anyway, because the thing that would change that — a plugin
+     * copying examples in, a root moved up one level — would do it silently and
+     * turn saving a story into a page reload.
+     *
+     * The defaults are repeated because this replaces them rather than adding
+     * to them.
+     */
+    server: {
+      watch: {
+        ignored: ['**/node_modules/**', '**/.git/**', '**/data/**', '**/out/**', '**/release/**']
+      }
+    },
     build: {
       rollupOptions: {
         input: { index: resolve('src/renderer/index.html') }

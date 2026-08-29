@@ -31,18 +31,20 @@ import { Splitter } from "./layout/Splitter";
 import { usePaneWidth } from "./layout/usePaneWidth";
 import {
   RIGHT_TABS,
-  RIGHT_TAB_LABELS,
   VIEW_LABELS,
+  isWriteView,
   tabFor,
+  tabLabel,
   type RightTab,
   type ViewMode,
 } from "./layout/rightDock";
 import { AssistantPanel } from "./assistant/AssistantPanel";
 import { wroteOpenProjectFile } from "./assistant/writtenFiles";
 import { useAssistant } from "./assistant/useAssistant";
+import { DebugPanel } from "./editor/DebugPanel";
 import { InkContextMenu, type MenuTarget } from "./editor/InkContextMenu";
-import { InkWritePanel } from "./editor/InkWritePanel";
 import { ExportDialog } from "./export/ExportDialog";
+import { useGame } from "./manager/useGame";
 import {
   GameManagerView,
   SECTION_FILES,
@@ -189,11 +191,6 @@ export function App(): React.JSX.Element {
    */
   const [activeKnot, setActiveKnot] = useState<string | null>(null)
   const [editorSelection, setEditorSelection] = useState("");
-  /** Nonced so the same draft can be inserted twice. */
-  const [inkInsert, setInkInsert] = useState<{
-    text: string;
-    nonce: number;
-  } | null>(null);
   /**
    * Bumped whenever the assistant writes to the workspace. Everything that
    * caches a file — the file tree, the plan, the project list — reloads off
@@ -259,8 +256,7 @@ export function App(): React.JSX.Element {
     viewMode === "plan" ||
       // The map offers its knots grouped by act and chapter, which it cannot do
       // from a plan nobody loaded.
-      viewMode === "game" ||
-      (viewMode === "editor" && rightTab === "write"),
+      viewMode === "game",
     workspaceNonce,
   );
   const [planMode, setPlanMode] = useState<PlanMode>("grid");
@@ -867,6 +863,7 @@ export function App(): React.JSX.Element {
   const map = useMap(project, viewMode === "game", workspaceNonce);
   const gallery = useGallery(project, viewMode === "game", workspaceNonce);
   const achievements = useAchievements(project, viewMode === "game", workspaceNonce);
+  const game = useGame(project, viewMode === "game", workspaceNonce);
   // The editor's # completion offers minigame names, so keep this catalogue
   // loaded anywhere tags are authored, not only on its own Game tab.
   const minigames = useMinigames(project, STAGED_VIEWS.has(viewMode), workspaceNonce);
@@ -994,6 +991,12 @@ export function App(): React.JSX.Element {
         saving: achievements.saving,
         error: achievements.error,
         onChange: achievements.apply,
+      }}
+      game={{
+        doc: game.doc,
+        saving: game.saving,
+        error: game.error,
+        onChange: game.apply,
       }}
       minigames={{
         doc: minigames.doc,
@@ -1412,7 +1415,7 @@ export function App(): React.JSX.Element {
               selectedSection={selectedSection}
               onSelectSection={(index) => {
                 setSelectedSection(index);
-                setRightTab("write");
+                setRightTab("assistant");
               }}
               media={media.doc}
               mediaFiles={media.files}
@@ -1431,7 +1434,6 @@ export function App(): React.JSX.Element {
               onOpenEntry={openEntry}
               onFollowKnot={(knot) => void followKnot(knot)}
               gotoLine={gotoLine}
-              insert={inkInsert}
               edit={inkEdit}
               onEditHandled={(nonce) =>
                 setInkEdit((current) =>
@@ -1469,11 +1471,23 @@ export function App(): React.JSX.Element {
             onChange={(next) => setRightTab(next as RightTab)}
             items={RIGHT_TABS[viewMode].map((tab) => ({
               value: tab,
-              label: RIGHT_TAB_LABELS[tab],
+              label: tabLabel(viewMode, tab),
             }))}
           />
 
-          {rightTab === "assistant" && assistantPanel}
+          {/* One slot, and the view decides which of the two it holds: the
+              manuscript is the only place with something to write into. */}
+          {rightTab === "assistant" &&
+            (isWriteView(viewMode) ? (
+              <WritePanel
+                manuscript={manuscript.manuscript}
+                session={manuscript}
+                sectionIndex={selectedSection}
+                codexEntries={codex.entries}
+              />
+            ) : (
+              assistantPanel
+            ))}
 
           {rightTab === "preview" && (
             <StoryPlayer
@@ -1486,26 +1500,6 @@ export function App(): React.JSX.Element {
             />
           )}
 
-          {rightTab === "write" &&
-            (viewMode === "manuscript" ? (
-              <WritePanel
-                manuscript={manuscript.manuscript}
-                session={manuscript}
-                sectionIndex={selectedSection}
-                codexEntries={codex.entries}
-              />
-            ) : (
-              <InkWritePanel
-                project={project}
-                filePath={openFile?.path ?? null}
-                source={source}
-                selection={editorSelection}
-                codexEntries={codex.entries}
-                plan={plan.plan}
-                onInsert={(text) => setInkInsert({ text, nonce: Date.now() })}
-              />
-            ))}
-
           {rightTab === "reading" && (
             <ManuscriptOutline
               manuscript={manuscript.manuscript}
@@ -1513,6 +1507,16 @@ export function App(): React.JSX.Element {
               entryPath={manuscriptEntry ?? project.main}
               onChangeEntry={setManuscriptEntry}
               onReload={() => void manuscript.reload()}
+            />
+          )}
+
+          {rightTab === "debug" && (
+            <DebugPanel
+              project={project}
+              onBeforeRun={async () => {
+                if (dirtyRef.current) await save();
+              }}
+              onOpen={openProjectFile}
             />
           )}
 

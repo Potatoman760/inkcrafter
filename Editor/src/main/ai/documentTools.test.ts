@@ -397,17 +397,17 @@ describe('write_media', () => {
     expect(stored).not.toHaveProperty('variants')
   })
 
-  it('catalogues a sound effect with one direct file rather than variants', async () => {
-    await mkdir(join(projectPath, 'media', 'sounds'), { recursive: true })
-    await writeFile(join(projectPath, 'media', 'sounds', 'door.ogg'), 'x', 'utf8')
+  it('catalogues a cue with one direct file rather than variants', async () => {
+    await mkdir(join(projectPath, 'media', 'music'), { recursive: true })
+    await writeFile(join(projectPath, 'media', 'music', 'door.ogg'), 'x', 'utf8')
 
     const result = await call('write_media', {
-      assets: [{ name: 'Door slam', kind: 'sound', file: 'sounds/door.ogg' }]
+      assets: [{ name: 'Door slam', kind: 'music', file: 'music/door.ogg' }]
     })
 
     expect(result.ok).toBe(true)
     const stored = JSON.parse(await read('media.json')).assets[0]
-    expect(stored).toMatchObject({ kind: 'sound', name: 'door_slam', file: 'sounds/door.ogg' })
+    expect(stored).toMatchObject({ kind: 'music', name: 'door_slam', file: 'music/door.ogg' })
     expect(stored).not.toHaveProperty('variants')
   })
 

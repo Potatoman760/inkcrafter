@@ -307,7 +307,8 @@ describe('formatTag', () => {
     { kind: 'show', name: 'wren', variant: null, slot: 'right', flipped: false },
     { kind: 'hide', name: 'wren' },
     { kind: 'clear' },
-    { kind: 'sound', name: 'door_slam', variant: 'heavy' },
+    { kind: 'music', name: 'door_slam', variant: 'heavy' },
+    { kind: 'music', name: 'harbour', variant: null, loop: true },
     { kind: 'speaker', name: 'Sister Abeline' },
     { kind: 'speaker', name: '' },
     { kind: 'stat', stat: 'courage', op: '+', value: 1 },
@@ -340,41 +341,63 @@ describe('mediaRefOf', () => {
     expect(mediaRefOf({ kind: 'active', active: { rule: 'character', name: 'wren' } })).toBeNull()
     expect(mediaRefOf({ kind: 'map', enabled: true })).toBeNull()
     expect(mediaRefOf({ kind: 'autosave' })).toBeNull()
-    expect(mediaRefOf({ kind: 'sound', name: 'door_slam', variant: null })).toEqual({
-      kind: 'sound',
+    expect(mediaRefOf({ kind: 'music', name: 'door_slam', variant: null })).toEqual({
+      kind: 'music',
       name: 'door_slam',
       variant: null
     })
   })
 })
 
-describe('sound effects', () => {
-  it('reads a one-shot cue, with or without a variant', () => {
-    expect(parseTag('sound: door_slam')).toEqual({
-      kind: 'sound',
+/*
+ * Looping is opt-in.
+ *
+ * There was a second tag and a second media kind for one-shot cues, because
+ * music always looped and a cue could not be said any other way. A bare
+ * `# music:` is that cue now, and `loop` is what a score asks for.
+ */
+describe('music, looping and once', () => {
+  it('plays once unless asked to loop', () => {
+    expect(parseTag('music: door_slam')).toEqual({
+      kind: 'music',
       name: 'door_slam',
       variant: null
     })
-    expect(parseTag('sound: door_slam/heavy')).toEqual({
-      kind: 'sound',
-      name: 'door_slam',
-      variant: 'heavy'
+    expect(parseTag('music: harbour loop')).toEqual({
+      kind: 'music',
+      name: 'harbour',
+      variant: null,
+      loop: true
     })
   })
 
-  it('refuses an empty cue or staging clause', () => {
-    expect(parseTag('sound:')).toBeNull()
-    expect(parseTag('sound: door_slam at left')).toBeNull()
+  it('takes loop after a variant, and is not fussy about case', () => {
+    expect(parseTag('music: harbour/night loop')).toEqual({
+      kind: 'music',
+      name: 'harbour',
+      variant: 'night',
+      loop: true
+    })
+    expect(parseTag('music: harbour LOOP')).toMatchObject({ name: 'harbour', loop: true })
   })
 
-  it('round-trips and names the sound file to load', () => {
-    const command = parseTag('sound: door_slam/heavy')!
-    expect(formatTag(command)).toBe('sound: door_slam/heavy')
-    expect(mediaRefOf(command)).toEqual({
-      kind: 'sound',
-      name: 'door_slam',
-      variant: 'heavy'
-    })
+  // Absent and false are one case, so the field is written only when true —
+  // otherwise every one-shot would carry `loop: false` and say nothing twice.
+  it('leaves the flag off rather than writing it false', () => {
+    expect(parseTag('music: door_slam')).not.toHaveProperty('loop')
+    expect(formatTag(parseTag('music: door_slam')!)).toBe('music: door_slam')
+    expect(formatTag(parseTag('music: harbour loop')!)).toBe('music: harbour loop')
+  })
+
+  it('refuses an empty name or a staging clause', () => {
+    expect(parseTag('music:')).toBeNull()
+    expect(parseTag('music: door_slam at left')).toBeNull()
+  })
+
+  // Stopping names no track, so there is nothing to loop and nothing to load.
+  it('says nothing about looping when it is stopping', () => {
+    expect(parseTag('music: stop')).toEqual({ kind: 'music', name: null, variant: null })
+    expect(formatTag(parseTag('music: stop 5')!)).toBe('music: stop 5')
   })
 })
 

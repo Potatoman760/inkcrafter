@@ -19,7 +19,6 @@ const EMPTY: AppSettings = {
   interfaceScale: 1,
   providers: [],
   activeProviderId: null,
-  playerDir: null,
   comfy: emptyComfySettings(),
   prompts: emptyPromptOverrides(),
   encryptionAvailable: true
@@ -41,7 +40,6 @@ export interface Settings {
   testProvider(providerId: string): Promise<ConnectionTestResult>
   listModels(providerId: string): Promise<ModelListResult>
   /** Points the app at a player checkout, or clears it with null. */
-  setPlayerDir(dir: string | null): Promise<void>
   /** Where ComfyUI answers. A malformed address is refused by main. */
   setComfyBaseUrl(url: string): Promise<void>
   setComfyWorkflowDir(dir: string | null): Promise<void>
@@ -220,15 +218,6 @@ export function useSettings(enabled: boolean): Settings {
     [flush]
   )
 
-  const setPlayerDir = useCallback(async (dir: string | null): Promise<void> => {
-    try {
-      setSettings(await window.inkcrafter.settings.setPlayerDir(dir))
-      setError(null)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
-    }
-  }, [])
-
   /**
    * Every ComfyUI setting takes the immediate round trip rather than the
    * providers' debounce: each one is a discrete act — choosing a folder,
@@ -312,7 +301,6 @@ export function useSettings(enabled: boolean): Settings {
     setApiKey,
     testProvider,
     listModels,
-    setPlayerDir,
     setComfyBaseUrl,
     setComfyWorkflowDir,
     setComfyTimeout,

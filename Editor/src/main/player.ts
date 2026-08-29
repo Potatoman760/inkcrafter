@@ -1,17 +1,17 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { app, shell } from 'electron'
 import type { PlayerCheck, PlayerStatus } from '@shared/player'
 import { exists, isDirectory } from './fs'
 
 /**
- * The connected player: a checkout of InkCrafter Player, run as a dev server.
+ * The connected player: the `Player` package, run as a dev server.
  *
  * Previewing in the real player is the only way to see what a reader will see —
  * the app's own preview runs the ink, but it is not the game. So the bundle is
  * exported into the player's `game/preview/` and vite is pointed at it, which
- * is exactly what `npm run dev -- --game preview` does in that repo.
+ * is exactly what `npm run dev -- --game preview` does there.
  *
  * One server, kept running. Vite takes seconds to boot and rebuilding it for
  * every preview would make the feature feel worse than a terminal; a second
@@ -21,6 +21,24 @@ import { exists, isDirectory } from './fs'
 
 /** The folder inside the player's static root that a preview is written to. */
 export const PREVIEW_GAME = 'preview'
+
+/**
+ * Where the player is, which is no longer a question.
+ *
+ * The editor and the player are two packages of one repository, so the path is
+ * derived rather than stored: `app.getAppPath()` is the editor package in
+ * development, and the player is its sibling. This used to be a folder the
+ * author picked in Settings, from when the two were separate checkouts that
+ * could be anywhere.
+ *
+ * Packaged, the sibling does not exist — and could not be used if it did, since
+ * previewing runs `npm run dev` in it. `checkPlayer` reports that as the plain
+ * "not a folder" it is, which is the same answer the setting gave when it
+ * pointed somewhere stale.
+ */
+export function playerDir(): string {
+  return resolve(app.getAppPath(), '..', 'Player')
+}
 
 /** How much of the server's output is kept, for when it will not start. */
 const KEPT_LINES = 40
@@ -99,9 +117,9 @@ export async function checkPlayer(dir: string): Promise<PlayerCheck> {
   return { ok: true, problem: null, name: manifest.name ?? null }
 }
 
-/** Where a preview bundle goes inside a player checkout. */
-export function previewDir(playerDir: string): string {
-  return join(playerDir, 'game', PREVIEW_GAME)
+/** Where a preview bundle goes inside the player. */
+export function previewDir(): string {
+  return join(playerDir(), 'game', PREVIEW_GAME)
 }
 
 /**

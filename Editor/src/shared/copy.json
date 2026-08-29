@@ -67,8 +67,6 @@
   "provider.baseUrl": "Include the version path.",
   "provider.model": "The default for new requests.",
 
-  "player.dir": "A checkout of InkCrafter Player — the one with a game/ folder in it.",
-  "player.server": "Started by Preview in player, stopped when you quit.",
 
   "stats.custom": "Passed through to the export untouched.",
   "stats.display": "What the player sees.",

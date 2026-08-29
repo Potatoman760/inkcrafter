@@ -55,13 +55,12 @@ interface StoredSettings {
   interfaceScale: number
   providers: StoredProvider[]
   activeProviderId: string | null
-  playerDir: string | null
   /** Directory used by the most recent native media upload picker. */
   lastUploadDir: string | null
   /**
    * Stored in the clear, deliberately: ComfyUI has no authentication, so there
-   * is no credential here to protect. This is an address and a folder path, the
-   * same kind of thing as `playerDir`.
+   * is no credential here to protect. This is an address and a folder path,
+   * neither of them secret.
    */
   comfy: ComfySettings
   /** Only what the author changed; the defaults live in the code. */
@@ -75,7 +74,6 @@ const EMPTY: StoredSettings = {
   interfaceScale: DEFAULT_INTERFACE_SCALE,
   providers: [],
   activeProviderId: null,
-  playerDir: null,
   lastUploadDir: null,
   comfy: emptyComfySettings(),
   prompts: emptyPromptOverrides(),
@@ -242,7 +240,6 @@ async function read(): Promise<StoredSettings> {
       : []
 
     const active = asString(record['activeProviderId'])
-    const player = asString(record['playerDir'])
     const upload = asString(record['lastUploadDir'])
     const releaseKeys: Record<string, string> = {}
     if (typeof record['releaseKeys'] === 'object' && record['releaseKeys'] !== null) {
@@ -257,7 +254,6 @@ async function read(): Promise<StoredSettings> {
       interfaceScale: asInterfaceScale(record['interfaceScale']),
       providers,
       activeProviderId: providers.some((provider) => provider.id === active) ? active : null,
-      playerDir: player.length > 0 ? player : null,
       lastUploadDir: upload.length > 0 ? upload : null,
       comfy: asStoredComfy(record['comfy']),
       prompts: asStoredPrompts(record['prompts']),
@@ -289,20 +285,6 @@ export function encryptionAvailable(): boolean {
   } catch {
     return false
   }
-}
-
-/**
- * Points the app at a player checkout, or clears it.
- *
- * Stored without checking: the folder may be about to exist, or be on a drive
- * that is not mounted right now, and refusing to remember a path because of
- * today's disk is worse than remembering one that does not resolve. The tab
- * checks it and says so.
- */
-export async function setPlayerDir(dir: string | null): Promise<AppSettings> {
-  const stored = await read()
-  await write({ ...stored, playerDir: dir && dir.trim().length > 0 ? dir : null })
-  return loadSettings()
 }
 
 /** Saves a whole-window scale, clamped to the range the settings UI offers. */
@@ -352,7 +334,6 @@ export async function loadSettings(): Promise<AppSettings> {
     interfaceScale: stored.interfaceScale,
     providers: stored.providers.map(toProvider),
     activeProviderId: stored.activeProviderId,
-    playerDir: stored.playerDir,
     // Carried across whole: unlike a provider there is nothing in it to strip.
     comfy: stored.comfy,
     prompts: stored.prompts,

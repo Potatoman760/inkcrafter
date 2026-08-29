@@ -2943,40 +2943,6 @@ body.is-resizing {
 
 /* Two fields, and they are about different things: where the player is, and
    whether it is running. .settings-content stacks its children flush. */
-.player-tab {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-7);
-}
-
-/* The path is long and not editable here — it comes from the folder picker,
-   which is the only way to be sure it exists. */
-.player-path {
-  flex: 1;
-  min-width: 0;
-}
-
-.player-status {
-  flex: none;
-}
-
-/* Only shown when the server would not start, so it is a transcript of a
-   failure rather than a console sitting open. */
-.player-log {
-  margin: 0;
-  padding: var(--space-4) var(--space-5);
-  max-height: 12rem;
-  overflow: auto;
-  border: 1px solid var(--border-hairline);
-  border-radius: var(--radius-md);
-  background: var(--surface-inset);
-  color: var(--text-tertiary);
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  line-height: var(--leading-snug);
-  white-space: pre-wrap;
-}
-
 .settings-tab {
   display: flex;
   flex-direction: column;
@@ -5180,4 +5146,79 @@ body.is-resizing {
 .saving-note--loose {
   margin: 0;
   padding: var(--space-3) var(--space-5) 0;
+}
+
+/*
+ * The Debug tab: the diagnostics strip, given a pane to fill.
+ *
+ * The component is shaped for the bottom of the window — a 132px band with a
+ * rule along its top — so here it loses the cap and the rule and takes the
+ * height instead. Same rows, same click, more of them visible at once.
+ */
+.debug-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+/* The button and what the last run found, above the list it produced. */
+.debug-run {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: var(--border-width) solid var(--border-hairline);
+}
+
+.debug-run .ic-btn {
+  flex: none;
+}
+
+.debug-panel .debug-list {
+  flex: 1;
+  max-height: none;
+  border-top: 0;
+  background: transparent;
+}
+
+/* Config's two tabs, under the Game section's own row. */
+.manager-subtabs {
+  border-bottom: var(--border-width) solid var(--border-hairline);
+}
+
+.game-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-6);
+  overflow: auto;
+}
+
+/* Small: it confirms which picture was chosen, it is not a preview of the menu. */
+.game-settings__preview {
+  width: 220px;
+  height: 124px;
+  margin-top: var(--space-3);
+}
+
+/* Colour and size sit together: two short controls, not two full rows. */
+.game-settings__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8rem;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.game-settings__colour {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* A swatch, not a text field: the browser draws the whole control. */
+.game-settings__swatch {
+  flex: none;
+  width: 3rem;
+  padding: var(--space-1);
 }

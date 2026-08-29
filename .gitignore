@@ -1,0 +1,9 @@
+# The workspace root. Each package keeps its own .gitignore for its own output.
+
+node_modules/
+
+# Turborepo's local task cache and daemon state.
+.turbo/
+
+.DS_Store
+Thumbs.db

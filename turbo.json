@@ -1,0 +1,44 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "stream",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["out/**", "dist/**"]
+    },
+    "typecheck": {
+      "outputs": []
+    },
+    "test": {
+      "outputs": []
+    },
+    "spec:check": {
+      "outputs": []
+    },
+    "spec:sync": {
+      "cache": false
+    },
+    "desktop:compile": {
+      "outputs": ["desktop-dist/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "dist": {
+      "dependsOn": ["build"],
+      "outputs": ["release/**"],
+      "cache": false
+    },
+    "desktop:pack": {
+      "dependsOn": ["build"],
+      "outputs": ["release/**"],
+      "cache": false
+    },
+    "desktop:dist": {
+      "dependsOn": ["build"],
+      "outputs": ["release/**"],
+      "cache": false
+    }
+  }
+}

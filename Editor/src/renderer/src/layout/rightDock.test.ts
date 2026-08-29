@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { RIGHT_TABS, hasTab, tabFor, type RightTab, type ViewMode } from './rightDock'
+import {
+  RIGHT_TABS,
+  hasTab,
+  isWriteView,
+  tabFor,
+  tabLabel,
+  type RightTab,
+  type ViewMode
+} from './rightDock'
 
 const VIEWS = Object.keys(RIGHT_TABS) as ViewMode[]
 
@@ -29,9 +37,26 @@ describe('the right-hand dock', () => {
   })
 
   it('keeps a tab the next view also has', () => {
-    // Write is in both, so moving between them should not disturb it.
-    expect(tabFor('manuscript', 'write')).toBe('write')
-    expect(tabFor('editor', 'write')).toBe('write')
+    // The assistant is in every strip, so moving never disturbs it.
+    expect(tabFor('manuscript', 'assistant')).toBe('assistant')
+    expect(tabFor('editor', 'assistant')).toBe('assistant')
+  })
+
+  // Writing shares the assistant's slot rather than having a tab of its own,
+  // and the view decides which of the two is in it.
+  it('is the writer in the manuscript and the assistant everywhere else', () => {
+    expect(isWriteView('manuscript')).toBe(true)
+    expect(tabLabel('manuscript', 'assistant')).toBe('Write')
+
+    for (const view of VIEWS.filter((one) => one !== 'manuscript')) {
+      expect(isWriteView(view), view).toBe(false)
+      expect(tabLabel(view, 'assistant'), view).toBe('Assistant')
+    }
+  })
+
+  it('leaves every other tab named what it is', () => {
+    expect(tabLabel('manuscript', 'reading')).toBe('Reading')
+    expect(tabLabel('editor', 'preview')).toBe('Preview')
   })
 
   /**
@@ -48,7 +73,7 @@ describe('the right-hand dock', () => {
   })
 
   it('never lands on a tab the view does not have', () => {
-    const all: RightTab[] = ['assistant', 'preview', 'write', 'reading', 'structure']
+    const all: RightTab[] = ['assistant', 'preview', 'reading', 'structure']
 
     for (const view of VIEWS) {
       for (const tab of all) {

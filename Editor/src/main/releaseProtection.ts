@@ -2,8 +2,8 @@ import { createHash, generateKeyPair } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { ProjectProtection } from '@shared/project'
-import { checkPlayer } from './player'
-import { loadSettings, releasePrivateKeyFor, storeReleasePrivateKey } from './settings'
+import { checkPlayer, playerDir } from './player'
+import { releasePrivateKeyFor, storeReleasePrivateKey } from './settings'
 
 interface PlayerReleaseKeyring {
   version: 1
@@ -40,12 +40,10 @@ export async function installProjectProtection(
     }
   }
 
-  const { playerDir } = await loadSettings()
-  if (!playerDir) return { ok: false, message: 'Choose a connected player in Settings first.' }
-  const player = await checkPlayer(playerDir)
+  const player = await checkPlayer(playerDir())
   if (!player.ok) return { ok: false, message: player.problem ?? 'The connected player is not available.' }
 
-  const folder = join(playerDir, '.inkcrafter')
+  const folder = join(playerDir(), '.inkcrafter')
   const path = join(folder, 'release-keys.json')
   let keyring: PlayerReleaseKeyring = { version: 1, keys: {} }
   try {

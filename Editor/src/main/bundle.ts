@@ -20,6 +20,7 @@ import {
 } from '@shared/bundle/preview'
 import { scanKnots } from '@shared/inkKnots'
 import { preflight } from '@shared/bundle/preflight'
+import { emptyGame, parseGame, serialiseGame, type GameDocument } from '@shared/bundle/gameDoc'
 import { emptyNpcs, parseNpcs, serialiseNpcs, type NpcDocument } from '@shared/bundle/npcDoc'
 import { emptyMap, parseMap, serialiseMap, type MapDocument } from '@shared/bundle/mapDoc'
 import {
@@ -117,7 +118,7 @@ export async function exportBundle(
       if (options.preview.target !== null) {
         // Resetting the callstack makes this the same kind of arrival as map
         // travel. Do not Continue: the player must still process the first
-        // paragraph's media, state, autosave, and sound tags itself.
+        // paragraph's media, state and autosave tags itself.
         story.ChoosePathString(options.preview.target, true)
       }
       preview = {
@@ -140,14 +141,15 @@ export async function exportBundle(
     }
   }
 
-  const [stats, media, npcs, map, gallery, achievements, minigames] = await Promise.all([
+  const [stats, media, npcs, map, gallery, achievements, minigames, game] = await Promise.all([
     readDoc(project, 'stats.json', parseStats, emptyStats),
     readDoc(project, 'media.json', parseMedia, emptyMedia),
     readDoc(project, 'npcs.json', parseNpcs, emptyNpcs),
     readDoc(project, 'map.json', parseMap, emptyMap),
     readDoc(project, 'gallery.json', parseGallery, emptyGallery),
     readDoc(project, 'achievements.json', parseAchievements, emptyAchievements),
-    readDoc(project, 'minigames.json', parseMinigames, emptyMinigames)
+    readDoc(project, 'minigames.json', parseMinigames, emptyMinigames),
+    readDoc(project, 'game.json', parseGame, emptyGame)
   ])
 
   // Built beside the destination and swapped in at the end, so a crash or a
@@ -174,6 +176,7 @@ export async function exportBundle(
         gallery,
         achievements,
         minigames,
+        game,
         protection: options.preview || options.forcePlain ? null : (project.protection ?? null)
       },
       { diagnostics, warnings, filesRead }
@@ -195,6 +198,7 @@ interface BundleContents {
   gallery: GalleryDocument
   achievements: AchievementDocument
   minigames: MinigameDocument
+  game: GameDocument
   protection: ProjectProtection | null
 }
 
@@ -212,7 +216,7 @@ async function writeBundle(
   context: ExportContext
 ): Promise<BundleExportResult> {
   const {
-    storyJson, contentHash, preview, stats, media, npcs, map, gallery, achievements, minigames, protection
+    storyJson, contentHash, preview, stats, media, npcs, map, gallery, achievements, minigames, game, protection
   } = contents
   const { diagnostics, warnings, filesRead } = context
 
@@ -236,7 +240,7 @@ async function writeBundle(
   // something nobody asserted about them would be work for nothing.
   const sizes = await measureHotspots(project, media)
 
-  for (const problem of preflight({ sources, media, stats, npcs, map, gallery, minigames, knots, sizes })) {
+  for (const problem of preflight({ sources, media, stats, npcs, map, gallery, minigames, game, knots, sizes })) {
     const at = problem.line === null ? '' : `:${problem.line}`
     const where = problem.file === null ? '' : `${problem.file}${at} — `
     warnings.push(`${where}${problem.message}`)
@@ -270,6 +274,7 @@ async function writeBundle(
       'utf8'
     ),
     writeFile(join(staging, BUNDLE_FILES.minigames), serialiseMinigames(minigames), 'utf8'),
+    writeFile(join(staging, BUNDLE_FILES.game), serialiseGame(game), 'utf8'),
     writeFile(join(staging, BUNDLE_FILES.manifest), serialiseJson(manifest), 'utf8')
   ]
   if (preview) {
@@ -509,7 +514,7 @@ async function bundlesInside(outDir: string, contents: string[]): Promise<string
  * want the same text and re-reading it per pass would be the sort of waste that
  * only shows up on a project with two hundred chapters.
  */
-async function readSources(project: Project, filesRead: string[]): Promise<Map<string, string>> {
+export async function readSources(project: Project, filesRead: string[]): Promise<Map<string, string>> {
   const sources = new Map<string, string>()
 
   for (const file of filesRead) {
@@ -534,7 +539,7 @@ async function readSources(project: Project, filesRead: string[]): Promise<Map<s
  * is a fact about the text, and `scanKnots` already answers it — functions
  * excluded, because a function is called rather than travelled to.
  */
-function destinationsIn(sources: Map<string, string>): string[] {
+export function destinationsIn(sources: Map<string, string>): string[] {
   const names = new Set<string>()
 
   for (const source of sources.values()) {
@@ -561,7 +566,7 @@ function destinationsIn(sources: Map<string, string>): string[] {
  * be run against a document in a test, so it is handed the answer rather than
  * finding it.
  */
-async function measureHotspots(
+export async function measureHotspots(
   project: Project,
   media: MediaDocument
 ): Promise<Record<string, { width: number; height: number }>> {
@@ -646,7 +651,7 @@ async function copyVariant(
  * so the Electron app object, and an exporter that could not run outside
  * Electron could not be tested, scripted, or run from a watch task.
  */
-async function readDoc<T>(
+export async function readDoc<T>(
   project: Project,
   file: string,
   parse: (json: string) => T,

@@ -6,7 +6,6 @@ import type { GameState } from "@/state/GameState";
 import { SaveManager } from "@/save/SaveManager";
 import { MediaLayer } from "@/media/MediaLayer";
 import { MusicPlayer } from "@/audio/MusicPlayer";
-import { SoundPlayer } from "@/audio/SoundPlayer";
 import { DialogueBox } from "@/ui/DialogueBox";
 import { ChoiceMenu } from "@/ui/ChoiceMenu";
 import { makeButton } from "@/ui/Button";
@@ -52,7 +51,6 @@ export class VNScene extends Phaser.Scene {
   private state!: GameState;
   private media!: MediaLayer;
   private music!: MusicPlayer;
-  private sounds!: SoundPlayer;
   private dialogue!: DialogueBox;
   private choices!: ChoiceMenu;
   private mapButton?: Phaser.GameObjects.Container;
@@ -94,13 +92,11 @@ export class VNScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor("#05060a");
     this.media = new MediaLayer(this, getAssetIndex(this));
     this.music = new MusicPlayer(this, getAssetIndex(this));
-    this.sounds = new SoundPlayer(this, getAssetIndex(this));
     // Audio outlives the scene that started it, because it belongs to the
     // game's sound manager rather than to the display list. Nothing stops the
     // story's music or active cues on the way back to the title unless this does.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.music.destroy();
-      this.sounds.destroy();
       this.media.destroy();
     });
     this.events.on(Phaser.Scenes.Events.RESUME, this.onSceneResume, this);
@@ -285,10 +281,8 @@ export class VNScene extends Phaser.Scene {
           // `stop` carries the fade; a tag naming a track never does, so there
           // is nothing to pass on the other branch.
           if (cmd.name === null) this.music.stop(cmd.fade);
-          else this.music.play(cmd.name, cmd.variant);
+          else this.music.play(cmd.name, cmd.variant, cmd.loop === true);
           break;
-        case "sound":
-          this.sounds.play(cmd.name, cmd.variant);
           break;
         case "anim":
           if (cmd.name === null) this.media.clearAnims();

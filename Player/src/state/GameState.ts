@@ -284,7 +284,6 @@ export class GameState {
       case "stat":
       case "npc":
       case "autosave":
-      case "sound":
       case "minigame":
         break;
       default:

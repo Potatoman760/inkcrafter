@@ -23,9 +23,15 @@ sibling checkout. See [The bundle](#the-bundle).
 
 ## Commands
 
+Run these from `Editor/`. The editor is one half of a two-package monorepo — the
+other is `Player/`, which runs what the editor exports — and the workspace root
+above adds `npm run typecheck`, `test` and `build` that fan out to both through
+Turborepo, with a task cache. Either way in works; the root is the one that
+catches a change here breaking the player.
+
 | | |
 | --- | --- |
-| `npm run dev` | electron-vite dev server, hot reload |
+| `npm run dev` | dev server. Renderer edits hot-swap; main, preload and `shared/` rebuild and **restart the app**, which is what `--watch` buys |
 | `npm run test` | vitest, one pass, ~830 tests in ~6s |
 | `npm run typecheck` | both tsconfigs — **run this; `npm run test` does not typecheck** |
 | `npm run build` | production build into `out/` |
@@ -35,6 +41,11 @@ sibling checkout. See [The bundle](#the-bundle).
 Before calling work done: `npm run typecheck`, `npm run test`, then
 `npx electron-vite build`. If the change touches anything the renderer imports,
 launch it too — see [Verifying against the real thing](#verifying-against-the-real-thing).
+
+A restart loses the open file and any unsaved buffer, so a main-process change
+mid-edit costs the buffer. `data/` is excluded from the dev watcher: it is the
+author's workspace, written by the app itself, and a story saved in the editor
+is not a source change.
 
 There is no linter and no formatter. Match the surrounding file.
 
@@ -61,6 +72,28 @@ for `src/renderer/src/*` (renderer only).
 sides depend on, so a type that main needs and the renderer displays is
 *declared in shared* and imported by main — not the other way around. This has
 been violated once and caught in review.
+
+## Words in the UI
+
+Short. A control is a control, not a sentence explaining itself. The rule is
+already written in [Field.tsx](src/renderer/src/design/components/Field.tsx) and
+worth repeating because it is easy to break while being helpful:
+
+- **Buttons, tabs and labels are one or two words.** "Run check", not "Run a
+  full check of the project".
+- **`note` is a fact the app worked out** — `seraphine.md`, `3 unfiled`,
+  `2 errors across 37 files`. Something that changes, and is worth a glance.
+- **`about` is the teaching**, behind the info mark beside a label. Read once,
+  then never again. A paragraph that would be `about` does not go on the page
+  because the page has no room to say it every time.
+- **`hint` is one line and states a consequence**, not the label again.
+- **Nothing at all is a valid answer.** A button that says what it does needs no
+  sentence under it saying the same thing at greater length. Empty states and
+  errors are the exception: there, the words are all there is.
+
+The failure this catches: a Run button captioned "Compiles the whole story and
+checks every tag against the catalogues." Twelve words explaining a two-word
+button, permanently on screen, in a pane 300px wide.
 
 ## Rules that came from bugs
 
@@ -297,22 +330,24 @@ question is visual rather than structural.
 Windows, with PowerShell primary and Bash (Git Bash) also available — each takes
 its own syntax.
 
-**Never write a file with a Bash heredoc here.** Not even a quoted one, which is
-supposed to be literal. Two ways it has gone wrong, both silently enough to cost
-a debugging session:
+**Never write a file with a Bash heredoc here** — no `cat > file <<'EOF'`, not
+even with the quoted delimiter that is supposed to make it literal. Use the Write
+tool for new files and Edit for changes to existing ones.
+
+Every other heredoc use is fine: piping a query to a tool, or an inline script
+that reads, greps or prints. The rule is about file *content*.
+
+Two ways it has gone wrong, both quietly enough to cost a debugging session:
 
 - **Backslashes collapse.** `\\` arrives as `\`, so `/[.*+?^${}()|[\]\\]/g` was
   written out as `/[.*+?^${}()|[\]\]/g` — an unterminated character class, and a
-  regex literal that no longer parses. The same collapse turns a Python `'\\('`
-  into `'\('`, which then warns about an invalid escape and quietly keeps the
-  wrong string.
+  regex literal that no longer parses.
 - **A large body can fail to parse at all.** A ~300-line TypeScript file ended
   in `unexpected EOF while looking for matching quote` and wrote nothing.
 
-Use the Write tool for new files, Edit for changes to existing ones, and a
-Python script for scripted multi-file edits — Python here is fine as long as the
-*script itself* does not arrive by heredoc carrying escapes. When a Python
-edit script is unavoidable, keep backslashes out of the strings it matches on:
+A heredoc-delivered Python script is the practical way to make the same edit
+across many files, and that stays. The collapse above applies to it too, though:
+keep backslashes out of the strings such a script matches on or writes, and
 anchor on a neighbouring line instead.
 
 Line endings are `.gitattributes`-managed. The CRLF warnings printed on commit

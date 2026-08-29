@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { MapDocument } from "@shared/bundle/mapDoc";
 import type { NpcDocument } from "@shared/bundle/npcDoc";
 import type { KnotSource } from "@shared/inkKnots";
@@ -15,9 +16,11 @@ import { CastPanel } from "../npcs/CastPanel";
 import { StatsPanel } from "../stats/StatsPanel";
 import { GalleryPanel } from "../gallery/GalleryPanel";
 import { AchievementPanel } from "../achievements/AchievementPanel";
+import type { GameDocument } from "@shared/bundle/gameDoc";
 import { MinigamePanel } from "../minigames/MinigamePanel";
 import { type IconName } from "../design/Icon";
 import { Tabs } from "../design/components";
+import { GameSettingsPanel } from "./GameSettingsPanel";
 
 /**
  * One view for everything the game is made of.
@@ -48,9 +51,26 @@ export const MANAGER_SECTIONS = [
   "cast",
   "map",
   "gallery",
-  "steam",
+  "config",
   "minigames",
 ] as const;
+
+/**
+ * The Config section's own tabs.
+ *
+ * Steam used to sit in the row above, beside the catalogues, which put a
+ * Steamworks integration at the same level as the media library. It is one of
+ * the things you configure about the game rather than one of the things the
+ * story is made of, so it is a tab inside Config now — the same two levels the
+ * Media section already has.
+ */
+export const CONFIG_TABS = ["settings", "steam"] as const;
+export type ConfigTab = (typeof CONFIG_TABS)[number];
+
+const CONFIG_LABELS: Record<ConfigTab, string> = {
+  settings: "Game Settings",
+  steam: "Steam",
+};
 export type ManagerSection = (typeof MANAGER_SECTIONS)[number];
 
 const SECTION_LABELS: Record<ManagerSection, string> = {
@@ -59,7 +79,7 @@ const SECTION_LABELS: Record<ManagerSection, string> = {
   cast: "Cast",
   map: "Map",
   gallery: "Gallery",
-  steam: "Steam",
+  config: "Config",
   minigames: "Minigames",
 };
 
@@ -77,7 +97,8 @@ export const SECTION_FILES: Record<ManagerSection, string> = {
   cast: "npcs.json",
   map: "map.json",
   gallery: "gallery.json",
-  steam: "achievements.json",
+  // Config holds two files; this names the one its leading tab edits.
+  config: "game.json",
   minigames: "minigames.json",
 };
 
@@ -88,7 +109,7 @@ const SECTION_ICONS: Record<ManagerSection, IconName> = {
   cast: "users",
   map: "map",
   gallery: "image",
-  steam: "trophy",
+  config: "settings",
   minigames: "gauge",
 };
 
@@ -152,6 +173,12 @@ interface GameManagerViewProps {
     error: string | null;
     onChange: (next: AchievementDocument) => void;
   };
+  game: {
+    doc: GameDocument;
+    saving: boolean;
+    error: string | null;
+    onChange: (next: GameDocument) => void;
+  };
   minigames: {
     doc: MinigameDocument;
     saving: boolean;
@@ -172,8 +199,13 @@ export function GameManagerView({
   map,
   gallery,
   achievements,
+  game,
   minigames,
 }: GameManagerViewProps): React.JSX.Element {
+  // Which half of Config is open. Local, because it is a place in the UI rather
+  // than anything the rest of the app has an opinion about.
+  const [configTab, setConfigTab] = useState<ConfigTab>("settings");
+
   return (
     <div
       className={`manager-view manager-${section}`}
@@ -212,12 +244,32 @@ export function GameManagerView({
       {section === "gallery" && (
         <GalleryPanel {...gallery} media={media.doc} files={media.files} />
       )}
-      {section === "steam" && (
-        <AchievementPanel
-          {...achievements}
-          stats={stats.doc}
-          npcs={cast.doc}
-        />
+      {section === "config" && (
+        <>
+          <Tabs
+            className="manager-subtabs"
+            level="sub"
+            label="Config"
+            value={configTab}
+            onChange={(next) => setConfigTab(next as ConfigTab)}
+            items={CONFIG_TABS.map((candidate) => ({
+              value: candidate,
+              label: CONFIG_LABELS[candidate],
+            }))}
+          />
+
+          {configTab === "steam" && (
+            <AchievementPanel {...achievements} stats={stats.doc} npcs={cast.doc} />
+          )}
+          {configTab === "settings" && (
+            <GameSettingsPanel
+              {...game}
+              projectTitle={project?.title ?? ""}
+              media={media.doc}
+              files={media.files}
+            />
+          )}
+        </>
       )}
       {section === "minigames" && (
         <MinigamePanel

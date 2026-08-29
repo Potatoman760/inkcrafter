@@ -1,0 +1,26 @@
+{
+  "name": "inkcrafter-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "The InkCrafter editor and the player that runs what it exports.",
+  "workspaces": [
+    "Editor",
+    "Player"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "dev": "turbo run dev",
+    "spec:sync": "turbo run spec:sync",
+    "editor": "npm run dev --workspace inkcrafter",
+    "player": "npm run dev --workspace inkcrafter-player"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.8"
+  },
+  "packageManager": "npm@11.11.0",
+  "engines": {
+    "node": ">=20"
+  }
+}

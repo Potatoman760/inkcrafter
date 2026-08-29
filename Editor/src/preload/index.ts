@@ -93,6 +93,11 @@ const api: InkCrafterApi = {
     destinations: (project) => ipcRenderer.invoke('map:destinations', project)
   },
 
+  game: {
+    read: (project) => ipcRenderer.invoke('game:read', project),
+    write: (project, doc) => ipcRenderer.invoke('game:write', project, doc)
+  },
+
   gallery: {
     read: (project) => ipcRenderer.invoke('gallery:read', project),
     write: (project, doc) => ipcRenderer.invoke('gallery:write', project, doc)
@@ -106,6 +111,10 @@ const api: InkCrafterApi = {
   minigames: {
     read: (project) => ipcRenderer.invoke('minigames:read', project),
     write: (project, doc) => ipcRenderer.invoke('minigames:write', project, doc)
+  },
+
+  project: {
+    check: (project) => ipcRenderer.invoke('project:check', project)
   },
 
   search: {
@@ -140,7 +149,6 @@ const api: InkCrafterApi = {
     setApiKey: (providerId, key) => ipcRenderer.invoke('settings:setApiKey', providerId, key),
     testProvider: (providerId) => ipcRenderer.invoke('settings:testProvider', providerId),
     listModels: (providerId) => ipcRenderer.invoke('settings:listModels', providerId),
-    setPlayerDir: (dir) => ipcRenderer.invoke('settings:setPlayerDir', dir),
     setComfyBaseUrl: (url) => ipcRenderer.invoke('settings:setComfyBaseUrl', url),
     setComfyWorkflowDir: (dir) => ipcRenderer.invoke('settings:setComfyWorkflowDir', dir),
     setComfyTimeout: (seconds) => ipcRenderer.invoke('settings:setComfyTimeout', seconds),
@@ -163,13 +171,9 @@ const api: InkCrafterApi = {
   },
 
   player: {
-    choose: () => ipcRenderer.invoke('player:choose'),
-    check: (dir) => ipcRenderer.invoke('player:check', dir),
-    status: () => ipcRenderer.invoke('player:status'),
     // Project stays the first argument for compatibility with a main process
     // that has not restarted after a renderer hot reload.
     preview: (project, target) => ipcRenderer.invoke('player:preview', project, target),
-    stop: () => ipcRenderer.invoke('player:stop'),
     open: (previewId, minigame) => ipcRenderer.invoke('player:open', previewId, minigame)
   },
 
