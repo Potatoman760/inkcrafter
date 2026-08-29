@@ -11,7 +11,7 @@ import {
   type ChatContext,
 } from "@shared/chat";
 import type { CodexEntry, CodexType } from "@shared/codex";
-import { countMentions, findMentions } from "@shared/mentions";
+import { findMentions } from "@shared/mentions";
 import { sectionsOf, type SourceAnchor } from "@shared/manuscript";
 import {
   updatePlanNode,
@@ -68,6 +68,7 @@ import { useManuscript } from "./manuscript/useManuscript";
 import { WritePanel } from "./manuscript/WritePanel";
 import { StoryPlayer } from "./player/StoryPlayer";
 import { FileTree } from "./project/FileTree";
+import { SearchDialog } from "./search/SearchDialog";
 import { ProjectPicker } from "./project/ProjectPicker";
 import { ProjectDialog } from "./project/ProjectDialog";
 import { useProject } from "./project/useProject";
@@ -101,6 +102,12 @@ import { useToasts } from "./layout/useToasts";
 import { Hint } from './design/components'
 
 const COMPILE_DEBOUNCE_MS = 300;
+/**
+ * Longer than a compile's, because this reads every ink file and nothing waits
+ * on the answer — a badge that settles a moment after the typing stops is not
+ * something an author is watching for.
+ */
+const MENTION_DEBOUNCE_MS = 500;
 
 /**
  * The views that need the catalogues loaded.
@@ -166,6 +173,7 @@ export function App(): React.JSX.Element {
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   /** Which catalogue the Game view is showing. */
   const [managerSection, setManagerSection] = useState<ManagerSection>("media");
   /** Where the ink editor was right-clicked, or null. */
@@ -203,10 +211,16 @@ export function App(): React.JSX.Element {
   // The manuscript can be read from any file in the project, independently of
   // whichever one is open in the editor.
   const [manuscriptEntry, setManuscriptEntry] = useState<string | null>(null);
-  /** Set when jumping from the manuscript to a source line; nonce forces repeats. */
+  /**
+   * Set when jumping to a source line; nonce forces repeats.
+   *
+   * `align` is where the line lands: the manuscript and the outline want it
+   * centred with its context, a search hit wants it at the top to read forward.
+   */
   const [gotoLine, setGotoLine] = useState<{
     line: number;
     nonce: number;
+    align?: "center" | "start";
   } | null>(null);
   /** A knot to trace once the manuscript view has opened. */
   const [pendingTrace, setPendingTrace] = useState<string | null>(null);
@@ -317,11 +331,53 @@ export function App(): React.JSX.Element {
   // Detection scans the whole file, so let React keep typing responsive and
   // catch up on mentions when it has a spare moment.
   const deferredSource = useDeferredValue(source);
+  // Stays the open file's: these are ranges into the document the editor is
+  // showing, and they are what underlines a name in it.
   const mentions = useMemo(
     () => findMentions(deferredSource, codex.entries),
     [deferredSource, codex.entries],
   );
-  const mentionCounts = useMemo(() => countMentions(mentions), [mentions]);
+
+  /**
+   * How often each entry is named across the whole story.
+   *
+   * Counted in main over every ink file rather than here over the open one: the
+   * badge sits beside the entry and reads as a fact about the entry, so
+   * counting only what happened to be on screen made a central character show 0
+   * whenever the author was looking at a chapter she is not in.
+   *
+   * The open buffer goes along unsaved, so the number still moves as it is
+   * typed rather than waiting for the next save.
+   */
+  const [mentionCounts, setMentionCounts] = useState<Record<string, number>>(
+    {},
+  );
+
+  useEffect(() => {
+    if (!project || codex.entries.length === 0) {
+      setMentionCounts({});
+      return;
+    }
+
+    let live = true;
+    const timer = setTimeout(() => {
+      void window.inkcrafter.codex
+        .mentionCounts(project, {
+          entries: codex.entries,
+          ...(openFile
+            ? { overrides: { [openFile.absolutePath]: deferredSource } }
+            : {}),
+        })
+        .then((next) => {
+          if (live) setMentionCounts(next);
+        });
+    }, MENTION_DEBOUNCE_MS);
+
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [project, codex.entries, openFile, deferredSource, files]);
 
 
   const save = useCallback(async () => {
@@ -403,6 +459,9 @@ export function App(): React.JSX.Element {
           break;
         case "project:export":
           setExportOpen(true);
+          break;
+        case "search:inFiles":
+          setSearchOpen(true);
           break;
         case "player:preview":
           void previewInPlayer();
@@ -530,6 +589,28 @@ export function App(): React.JSX.Element {
       );
     },
     [files, selectFile],
+  );
+
+  /**
+   * Jump from a search result to the line that matched.
+   *
+   * Differs from `openSource` in the two things a result asks for that the
+   * manuscript does not: the rail comes back to the file tree, where the file
+   * just landed in is the highlighted one, and the line goes to the top of the
+   * editor rather than the middle, because from a search hit the author is
+   * reading forward from it.
+   */
+  const openHit = useCallback(
+    (path: string, line: number) => {
+      const file = files.find((candidate) => candidate.path === path);
+      if (!file) return;
+      setSidebar("files");
+      showView("editor");
+      void selectFile(file).then(() =>
+        setGotoLine({ line, nonce: Date.now(), align: "start" }),
+      );
+    },
+    [files, selectFile, showView],
   );
 
   // Ctrl-clicking a name in the editor shows that entry in the sidebar, where
@@ -938,6 +1019,15 @@ export function App(): React.JSX.Element {
       }}
     />
   ) : null;
+
+  const searchOverlay =
+    searchOpen && project ? (
+      <SearchDialog
+        project={project}
+        onOpen={openHit}
+        onClose={() => setSearchOpen(false)}
+      />
+    ) : null;
 
   const exportOverlay =
     exportOpen && project ? (
@@ -1560,6 +1650,7 @@ export function App(): React.JSX.Element {
         />
       )}
 
+      {searchOverlay}
       {exportOverlay}
       {settingsOverlay}
     </div>

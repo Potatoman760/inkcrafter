@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Compiler, CompilerOptions } from 'inkjs/compiler/Compiler'
 import {
-  addCategory,
   addItem,
   addStat,
   emptyStats,
@@ -9,7 +8,7 @@ import {
   newStat,
   type StatsDocument
 } from '@shared/statsDoc'
-import { includePathFrom, listName, renderStateInk, withStateInclude } from '@shared/statsInk'
+import { includePathFrom, renderStateInk, withStateInclude } from '@shared/statsInk'
 
 /**
  * The generated declarations have to compile, and the vocabulary has to actually
@@ -47,9 +46,9 @@ function seeded(): StatsDocument {
   doc = addStat(doc, { ...newStat('Strength'), initial: 2 })
   doc = addStat(doc, newStat('Has met Wren', 'boolean'))
   doc = addStat(doc, { ...newStat('Title', 'text'), initial: 'archivist' })
-  doc = addItem(doc, newItem('Shovel', 'Tools'))
-  doc = addItem(doc, newItem('Rope', 'Tools'))
-  doc = addItem(doc, newItem('Brass key', 'Keys'))
+  doc = addItem(doc, newItem('Shovel'))
+  doc = addItem(doc, newItem('Rope'))
+  doc = addItem(doc, newItem('Brass key'))
   return doc
 }
 
@@ -117,22 +116,19 @@ You stand at the hole.
     ])
   })
 
-  // One list of a hundred names is unreadable, and this is the scale the
-  // catalogue is meant for, so it is tested rather than assumed.
-  it('compiles a hundred items across several categories', () => {
+  // A hundred names in one LIST is the scale the catalogue is meant for, so it
+  // is tested rather than assumed.
+  it('compiles a hundred items in one list', () => {
     let doc = emptyStats()
-    const categories = ['Tools', 'Keys', 'Documents', 'Clothing', 'Curios']
-    for (const [index, category] of categories.entries()) {
-      for (let n = 0; n < 20; n++) doc = addItem(doc, newItem(`${category} item ${index * 20 + n}`, category))
-    }
+    for (let n = 0; n < 100; n++) doc = addItem(doc, newItem(`item ${n}`))
 
     const source = `${renderStateInk(doc)}
 -> start
 
 === start ===
-~ inventory += tools_item_0
+~ inventory += item_0
 Carrying {LIST_COUNT(inventory)}.
-* {inventory ? tools_item_0} [Dig]
+* {inventory ? item_0} [Dig]
     -> done
 
 === done ===
@@ -154,13 +150,12 @@ Carrying {LIST_COUNT(inventory)}.
     expect(rendered).not.toContain('VAR inventory')
   })
 
-  it('skips a category nothing is in, which would declare an empty LIST', () => {
-    // `LIST Empty = ` is a compile error, so an unstocked category must not emit.
-    const doc = addCategory(addItem(emptyStats(), newItem('Shovel', 'Tools')), 'Unused')
+  it('declares every item in one list', () => {
+    let doc = addItem(emptyStats(), newItem('Shovel'))
+    doc = addItem(doc, newItem('Brass key'))
     const rendered = renderStateInk(doc)
 
-    expect(rendered).toContain('LIST Tools = shovel')
-    expect(rendered).not.toContain('Unused')
+    expect(rendered).toContain('LIST items = shovel, brass_key')
     expect(play(`${rendered}\n-> START\n=== START ===\n-> END\n`).errors).toEqual([])
   })
 
@@ -176,15 +171,6 @@ Carrying {LIST_COUNT(inventory)}.
   it('carries a description through as a comment', () => {
     const doc = addStat(emptyStats(), { ...newStat('Strength'), description: 'How much they can lift.' })
     expect(renderStateInk(doc)).toContain('// How much they can lift.')
-  })
-})
-
-describe('listName', () => {
-  it('makes an ink identifier while keeping the capitalisation ink uses for lists', () => {
-    expect(listName('Tools')).toBe('Tools')
-    expect(listName('Key items')).toBe('Key_items')
-    expect(listName('9 lives')).toBe('_9_lives')
-    expect(listName('!!!')).toBe('Items')
   })
 })
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  newCarryMinigame,
   newCombatMinigame,
   newQuickhandsMinigame,
   parseMinigames,
@@ -105,6 +106,29 @@ describe('minigame catalogue', () => {
     expect(resolveTunable({ base: 140, modifiers: [] }, () => 0, 150)).toBe(150)
   })
 
+  it('round-trips a carry definition, stat modifiers and all', () => {
+    const carry = newCarryMinigame('Yard carry')
+    carry.resultVariable = 'carry_result'
+    carry.staminaMax = { base: 100, modifiers: [{ stat: 'strength', perPoint: 10 }] }
+
+    const back = parseMinigames(serialiseMinigames({ version: 1, minigames: [carry] }))
+
+    expect(back.minigames).toEqual([carry])
+  })
+
+  // The stamina bar is deliberately scene-local, unlike combat's health
+  // variable: an exercise that left the player worse off would be absurd.
+  it('gives a carry no numeric variable to write to', () => {
+    expect(newCarryMinigame('Yard carry')).not.toHaveProperty('playerHealthVariable')
+  })
+
+  it('scales a carry tuning off a stat, like every other tuning', () => {
+    const carry = newCarryMinigame('Yard carry')
+    carry.staminaMax = { base: 100, modifiers: [{ stat: 'strength', perPoint: 10 }] }
+
+    expect(resolveTunable(carry.staminaMax, (name) => (name === 'strength' ? 3 : 0))).toBe(130)
+  })
+
   it('drops malformed rows and tolerates an unreadable document', () => {
     expect(parseMinigames('not json').minigames).toEqual([])
     expect(parseMinigames(JSON.stringify({
@@ -112,7 +136,8 @@ describe('minigame catalogue', () => {
         null,
         { kind: 'puzzle', name: 'x' },
         { kind: 'combat', name: '' },
-        { kind: 'quickhands', name: '' }
+        { kind: 'quickhands', name: '' },
+        { kind: 'carry', name: '' }
       ]
     })).minigames).toEqual([])
   })

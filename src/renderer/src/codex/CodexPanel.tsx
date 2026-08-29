@@ -16,6 +16,7 @@ import {
   Hint,
   Input,
   ListRow,
+  IconButton,
   PaneHeader,
   Select
 } from '../design/components'
@@ -121,17 +122,18 @@ export function CodexPanel({
       <PaneHeader
         className="pane-header"
         title="Codex"
+        // Icon only, as the file tree's actions are. The name lives in the
+        // label, which is the tooltip and the accessible name both.
         actions={
-          <Button variant="link" icon="book-open" onClick={onOpenSettings}>
-            libraries
-          </Button>
+          <IconButton icon="book-open" label="Libraries" size="sm" onClick={onOpenSettings} />
         }
       />
 
       <div className="codex-new">
         <Input
           value={newName}
-          placeholder="New entry…"
+          aria-label="New entry"
+          placeholder="Name"
           onChange={(event) => setNewName(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') submit()
@@ -220,7 +222,7 @@ export function CodexPanel({
                     trail={
                       <Badge
                         variant={count === 0 ? 'zero' : 'default'}
-                        title={`${count} mention${count === 1 ? '' : 's'} in this file`}
+                        title={`${count} mention${count === 1 ? '' : 's'} across the story`}
                       >
                         {count}
                       </Badge>

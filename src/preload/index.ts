@@ -35,7 +35,9 @@ const api: InkCrafterApi = {
     load: (libraryIds) => ipcRenderer.invoke('codex:load', libraryIds),
     save: (entry, names) => ipcRenderer.invoke('codex:save', entry, names),
     remove: (entry) => ipcRenderer.invoke('codex:remove', entry),
-    move: (entry, toFile) => ipcRenderer.invoke('codex:move', entry, toFile)
+    move: (entry, toFile) => ipcRenderer.invoke('codex:move', entry, toFile),
+    mentionCounts: (project, request) =>
+      ipcRenderer.invoke('codex:mentionCounts', project, request)
   },
 
   manuscript: {
@@ -106,6 +108,9 @@ const api: InkCrafterApi = {
     write: (project, doc) => ipcRenderer.invoke('minigames:write', project, doc)
   },
 
+  search: {
+    ink: (project, request) => ipcRenderer.invoke('search:ink', project, request)
+  },
   bundle: {
     export: (project, outDir) => ipcRenderer.invoke('bundle:export', project, outDir),
     generateProtection: () => ipcRenderer.invoke('bundle:generateProtection'),

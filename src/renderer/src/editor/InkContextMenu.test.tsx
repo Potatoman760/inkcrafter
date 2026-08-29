@@ -56,8 +56,8 @@ function catalogue(): StatsDocument {
   doc = addStat(doc, newStat('Strength'))
   doc = addStat(doc, newStat('Has met Wren', 'boolean'))
   doc = addVariable(doc, newVariable('Secret count'))
-  doc = addItem(doc, newItem('Shovel', 'Tools'))
-  doc = addItem(doc, newItem('Brass key', 'Keys'))
+  doc = addItem(doc, newItem('Shovel'))
+  doc = addItem(doc, newItem('Brass key'))
   return doc
 }
 

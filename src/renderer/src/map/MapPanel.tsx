@@ -40,7 +40,6 @@ import {
   Hint,
   IconButton,
   Input,
-  PaneHeader,
   Select
 } from '../design/components'
 import { copy } from '@shared/copy'
@@ -245,7 +244,7 @@ export function MapPanel({
   if (area === null) {
     return (
       <>
-        <PaneHeader title="Maps" actions={saving && <span className="saving-note">saving…</span>} />
+        {saving && <p className="saving-note saving-note--loose">saving…</p>}
         {error !== null && <p className="settings-error">{error}</p>}
         <EmptyState
           centered
@@ -412,7 +411,7 @@ export function MapPanel({
 
   return (
     <>
-      <PaneHeader title="Maps" actions={saving && <span className="saving-note">saving…</span>} />
+      {saving && <p className="saving-note saving-note--loose">saving…</p>}
       {error !== null && <p className="settings-error">{error}</p>}
 
       <div className="map-layout">
@@ -449,7 +448,7 @@ export function MapPanel({
               <Input
                 value={draftLabel}
                 aria-label="New place label"
-                placeholder="New place, e.g. The Archive"
+                placeholder="Name"
                 disabled={knots.length === 0}
                 onChange={(event) => setDraftLabel(event.target.value)}
                 onKeyDown={(event) => {

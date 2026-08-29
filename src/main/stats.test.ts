@@ -64,8 +64,8 @@ function catalogue(): ReturnType<typeof emptyStats> {
   let doc = emptyStats()
   doc = addStat(doc, { ...newStat('Strength'), initial: 2 })
   doc = addStat(doc, newStat('Has met Wren', 'boolean'))
-  doc = addItem(doc, newItem('Shovel', 'Tools'))
-  doc = addItem(doc, newItem('Brass key', 'Keys'))
+  doc = addItem(doc, newItem('Shovel'))
+  doc = addItem(doc, newItem('Brass key'))
   doc = updateItem(doc, doc.items[1]!.id, {
     display: 'Brass Key',
     blurb: 'Cold, heavy, older than the door.',
@@ -102,7 +102,7 @@ describe('writeStats', () => {
 
     const state = await readFile(join(root, 'ink', 'state.ink'), 'utf8')
     expect(state).toContain('VAR strength = 2')
-    expect(state).toContain('LIST Tools = shovel')
+    expect(state).toContain('LIST items = shovel')
     expect(state).toContain('VAR inventory = ()')
   })
 

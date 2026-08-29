@@ -44,6 +44,7 @@ export function GalleryPanel({
   onChange
 }: GalleryPanelProps): React.JSX.Element {
   const [selectedId, setSelectedId] = useState<string | null>(doc.groups[0]?.id ?? null)
+  const [draftName, setDraftName] = useState('')
   const [itemQuery, setItemQuery] = useState('')
   const [previewKey, setPreviewKey] = useState<string | null>(null)
   const selected = doc.groups.find((group) => group.id === selectedId) ?? null
@@ -90,31 +91,51 @@ export function GalleryPanel({
   const cover = selected?.cover ? galleryMedia(media, selected.cover) : null
   const coverUrl = cover ? mediaUrl(cover.file) : null
 
+  /**
+   * Named on the way in, as everywhere else with a list to add to.
+   *
+   * It used to make a group called "New gallery" and leave the author to rename
+   * it in the detail pane — which is one more step than the media, cast and
+   * stats panels ask for, all of which take the name in the row under the
+   * heading.
+   */
   const addGroup = (): void => {
-    const group = newGalleryGroup('New gallery')
+    const name = draftName.trim()
+    if (name.length === 0) return
+
+    const group = newGalleryGroup(name)
     onChange({ ...doc, groups: [...doc.groups, group] })
     setSelectedId(group.id)
+    setDraftName('')
   }
 
   return (
     <div className="gallery-layout">
       <div className="gallery-groups">
-        <PaneHeader
-          title="Gallery groups"
-          actions={
-            <>
-              {saving && <span className="saving-note">saving…</span>}
-              <Button size="sm" icon="plus" onClick={addGroup}>Add group</Button>
-            </>
-          }
-        />
+        {saving && <p className="saving-note saving-note--loose">saving…</p>}
+        <div className="panel-new">
+          <Input
+            value={draftName}
+            aria-label="New gallery group"
+            placeholder="Name"
+            onChange={(event) => setDraftName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') addGroup()
+            }}
+          />
+          <Button variant="primary" icon="plus" onClick={addGroup} disabled={draftName.trim().length === 0}>
+            Add
+          </Button>
+        </div>
+
         {error && <p className="settings-error">{error}</p>}
         {doc.groups.length === 0 ? (
+          // No action of its own: the name field and its Add button are in the
+          // row directly above this, which is where the other panels put them.
           <EmptyState
             centered
             title="No gallery groups"
-            body="Add a group such as Seraphine, then choose the scenes that unlock beneath it."
-            action={<Button icon="plus" onClick={addGroup}>Add a group</Button>}
+            body="Name a group such as Seraphine above, then choose the scenes that unlock beneath it."
           />
         ) : (
           <div className="gallery-group-list">

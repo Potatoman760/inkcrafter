@@ -54,13 +54,27 @@ describe('MinigamePanel quick-hands authoring', () => {
     }))
   })
 
-  it('offers both kinds under the one Add button, and closes after choosing', async () => {
+  it('creates a carry, which binds no numeric variable of its own', async () => {
+    const onChange = panel({ version: 1, minigames: [] })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'The Carry' }))
+
+    const [[next]] = onChange.mock.calls as [[MinigameDocument]]
+    const carry = next.minigames[0]!
+    expect(carry).toEqual(expect.objectContaining({ kind: 'carry', staminaMax: { base: 100, modifiers: [] } }))
+    // Combat damages a bound variable; a training exercise must not.
+    expect(carry).not.toHaveProperty('playerHealthVariable')
+  })
+
+  it('offers every kind under the one Add button, and closes after choosing', async () => {
     const onChange = panel({ version: 1, minigames: [] })
 
     expect(screen.queryByRole('menuitem', { name: 'Combat' })).toBeNull()
 
     await userEvent.click(screen.getByRole('button', { name: 'Add' }))
     expect(screen.getByRole('menuitem', { name: 'Quick-hands' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'The Carry' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('menuitem', { name: 'Combat' }))
 
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({

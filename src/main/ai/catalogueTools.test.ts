@@ -85,7 +85,7 @@ describe('write_variables', () => {
 
     const state = await read('ink/state.ink')
     expect(state).toContain('VAR strength = 2')
-    expect(state).toContain('LIST Keys = brass_key')
+    expect(state).toContain('LIST items = brass_key')
     expect(state).toContain('VAR inventory = ()')
 
     // And the entry point can see it.
@@ -168,16 +168,18 @@ describe('write_variables', () => {
     expect(doc.items[0]).toMatchObject({ name: 'brass_key', display: 'Brass Key' })
   })
 
-  it('records the category so the LIST is generated', async () => {
-    await call('write_variables', { items: [{ name: 'shovel', category: 'Tools' }] })
-    expect(parseStats(await read('stats.json')).categories).toEqual(['Tools'])
+  it('writes an item, which needs nothing but a name', async () => {
+    await call('write_variables', { items: [{ name: 'shovel' }] })
+    expect(parseStats(await read('stats.json')).items.map((item) => item.name)).toEqual(['shovel'])
   })
 
-  it('drops an item with no category rather than guessing one', async () => {
-    const result = await call('write_variables', { items: [{ name: 'orphan' }] })
+  /** Items were grouped into author-named categories, and one was required. */
+  it('accepts an item that still carries a category, ignoring it', async () => {
+    await call('write_variables', { items: [{ name: 'shovel', category: 'Tools' }] })
 
-    expect(result.ok).toBe(false)
-    expect(result.content).toMatch(/also needs a category/)
+    const doc = parseStats(await read('stats.json'))
+    expect(doc.items.map((item) => item.name)).toEqual(['shovel'])
+    expect(doc.items[0]).not.toHaveProperty('category')
   })
 
   it('says so when there is nothing usable, rather than writing an empty catalogue', async () => {

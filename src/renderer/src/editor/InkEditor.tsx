@@ -38,7 +38,7 @@ interface InkEditorProps {
    * Scrolls to a line and selects it. The nonce lets the same line be requested
    * twice — jumping back to where you already were should still move the view.
    */
-  gotoLine?: { line: number; nonce: number } | null
+  gotoLine?: { line: number; nonce: number; align?: 'center' | 'start' } | null
   /**
    * Puts text in at the cursor, over the selection when there is one. Nonced
    * like `gotoLine`, so the same draft can be inserted twice.
@@ -162,22 +162,27 @@ function toEditorDiagnostics(
 const fromProps = Annotation.define<boolean>()
 
 /**
- * Scrolls a line into the middle and selects it.
+ * Scrolls a line into view and selects it.
  *
- * Shared by the outline and by `gotoLine` so the two arrive the same way: the
+ * Shared by the outline and by `gotoLine` so they arrive the same way: the
  * selection is what makes the jump visible, since scrolling alone leaves an
  * author looking at a screen of text with no mark saying which line they asked
- * for. Centred rather than scrolled to the top, so the lines around it — the
- * tag block under a knot header — come along.
+ * for.
+ *
+ * Centred by default, so the lines around it — the tag block under a knot
+ * header — come along. A search result asks for `start` instead: there the
+ * author is reading forward from the hit, and what matters is the prose after
+ * it rather than the context before. Neither can scroll past the end of the
+ * document, so a match in the last few lines simply lands as high as it can.
  */
-function reveal(view: EditorView, at: number): void {
+function reveal(view: EditorView, at: number, align: 'center' | 'start' = 'center'): void {
   // The document may still be the previous file for a frame after switching.
   if (at < 1 || at > view.state.doc.lines) return
 
   const line = view.state.doc.line(at)
   view.dispatch({
     selection: { anchor: line.from, head: line.to },
-    effects: EditorView.scrollIntoView(line.from, { y: 'center' })
+    effects: EditorView.scrollIntoView(line.from, { y: align })
   })
   view.focus()
 }
@@ -360,7 +365,7 @@ export function InkEditor({
   useEffect(() => {
     const view = viewRef.current
     if (!view || !gotoLine) return
-    reveal(view, gotoLine.line)
+    reveal(view, gotoLine.line, gotoLine.align)
   }, [gotoLine])
 
   useEffect(() => {

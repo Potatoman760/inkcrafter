@@ -12,7 +12,7 @@ import { npcVar, type NpcDocument } from '@shared/bundle/npcDoc'
 import type { StatKind, StatsDocument } from '@shared/statsDoc'
 import {
   Button, EmptyState, Field, Hint, Input, ListRow, MasterDetail, MasterList,
-  PaneHeader, Select, Textarea
+  Select, Textarea
 } from '../design/components'
 
 interface AchievementPanelProps {
@@ -75,11 +75,9 @@ export function AchievementPanel({
 
   return (
     <>
-      <PaneHeader title="Steam achievements"
-        actions={saving && <span className="saving-note">saving…</span>} />
+      {saving && <p className="saving-note saving-note--loose">saving…</p>}
       {error && <p className="settings-error">{error}</p>}
       <MasterDetail
-        masterWidth={290}
         className="achievement-layout"
         master={
           <>
@@ -90,7 +88,7 @@ export function AchievementPanel({
               <Input mono
                 value={draftApiName}
                 aria-label="New achievement API Name"
-                placeholder="STORY_FIRST_CHAPTER"
+                placeholder="Name"
                 onChange={(event) => setDraftApiName(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') add()

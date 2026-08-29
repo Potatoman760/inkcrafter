@@ -1,4 +1,4 @@
-import { INVENTORY, itemsInCategory, type StatsDocument, type Variable } from "./statsDoc";
+import { INVENTORY, ITEM_LIST, type StatsDocument, type Variable } from "./statsDoc";
 import { emptyNpcs, npcVar, type NpcDocument } from "./bundle/npcDoc";
 
 /**
@@ -10,10 +10,10 @@ import { emptyNpcs, npcVar, type NpcDocument } from "./bundle/npcDoc";
  * losing a line to a round trip. Everything that *uses* these names lives in the
  * story files, written by hand or by the GUI, and is never touched from here.
  *
- * One `LIST` per category, because one list of a hundred names is unreadable and
- * `LIST Tools = shovel, rope` is how an author already thinks. They all feed a
- * single inventory variable, which is what makes `inventory ? shovel` work
- * whichever list `shovel` came from.
+ * One `LIST` holding every item, feeding a single inventory variable — which is
+ * what makes `inventory ? shovel` work. It was once one list per author-named
+ * category, which asked for a second name for every item: one for the thing and
+ * one for the box it went in.
  */
 
 /** Where the generated declarations live, project-relative. */
@@ -69,16 +69,9 @@ export function renderStateInk(
     lines.push("");
   }
 
-  const stocked = doc.categories.filter(
-    (category) => itemsInCategory(doc, category).length > 0,
-  );
-
-  if (stocked.length > 0) {
-    lines.push("// Items, one list per category.");
-    for (const category of stocked) {
-      const names = itemsInCategory(doc, category).map((item) => item.name);
-      lines.push(`LIST ${listName(category)} = ${names.join(", ")}`);
-    }
+  if (doc.items.length > 0) {
+    lines.push("// Everything that can be carried.");
+    lines.push(`LIST ${ITEM_LIST} = ${doc.items.map((item) => item.name).join(", ")}`);
     lines.push("");
     lines.push(
       "// What the player is carrying. The game owns this at runtime.",
@@ -113,7 +106,7 @@ export function renderStateInk(
   if (
     doc.stats.length === 0 &&
     doc.variables.length === 0 &&
-    stocked.length === 0 &&
+    doc.items.length === 0 &&
     npcs.npcs.length === 0
   ) {
     lines.push(
@@ -134,19 +127,6 @@ export function renderStateInk(
  */
 function inkString(value: string): string {
   return value.replace(/"/g, "");
-}
-
-/**
- * A category's `LIST` name. Ink identifiers cannot contain spaces, so
- * "Key items" becomes `Key_items` — capitalisation is kept, which is the
- * convention ink's own documentation uses for list types.
- */
-export function listName(category: string): string {
-  const cleaned = category
-    .trim()
-    .replace(/[^A-Za-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  return /^[0-9]/.test(cleaned) ? `_${cleaned}` : cleaned || "Items";
 }
 
 /**

@@ -118,7 +118,7 @@ export function CodexEntryEditor({
       </div>
 
       <p className="entry-mentions">
-        {mentionCount} mention{mentionCount === 1 ? '' : 's'} in the open file · {libraryTitle}
+        {mentionCount} mention{mentionCount === 1 ? '' : 's'} across the story · {libraryTitle}
       </p>
 
       <Tabs

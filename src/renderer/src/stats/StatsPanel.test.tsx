@@ -18,9 +18,9 @@ function seeded(): StatsDocument {
   let doc = emptyStats()
   doc = addStat(doc, { ...newStat('Strength'), initial: 2 })
   doc = addStat(doc, newStat('Has met Wren', 'boolean'))
-  doc = addItem(doc, newItem('Shovel', 'Tools'))
-  doc = addItem(doc, newItem('Rope', 'Tools'))
-  doc = addItem(doc, newItem('Brass key', 'Keys'))
+  doc = addItem(doc, newItem('Shovel'))
+  doc = addItem(doc, newItem('Rope'))
+  doc = addItem(doc, newItem('Brass key'))
   return doc
 }
 
@@ -85,12 +85,15 @@ describe('StatsPanel', () => {
     expect(screen.getByRole('tab', { name: /^Items\s*\(3\)/ })).toBeInTheDocument()
   })
 
-  it('groups items under the LIST their category becomes', async () => {
+  // Items were grouped under an author-named category that became its own ink
+  // LIST; they share one list now, so the tab is a flat list like the others.
+  it('lists every item, ungrouped', async () => {
     dialog()
     await toItems()
 
-    expect(screen.getByText('LIST Tools')).toBeInTheDocument()
-    expect(screen.getByText('LIST Keys')).toBeInTheDocument()
+    expect(screen.getByText('shovel')).toBeInTheDocument()
+    expect(screen.getByText('rope')).toBeInTheDocument()
+    expect(screen.getByText('brass_key')).toBeInTheDocument()
   })
 
   it('says nothing is chosen until something is', () => {
@@ -213,35 +216,6 @@ describe('StatsPanel', () => {
     await waitFor(() => expect(screen.queryByText(/is used in/)).not.toBeInTheDocument())
   })
 
-  it('renames a category, carrying its items', async () => {
-    const { onChange } = dialog()
-    await toItems()
-
-    const name = screen.getByLabelText('Name of the Tools category')
-    await userEvent.clear(name)
-    await userEvent.type(name, 'Equipment')
-    await userEvent.tab()
-
-    const next = onChange.mock.calls.at(-1)![0] as StatsDocument
-    expect(next.categories).toEqual(['Equipment', 'Keys'])
-    expect(next.items.filter((item) => item.category === 'Equipment')).toHaveLength(2)
-  })
-
-  /* The hole that was open ------------------------------------------------ */
-
-  it('refuses a category named after an existing stat or item', async () => {
-    const { onChange } = dialog()
-    await toItems()
-
-    await userEvent.type(screen.getByLabelText('New category'), 'Shovel')
-
-    expect(screen.getByText(/collides with/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add category' })).toBeDisabled()
-
-    await userEvent.click(screen.getByRole('button', { name: 'Add category' }))
-    expect(onChange).not.toHaveBeenCalled()
-  })
-
   /* Reordering ------------------------------------------------------------ */
 
   it('moves a stat down the list', async () => {
@@ -255,16 +229,17 @@ describe('StatsPanel', () => {
     ])
   })
 
-  it('moves an item within its own category', async () => {
+  it('moves an item down the one list', async () => {
     const { onChange } = dialog()
     await toItems()
 
     await userEvent.click(screen.getByLabelText('Move shovel down'))
 
     const next = onChange.mock.calls[0]![0] as StatsDocument
-    expect(next.items.filter((i) => i.category === 'Tools').map((i) => i.name)).toEqual([
+    expect(next.items.map((i) => i.name)).toEqual([
       'rope',
-      'shovel'
+      'shovel',
+      'brass_key'
     ])
   })
 

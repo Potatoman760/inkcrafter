@@ -94,7 +94,8 @@ export function AiProvidersTab({ settings }: AiProvidersTabProps): React.JSX.Ele
           <div className="detail-row">
             <Input
               value={newLabel}
-              placeholder="New provider…"
+              aria-label="New provider"
+              placeholder="Name"
               onChange={(event) => setNewLabel(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') submitNew()

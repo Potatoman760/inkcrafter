@@ -35,6 +35,7 @@ export const MENU_ACTIONS = [
   'project:cast',
   'project:map',
   'project:export',
+  'search:inFiles',
   'settings:open',
   'assistant:open',
   'view:editor',

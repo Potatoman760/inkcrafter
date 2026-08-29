@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Compiler } from 'inkjs/compiler/Compiler'
 import {
-  addCategory,
   addItem,
   addStat,
   addVariable,
@@ -31,8 +30,8 @@ function seeded(): StatsDocument {
   doc = addStat(doc, { ...newStat('Title', 'text'), initial: 'archivist' })
   doc = addVariable(doc, { ...newVariable('Has opened vault', 'boolean'), initial: true })
 
-  doc = addItem(doc, newItem('Shovel', 'Tools'))
-  doc = addItem(doc, newItem('Brass key', 'Keys'))
+  doc = addItem(doc, newItem('Shovel'))
+  doc = addItem(doc, newItem('Brass key'))
   doc = updateItem(doc, doc.items[1]!.id, {
     display: 'Brass Key',
     blurb: 'Cold, heavy, older than the door.',
@@ -108,14 +107,18 @@ describe('buildExport', () => {
     expect(buildExport(next).stats[0]!.custom).toEqual({ slot: 'second' })
   })
 
-  // An empty category generates no LIST, so exporting it would name a list the
-  // story does not have — the same rule renderStateInk follows.
-  it('skips a category with nothing in it', () => {
-    const doc = addCategory(seeded(), 'Unused')
-    const exported = buildExport(doc)
+  /*
+   * Items are no longer grouped, but the two fields that carried the grouping
+   * stay in the format, because a player reads them. An empty string is what
+   * the player's inventory screen tests before printing a heading; an absent
+   * one would throw on the `.trim()` that tests it.
+   */
+  it('leaves the grouping fields empty rather than dropping them', () => {
+    const exported = buildExport(seeded())
 
-    expect(exported.categories.map((category) => category.name)).toEqual(['Tools', 'Keys'])
-    expect(exported.items.every((item) => item.category !== 'Unused')).toBe(true)
+    expect(exported.categories).toEqual([])
+    expect(exported.items.every((item) => item.category === '')).toBe(true)
+    expect(exported.items.every((item) => item.list === 'items')).toBe(true)
   })
 
   it('exports an empty catalogue without inventing anything', () => {
@@ -165,16 +168,14 @@ describe('the join to the compiled story', () => {
     }
   })
 
-  it('holds up when a category name is not a legal ink identifier', () => {
-    // "Key items" becomes the list `Key_items`, and the export has to say so
-    // rather than repeating the human-facing name.
+  it('names the one list the story actually declares', () => {
     let doc = emptyStats()
-    doc = addItem(doc, newItem('Brass key', 'Key items'))
+    doc = addItem(doc, newItem('Brass key'))
 
     const exported = buildExport(doc)
-    expect(exported.categories[0]).toEqual({ name: 'Key items', list: 'Key_items' })
-    expect(Object.keys(listDefs(doc))).toContain('Key_items')
-    expect(Object.keys(listDefs(doc)['Key_items']!)).toContain('brass_key')
+    expect(exported.items[0]!.list).toBe('items')
+    expect(Object.keys(listDefs(doc))).toContain('items')
+    expect(Object.keys(listDefs(doc)['items']!)).toContain('brass_key')
   })
 
   it('exports every item the story declares, and no others', () => {

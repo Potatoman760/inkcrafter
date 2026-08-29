@@ -219,7 +219,7 @@ export function PlanGrid({
       <section className="plan-act is-new">
         <Input
           value={newAct}
-          placeholder="New act…"
+          placeholder="Name"
           aria-label="New act title"
           onChange={(event) => setNewAct(event.target.value)}
           onKeyDown={(event) => {

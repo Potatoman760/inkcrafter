@@ -25,8 +25,10 @@ describe('GalleryPanel', () => {
     const { rerender } = render(
       <GalleryPanel doc={emptyGallery()} media={media} files={[]} saving={false} error={null} onChange={onChange} />
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Add a group' }))
+    await userEvent.type(screen.getByLabelText('New gallery group'), 'Seraphine')
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
     const withGroup = onChange.mock.calls[0]![0]
+    expect(withGroup.groups[0].name).toBe('Seraphine')
     rerender(<GalleryPanel doc={withGroup} media={media} files={[]} saving={false} error={null} onChange={onChange} />)
 
     await userEvent.click(screen.getByRole('radio', { name: '16:9 landscape' }))
@@ -38,6 +40,21 @@ describe('GalleryPanel', () => {
 
     expect(onChange.mock.calls.at(-1)![0].groups[0].items).toHaveLength(1)
     expect(screen.queryByRole('checkbox', { name: /Seraphine/ })).not.toBeInTheDocument()
+  })
+
+  // The panel used to add a group called "New gallery" from a header button, so
+  // an empty name was not a state it could be in.
+  it('will not add a group without a name', async () => {
+    const onChange = vi.fn()
+    render(
+      <GalleryPanel doc={emptyGallery()} media={media} files={[]} saving={false} error={null} onChange={onChange} />
+    )
+
+    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled()
+
+    await userEvent.type(screen.getByLabelText('New gallery group'), '   ')
+    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled()
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('filters a large scene selection list by text and media tags', async () => {

@@ -149,7 +149,7 @@ describe('FileTree', () => {
   it('adds a file, slugified and without the extension typed twice', async () => {
     const { onAdd } = tree()
 
-    await userEvent.type(screen.getByPlaceholderText(/New file/), 'ink/Act Two.ink')
+    await userEvent.type(screen.getByLabelText('New file'), 'ink/Act Two.ink')
     await userEvent.click(screen.getByRole('button', { name: 'Add' }))
 
     expect(onAdd).toHaveBeenCalledWith('ink/act-two')

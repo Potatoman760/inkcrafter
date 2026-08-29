@@ -1,14 +1,12 @@
 import {
   INVENTORY,
-  itemsInCategory,
+  ITEM_LIST,
   type CustomField,
   type StatKind,
   type StatsDocument
 } from './statsDoc'
-import { listName } from './statsInk'
 import type {
   CatalogueExport,
-  ExportedCategory,
   ExportedItem,
   ExportedStat,
   ExportedVariable
@@ -31,7 +29,7 @@ const TYPE_NAMES: Record<StatKind, string> = {
   text: 'string'
 }
 
-export type { CatalogueExport, ExportedCategory, ExportedItem, ExportedStat, ExportedVariable }
+export type { CatalogueExport, ExportedItem, ExportedStat, ExportedVariable }
 
 /**
  * Custom pairs as an object rather than an array.
@@ -51,10 +49,6 @@ function customAsObject(custom: CustomField[]): Record<string, string> {
 }
 
 export function buildExport(doc: StatsDocument): CatalogueExport {
-  // Only categories with items are exported, matching the ink: an empty category
-  // generates no LIST, so exporting it would name a list the story does not have.
-  const stocked = doc.categories.filter((category) => itemsInCategory(doc, category).length > 0)
-
   return {
     version: 1,
     generatedBy: 'InkCrafter',
@@ -77,18 +71,23 @@ export function buildExport(doc: StatsDocument): CatalogueExport {
       min: variable.min,
       max: variable.max
     })),
-    categories: stocked.map((category) => ({ name: category, list: listName(category) })),
-    items: stocked.flatMap((category) =>
-      itemsInCategory(doc, category).map((item) => ({
-        name: item.name,
-        category,
-        list: listName(category),
-        display: item.display,
-        blurb: item.blurb,
-        icon: item.icon,
-        custom: customAsObject(item.custom)
-      }))
-    )
+    // Always empty now that items are not grouped. The field stays in the
+    // format because a player reads it, and one that asked for `categories[0]`
+    // of a missing array would fail worse than one handed nothing.
+    categories: [],
+    items: doc.items.map((item) => ({
+      name: item.name,
+      // Empty rather than absent, for the same reason. The player prints a
+      // heading for each non-empty category and skips the blank, so an
+      // ungrouped inventory is exactly what an empty string asks for — where
+      // an undefined would throw on the `.trim()` that tests it.
+      category: '',
+      list: ITEM_LIST,
+      display: item.display,
+      blurb: item.blurb,
+      icon: item.icon,
+      custom: customAsObject(item.custom)
+    }))
   }
 }
 

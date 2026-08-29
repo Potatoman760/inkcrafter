@@ -76,7 +76,6 @@ function readStatInput(value: unknown): StatInput | null {
 
 interface ItemInput {
   name: string
-  category: string
   display: string
   blurb: string
   description: string
@@ -87,14 +86,10 @@ function readItemInput(value: unknown): ItemInput | null {
   const record = value as Record<string, unknown>
 
   const name = inkName(asText(record['name']))
-  const category = asText(record['category']).trim()
-  // A category is what decides which LIST the item is declared in, so an item
-  // without one has nowhere to go and is dropped rather than guessed at.
-  if (name.length === 0 || category.length === 0) return null
+  if (name.length === 0) return null
 
   return {
     name,
-    category,
     display: asText(record['display']) || asText(record['name']).trim(),
     blurb: asText(record['blurb']),
     description: asText(record['description'])
@@ -148,24 +143,17 @@ function mergeVariable(doc: StatsDocument, input: StatInput): { doc: StatsDocume
 
 function mergeItem(doc: StatsDocument, input: ItemInput): { doc: StatsDocument; added: boolean } {
   const existing = doc.items.find((item) => item.name === input.name)
-  const categories = doc.categories.includes(input.category)
-    ? doc.categories
-    : [...doc.categories, input.category]
 
   if (existing) {
     const updated: Item = { ...existing, ...input }
     return {
-      doc: {
-        ...doc,
-        categories,
-        items: doc.items.map((item) => (item.id === existing.id ? updated : item))
-      },
+      doc: { ...doc, items: doc.items.map((item) => (item.id === existing.id ? updated : item)) },
       added: false
     }
   }
 
-  const item: Item = { ...newItem(input.display || input.name, input.category), ...input }
-  return { doc: { ...doc, categories, items: [...doc.items, item] }, added: true }
+  const item: Item = { ...newItem(input.display || input.name), ...input }
+  return { doc: { ...doc, items: [...doc.items, item] }, added: true }
 }
 
 export const writeStatsTool: ToolDefinition = {
@@ -210,17 +198,16 @@ export const writeStatsTool: ToolDefinition = {
       items: {
         type: 'array',
         description:
-          'Distinct things the player can acquire, carry, use, equip, give away or lose, e.g. ring, brass_key, sword, potion, letter or quest token. Each becomes a member of its category LIST and possession is checked with {inventory ? item_name}.',
+          'Distinct things the player can acquire, carry, use, equip, give away or lose, e.g. ring, brass_key, sword, potion, letter or quest token. Each becomes a member of the items LIST and possession is checked with {inventory ? item_name}.',
         items: {
           type: 'object',
           properties: {
             name: { type: 'string', description: 'lower_snake_case, e.g. "brass_key".' },
-            category: { type: 'string', description: 'Becomes one ink LIST, e.g. "Keys".' },
             display: { type: 'string' },
             blurb: { type: 'string' },
             description: { type: 'string' }
           },
-          required: ['name', 'category']
+          required: ['name']
         }
       }
     }
@@ -244,7 +231,7 @@ export const writeStatsTool: ToolDefinition = {
       return {
         ok: false,
         summary: 'write_variables — nothing usable',
-        content: 'No usable variables or items. Each needs a name, and an item also needs a category.'
+        content: 'No usable variables or items. Each needs a name.'
       }
     }
 

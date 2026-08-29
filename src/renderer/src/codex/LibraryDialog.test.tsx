@@ -145,7 +145,7 @@ describe('LibraryDialog', () => {
   it('creates a library and attaches it, since that is why it was made here', async () => {
     const { onCreate, onToggle } = dialog()
 
-    await userEvent.type(screen.getByPlaceholderText('New library…'), 'Second game')
+    await userEvent.type(screen.getByLabelText('New library'), 'Second game')
     await userEvent.click(screen.getByRole('button', { name: 'Create' }))
 
     await waitFor(() => expect(onCreate).toHaveBeenCalledWith('Second game'))

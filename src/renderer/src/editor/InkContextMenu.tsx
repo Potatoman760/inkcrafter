@@ -380,7 +380,7 @@ export function InkContextMenu({
   const candidateItems = useMemo(
     () =>
       showItems
-        ? stats.items.filter((item) => matches(`${item.name} ${item.display} ${item.category}`))
+        ? stats.items.filter((item) => matches(`${item.name} ${item.display}`))
         : [],
     [stats.items, filter, showItems]
   )
@@ -962,7 +962,7 @@ export function InkContextMenu({
                     onClick={() => setChosen({ item })}
                   >
                     <code>{item.name}</code>
-                    <span>{item.display || item.category}</span>
+                    <span>{item.display}</span>
                   </button>
                 ))}
 

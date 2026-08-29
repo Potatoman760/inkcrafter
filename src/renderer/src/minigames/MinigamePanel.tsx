@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   minigameName,
+  newCarryMinigame,
   newCombatMinigame,
   newQuickhandsMinigame,
+  type CarryMinigame,
   type CombatMinigame,
   type MinigameDefinition,
   type MinigameDocument,
@@ -79,6 +81,25 @@ const QUICKHANDS_TUNINGS: Array<{ key: keyof Pick<QuickhandsMinigame,
   { key: 'missedTargetPenalty', label: 'Missed token penalty', unit: 'points' }
 ]
 
+/** One place, so a new kind cannot be named two different things in two rows. */
+const KIND_LABELS: Record<MinigameDefinition['kind'], string> = {
+  combat: 'Combat',
+  quickhands: 'Quick-hands',
+  carry: 'The Carry'
+}
+
+const CARRY_TUNINGS: Array<{ key: keyof Pick<CarryMinigame,
+  'distanceMs' | 'staminaMax' | 'staminaDrainPerSecond' | 'wobbleDriftPerSecond' |
+  'wobbleLimit' | 'correctionStrength' | 'tiltDrainMultiplier'>; label: string; unit: string }> = [
+  { key: 'distanceMs', label: 'Distance', unit: 'ms' },
+  { key: 'staminaMax', label: 'Stamina', unit: 'points' },
+  { key: 'staminaDrainPerSecond', label: 'Stamina drain', unit: 'per second' },
+  { key: 'wobbleDriftPerSecond', label: 'Wobble drift', unit: 'tilt per second' },
+  { key: 'wobbleLimit', label: 'Drop at tilt', unit: 'tilt' },
+  { key: 'correctionStrength', label: 'Correction', unit: 'tilt' },
+  { key: 'tiltDrainMultiplier', label: 'Tilt drain', unit: '× at full lean' }
+]
+
 interface ArtworkOption {
   ref: { assetId: string; variantId: string }
   label: string
@@ -148,7 +169,9 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
     setSelectedId(doc.minigames[0]?.id ?? null)
   }, [doc.minigames, selectedId])
 
-  const patch = (changes: Partial<CombatMinigame> | Partial<QuickhandsMinigame>): void => {
+  const patch = (
+    changes: Partial<CombatMinigame> | Partial<QuickhandsMinigame> | Partial<CarryMinigame>
+  ): void => {
     if (!selected) return
     onChange({
       ...doc,
@@ -175,6 +198,13 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
     setSelectedId(game.id)
   }
 
+  const createCarry = (): void => {
+    const count = doc.minigames.filter((game) => game.kind === 'carry').length + 1
+    const game = newCarryMinigame(`New carry ${count}`)
+    onChange({ ...doc, minigames: [...doc.minigames, game] })
+    setSelectedId(game.id)
+  }
+
   const remove = (): void => {
     if (!selected) return
     const stillUsed = selected.kind === 'combat' && doc.minigames.some(
@@ -188,7 +218,6 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
 
   return (
     <MasterDetail
-      masterWidth={270}
       masterClassName="minigame-master"
       detailClassName="minigame-detail"
       master={
@@ -243,6 +272,14 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
                       >
                         Combat
                       </MenuItem>
+                      <MenuItem
+                        onClick={() => {
+                          createCarry()
+                          setAdding(false)
+                        }}
+                      >
+                        The Carry
+                      </MenuItem>
                     </Menu>
                   </div>
                 )}
@@ -260,7 +297,10 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
                   key={game.id}
                   selected={game.id === selectedId}
                   name={game.display || game.name}
-                  meta={`${game.kind === 'quickhands' ? 'Quick-hands' : 'Combat'} · # minigame: ${game.name}`}
+                  // The kind alone. The ink name was here too, but it is on the
+                  // detail pane under the field that sets it, which is where an
+                  // author goes when they want it.
+                  meta={KIND_LABELS[game.kind]}
                   onClick={() => setSelectedId(game.id)}
                 />
               ))}
@@ -319,7 +359,7 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
 
             <Field as="div" label="Tutorial prompts" note="Enable transient instructions and action feedback during the encounter.">
               <Checkbox
-                label={`Show helper text during ${selected.kind === 'combat' ? 'combat' : 'quick-hands'}`}
+                label={`Show helper text during ${KIND_LABELS[selected.kind].toLowerCase()}`}
                 checked={selected.showStateHints}
                 onChange={(event) => patch({ showStateHints: event.target.checked })}
               />
@@ -382,7 +422,7 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
                   </div>
                 </section>
               </>
-            ) : (
+            ) : selected.kind === 'quickhands' ? (
               <>
                 <section className="minigame-section">
                   <h3>Quick-hands graphics</h3>
@@ -442,6 +482,38 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
                   <h3>Quick-hands tuning</h3>
                   <div className="minigame-tunings">
                     {QUICKHANDS_TUNINGS.map((field) => (
+                      <TuningField
+                        key={field.key}
+                        label={field.label}
+                        unit={field.unit}
+                        value={selected[field.key]}
+                        stats={numeric.map((one) => one.name)}
+                        onChange={(value) => patch({ [field.key]: value })}
+                      />
+                    ))}
+                  </div>
+                </section>
+              </>
+            ) : (
+              <>
+                <section className="minigame-section">
+                  <h3>The load</h3>
+                  <Hint>A still Animation look for what Kael is carrying, or leave it empty for the built-in shape.</Hint>
+                  <div className="quickhands-art-grid">
+                    <ArtworkField
+                      label="Load"
+                      value={selected.loadArt}
+                      options={artwork}
+                      byPath={byPath}
+                      onChange={(loadArt) => patch({ loadArt })}
+                    />
+                  </div>
+                </section>
+
+                <section className="minigame-section">
+                  <h3>Carry tuning</h3>
+                  <div className="minigame-tunings">
+                    {CARRY_TUNINGS.map((field) => (
                       <TuningField
                         key={field.key}
                         label={field.label}

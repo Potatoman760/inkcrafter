@@ -142,6 +142,23 @@ export interface CodexApi {
   remove(entry: CodexEntry): Promise<void>
   /** Moves the entry's file within its library. Its id, and every link, is unaffected. */
   move(entry: CodexEntry, toFile: string): Promise<void>
+  /**
+   * How often each entry is named across every ink file, keyed by entry id.
+   *
+   * Entries are passed in rather than read here: the renderer holds them, and
+   * they may carry aliases the author has typed but not yet saved.
+   */
+  mentionCounts(project: Project, request: MentionCountRequest): Promise<Record<string, number>>
+}
+
+export interface MentionCountRequest {
+  entries: CodexEntry[]
+  /**
+   * Unsaved buffers by absolute path, consulted before disk — so the count
+   * follows the prose being typed rather than the last save. Same contract as
+   * `CompileRequest.overrides`.
+   */
+  overrides?: Record<string, string>
 }
 
 export interface ManuscriptApi {
@@ -537,6 +554,38 @@ export interface PlayerApi {
 }
 
 /** The API surface exposed on `window.inkcrafter` by the preload script. */
+export interface SearchRequest {
+  query: string
+  caseSensitive: boolean
+  /** Reads `query` as a regular expression rather than as literal text. */
+  regex: boolean
+}
+
+/** One occurrence. A line matching twice is two hits, as it is in any editor. */
+export interface SearchHit {
+  /** Project-relative path with `/` separators, so a hit is also something the tree can open. */
+  file: string
+  /** 1-based. */
+  line: number
+  /** Where the match starts *in `preview`*, which is not the line when the line was clipped. */
+  column: number
+  length: number
+  /** The line, clipped around the match when it is too long to show whole. */
+  preview: string
+}
+
+export interface SearchResult {
+  hits: SearchHit[]
+  /** The cap stopped the search early; there are more matches than these. */
+  capped: boolean
+  /** Why the query could not be run — a half-typed regex. Null when it ran. */
+  problem: string | null
+}
+
+export interface SearchApi {
+  ink(project: Project, request: SearchRequest): Promise<SearchResult>
+}
+
 export interface InkCrafterApi {
   compile(request: CompileRequest): Promise<CompileResult>
   readFile(filePath: string): Promise<string>
@@ -554,6 +603,7 @@ export interface InkCrafterApi {
   achievements: AchievementsApi
   minigames: MinigamesApi
   bundle: BundleApi
+  search: SearchApi
   ai: AiApi
   settings: SettingsApi
   player: PlayerApi

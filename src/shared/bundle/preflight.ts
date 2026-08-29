@@ -122,7 +122,7 @@ function checkMinigames(input: PreflightInput): Preflight[] {
         ['idle time', game.idleMs],
         ['strike time', game.strikeMs]
       ]
-    } else {
+    } else if (game.kind === 'quickhands') {
       // The falling objects are a set and the catcher is one picture, so they
       // are flattened to the same shape here rather than checked twice.
       const arts: [string, GalleryMediaRef][] = [
@@ -151,6 +151,26 @@ function checkMinigames(input: PreflightInput): Preflight[] {
         ['target points', game.targetPoints],
         ['hazard penalty', game.hazardPenalty],
         ['missed target penalty', game.missedTargetPenalty]
+      ]
+    } else {
+      if (game.loadArt) {
+        const art = galleryMedia(input.media, game.loadArt)
+        if (!art) {
+          problems.push(at(`${game.display || game.name}'s load picture is no longer in the media catalogue.`))
+        } else if (art.kind !== 'animation') {
+          problems.push(at(`${game.display || game.name}'s load picture is not an animation look.`))
+        } else if (isVideoFile(art.file)) {
+          problems.push(at(`${game.display || game.name}'s load picture must be an image, not a video.`))
+        }
+      }
+      tunings = [
+        ['distance', game.distanceMs],
+        ['stamina', game.staminaMax],
+        ['stamina drain', game.staminaDrainPerSecond],
+        ['wobble drift', game.wobbleDriftPerSecond],
+        ['wobble limit', game.wobbleLimit],
+        ['correction strength', game.correctionStrength],
+        ['tilt drain', game.tiltDrainMultiplier]
       ]
     }
 

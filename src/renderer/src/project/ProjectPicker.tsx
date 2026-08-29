@@ -77,7 +77,8 @@ export function ProjectPicker({ onOpen, autoFocusNew = false }: ProjectPickerPro
           <Input
             ref={titleRef}
             value={title}
-            placeholder="New project title…"
+            aria-label="New project title"
+            placeholder="Name"
             onChange={(event) => setTitle(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') void create()

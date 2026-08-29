@@ -294,7 +294,8 @@ export function FileTree({
         <Input
           ref={draftRef}
           value={draft}
-          placeholder="New file, e.g. ink/act-two"
+          aria-label="New file"
+          placeholder="Name"
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') submit()

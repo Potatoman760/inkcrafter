@@ -295,9 +295,25 @@ question is visual rather than structural.
 ## Environment
 
 Windows, with PowerShell primary and Bash (Git Bash) also available — each takes
-its own syntax. Bash heredocs have mangled escape sequences here more than once;
-for anything containing backslash escapes or a large body, use a raw Python
-string, the Write tool, or splice from a scratch file.
+its own syntax.
+
+**Never write a file with a Bash heredoc here.** Not even a quoted one, which is
+supposed to be literal. Two ways it has gone wrong, both silently enough to cost
+a debugging session:
+
+- **Backslashes collapse.** `\\` arrives as `\`, so `/[.*+?^${}()|[\]\\]/g` was
+  written out as `/[.*+?^${}()|[\]\]/g` — an unterminated character class, and a
+  regex literal that no longer parses. The same collapse turns a Python `'\\('`
+  into `'\('`, which then warns about an invalid escape and quietly keeps the
+  wrong string.
+- **A large body can fail to parse at all.** A ~300-line TypeScript file ended
+  in `unexpected EOF while looking for matching quote` and wrote nothing.
+
+Use the Write tool for new files, Edit for changes to existing ones, and a
+Python script for scripted multi-file edits — Python here is fine as long as the
+*script itself* does not arrive by heredoc carrying escapes. When a Python
+edit script is unavoidable, keep backslashes out of the strings it matches on:
+anchor on a neighbouring line instead.
 
 Line endings are `.gitattributes`-managed. The CRLF warnings printed on commit
 are expected and not something to fix.

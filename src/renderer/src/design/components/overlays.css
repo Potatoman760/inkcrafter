@@ -73,7 +73,7 @@
 .ic-dialog__resize:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -3px; }
 
 /* Master–detail, the layout every catalogue in the app uses. */
-.ic-master-detail { display: grid; grid-template-columns: 240px 1fr; min-height: 0; flex: 1; }
+.ic-master-detail { display: grid; grid-template-columns: var(--master-width) 1fr; min-height: 0; flex: 1; }
 .ic-master-detail__master { display: flex; flex-direction: column; min-height: 0; border-right: var(--border-width) solid var(--border-hairline); background: var(--surface-pane); }
 .ic-master-detail__list { flex: 1; overflow: auto; padding: var(--space-2); }
 .ic-master-detail__detail { display: flex; flex-direction: column; gap: var(--space-6); min-height: 0; overflow: auto; padding: var(--space-6); }

@@ -33,6 +33,8 @@ export const APP_COMMANDS: readonly AppCommand[] = [
   { action: 'project:export', section: 'File', label: 'Export for player…', accelerator: 'CmdOrCtrl+E', icon: 'package' },
   { action: 'file:closeProject', section: 'File', label: 'Close project', accelerator: 'CmdOrCtrl+W', icon: 'x' },
 
+  { action: 'search:inFiles', section: 'Edit', label: 'Find in files…', accelerator: 'CmdOrCtrl+Shift+F', icon: 'search' },
+
   { action: 'view:editor', section: 'View', label: 'Editor', accelerator: 'CmdOrCtrl+1', icon: 'file-text' },
   { action: 'view:manuscript', section: 'View', label: 'Manuscript', accelerator: 'CmdOrCtrl+2', icon: 'book-open' },
   { action: 'view:outline', section: 'View', label: 'Plan', accelerator: 'CmdOrCtrl+3', icon: 'git-branch' },
@@ -139,7 +141,9 @@ export const MENU_LAYOUT: readonly MenuSection[] = [
       { kind: 'role', role: 'cut' },
       { kind: 'role', role: 'copy' },
       { kind: 'role', role: 'paste' },
-      { kind: 'role', role: 'selectAll' }
+      { kind: 'role', role: 'selectAll' },
+      { kind: 'separator' },
+      { kind: 'command', action: 'search:inFiles' }
     ]
   },
   {

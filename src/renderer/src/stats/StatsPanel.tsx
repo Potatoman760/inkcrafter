@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  addCategory,
   addItem,
   addStat,
   addVariable,
-  categoryProblem,
   inkName,
-  itemsInCategory,
-  moveCategory,
   moveItem,
   moveStat,
   moveVariable,
@@ -15,11 +11,9 @@ import {
   newItem,
   newStat,
   newVariable,
-  removeCategory,
   removeItem,
   removeStat,
   removeVariable,
-  renameCategory,
   STAT_KINDS,
   updateItem,
   updateStat,
@@ -30,13 +24,12 @@ import {
   type StatsDocument,
   type Variable
 } from '@shared/statsDoc'
-import { initialLiteral, listName } from '@shared/statsInk'
+import { initialLiteral } from '@shared/statsInk'
 import type { NameUse } from '@shared/types'
 import { CustomFields } from './CustomFields'
 import {
   Button,
   Field,
-  GroupLabel,
   Hint,
   IconButton,
   Input,
@@ -92,7 +85,6 @@ export function StatsPanel({
   const [filter, setFilter] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draftName, setDraftName] = useState('')
-  const [draftCategory, setDraftCategory] = useState('')
   const [uses, setUses] = useState<NameUse[]>([])
 
   const selectedStat = doc.stats.find((stat) => stat.id === selectedId) ?? null
@@ -135,7 +127,7 @@ export function StatsPanel({
   const items = useMemo(
     () =>
       doc.items.filter((item) =>
-        matches(`${item.name} ${item.display} ${item.category} ${item.description}`)
+        matches(`${item.name} ${item.display} ${item.description}`)
       ),
     [doc.items, filter]
   )
@@ -154,11 +146,9 @@ export function StatsPanel({
       onChange(addVariable(doc, variable))
       setSelectedId(variable.id)
     } else {
-      const category = draftCategory.trim() || doc.categories[0] || 'Items'
-      const item = newItem(draftName, category)
+      const item = newItem(draftName)
       onChange(addItem(doc, item))
       setSelectedId(item.id)
-      setDraftCategory(category)
     }
     setDraftName('')
   }
@@ -184,7 +174,6 @@ export function StatsPanel({
       />
 
       <MasterDetail
-        masterWidth={280}
         masterClassName="stats-master"
         detailClassName="stats-detail"
         master={
@@ -195,24 +184,12 @@ export function StatsPanel({
             <Input
               value={draftName}
               aria-label={tab === 'stats' ? 'New stat name' : tab === 'variables' ? 'New var name' : 'New item name'}
-              placeholder={tab === 'stats' ? 'New stat, e.g. Strength' : tab === 'variables' ? 'New var, e.g. Has met Wren' : 'New item, e.g. Brass key'}
+              placeholder="Name"
               onChange={(event) => setDraftName(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') create()
               }}
             />
-            {tab === 'items' && (
-              <Input className="stats-category-input"
-                value={draftCategory}
-                aria-label="New item category"
-                placeholder="Category"
-                list="stats-categories"
-                onChange={(event) => setDraftCategory(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') create()
-                }}
-              />
-            )}
             <Button variant="primary"
               onClick={create}
               disabled={draftName.trim().length === 0 || newProblem !== null}
@@ -262,11 +239,6 @@ export function StatsPanel({
             />
           )}
 
-          <datalist id="stats-categories">
-            {doc.categories.map((category) => (
-              <option key={category} value={category} />
-            ))}
-          </datalist>
           </>
         }
         detail={
@@ -386,133 +358,32 @@ function ItemMaster({
   onSelect: (id: string) => void
   onChange: (next: StatsDocument) => void
 }): React.JSX.Element {
-  const [newCategory, setNewCategory] = useState('')
-
-  if (doc.items.length === 0 && doc.categories.length === 0) {
+  if (doc.items.length === 0) {
     return <Hint>No items yet.</Hint>
   }
 
-  const shown = new Set(items.map((item) => item.id))
-  const categories = doc.categories.filter(
-    (category) =>
-      doc.items.some((item) => item.category === category && shown.has(item.id)) ||
-      itemsInCategory(doc, category).length === 0
-  )
-
-  const problem = newCategory.trim().length > 0 ? categoryProblem(doc, newCategory) : null
-
-  const create = (): void => {
-    if (newCategory.trim().length === 0 || problem) return
-    onChange(addCategory(doc, newCategory.trim()))
-    setNewCategory('')
+  if (items.length === 0) {
+    return <Hint>Nothing matches that filter.</Hint>
   }
 
+  // A flat list, as the stats and vars beside it are. Items used to be grouped
+  // under an author-named category that became its own ink `LIST`; they all
+  // share one list now, so there is nothing left to group by.
   return (
-    <>
-      {categories.length === 0 && <Hint>Nothing matches that filter.</Hint>}
-
-      {categories.map((category) => (
-        <section className="stats-category" key={category}>
-          {/* A label, not a heading — it names the ink LIST this category
-              becomes, which is the thing an author goes looking for. */}
-          <GroupLabel>
-            <code>LIST {listName(category)}</code>
-            <MoveButtons
-              label={`the ${category} category`}
-              onMove={(by) => onChange(moveCategory(doc, category, by))}
-            />
-          </GroupLabel>
-
-          <CategoryName doc={doc} category={category} onChange={onChange} />
-
-          <ul className="stats-rows">
-            {items
-              .filter((item) => item.category === category)
-              .map((item) => (
-                <li key={item.id}>
-                  <ListRow
-                    className="stats-pick"
-                    name={<code>{item.name}</code>}
-                    meta={item.display.length > 0 ? item.display : undefined}
-                    selected={item.id === selectedId}
-                    onClick={() => onSelect(item.id)}
-                  />
-                  <MoveButtons label={item.name} onMove={(by) => onChange(moveItem(doc, item.id, by))} />
-                </li>
-              ))}
-          </ul>
-        </section>
+    <ul className="stats-rows">
+      {items.map((item) => (
+        <li key={item.id}>
+          <ListRow
+            className="stats-pick"
+            name={<code>{item.name}</code>}
+            meta={item.display.length > 0 ? item.display : undefined}
+            selected={item.id === selectedId}
+            onClick={() => onSelect(item.id)}
+          />
+          <MoveButtons label={item.name} onMove={(by) => onChange(moveItem(doc, item.id, by))} />
+        </li>
       ))}
-
-      <div className="panel-new is-inline">
-        <Input
-          value={newCategory}
-          aria-label="New category"
-          placeholder="New category, e.g. Documents"
-          onChange={(event) => setNewCategory(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') create()
-          }}
-        />
-        <Button onClick={create} disabled={newCategory.trim().length === 0 || problem !== null}>
-          <Icon name="plus" size={13} />
-          Add category
-        </Button>
-      </div>
-      {problem && <p className="codex-error">{problem}</p>}
-    </>
-  )
-}
-
-/** A category's own name, renameable in place. */
-function CategoryName({
-  doc,
-  category,
-  onChange
-}: {
-  doc: StatsDocument
-  category: string
-  onChange: (next: StatsDocument) => void
-}): React.JSX.Element {
-  const [draft, setDraft] = useState(category)
-  useEffect(() => setDraft(category), [category])
-
-  const problem = draft.trim() !== category ? categoryProblem(doc, draft, category) : null
-
-  return (
-    <div className="stats-category-name">
-      <Input
-        value={draft}
-        aria-label={`Name of the ${category} category`}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={() => {
-          if (problem || draft.trim() === category) setDraft(category)
-          else onChange(renameCategory(doc, category, draft))
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') event.currentTarget.blur()
-          if (event.key === 'Escape') {
-            setDraft(category)
-            event.currentTarget.blur()
-          }
-        }}
-      />
-      <Button
-        variant="danger"
-        size="sm"
-        icon="trash-2"
-        aria-label={`Remove the ${category} category`}
-        onClick={() => {
-          const count = itemsInCategory(doc, category).length
-          if (window.confirm(`Remove ${category} and its ${count} item(s)?`)) {
-            onChange(removeCategory(doc, category))
-          }
-        }}
-      >
-        Remove
-      </Button>
-      {problem && <p className="codex-error">{problem}</p>}
-    </div>
+    </ul>
   )
 }
 
@@ -721,27 +592,6 @@ function ItemDetail({
 
       <Field label="Display name" about={copy('stats.display')}>
         <Input value={item.display} onChange={(event) => set({ display: event.target.value })} />
-      </Field>
-
-      <Field
-        label="Category"
-        note={
-          <>
-            declared in <code>LIST {listName(item.category)}</code>
-          </>
-        }
-      >
-        <Select
-          aria-label={`Category of ${item.name}`}
-          value={item.category}
-          onChange={(event) => set({ category: event.target.value })}
-        >
-          {doc.categories.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </Select>
       </Field>
 
       <Shared entry={item} onChange={set} />

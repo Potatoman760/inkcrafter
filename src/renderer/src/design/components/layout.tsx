@@ -99,13 +99,21 @@ export function CardFoot({ children }: { children?: React.ReactNode }): React.JS
 export function MasterDetail({
   master,
   detail,
-  masterWidth = 240,
+  masterWidth,
   className = '',
   masterClassName = '',
   detailClassName = ''
 }: {
   master: React.ReactNode
   detail: React.ReactNode
+  /**
+   * Overrides the standard rail width, in pixels. Omit it.
+   *
+   * Every catalogue used to pass one and they had drifted to five different
+   * numbers, so the rail moved whenever a tab changed. The width now lives in
+   * `--master-width`, and this is kept only for a pane that genuinely cannot
+   * use it.
+   */
   masterWidth?: number
   className?: string
   /** The two columns scroll and pad independently, so each takes its own. */
@@ -115,7 +123,11 @@ export function MasterDetail({
   return (
     <div
       className={['ic-master-detail', className].filter(Boolean).join(' ')}
-      style={{ gridTemplateColumns: `${masterWidth}px 1fr` }}
+      style={
+        masterWidth === undefined
+          ? undefined
+          : { gridTemplateColumns: `${masterWidth}px 1fr` }
+      }
     >
       <div className={['ic-master-detail__master', masterClassName].filter(Boolean).join(' ')}>
         {master}

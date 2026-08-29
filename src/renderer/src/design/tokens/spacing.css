@@ -25,6 +25,13 @@
   --gutter-dense: 6px;
   --gutter-page: 20px;
 
+  /* The width of a catalogue's left rail, everywhere one appears. One number
+     because the Game section is seven panels that read as one screen: the rail
+     was set per panel and had drifted to five widths, so the list jumped
+     sideways whenever a tab changed. Sized from the map's, the widest that has
+     to fit. A dimension, not a colour, so it lives here and not in a theme. */
+  --master-width: 340px;
+
   --splitter-width: 5px;
   --toolbar-height: 36px;
   --tabstrip-height: 30px;

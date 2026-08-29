@@ -173,7 +173,7 @@ export function CastPanel({
           size="sm"
           mono
           aria-label="New cast member"
-          placeholder="new_npc"
+          placeholder="Name"
           value={draftName}
           onChange={(event) => setDraftName(event.target.value)}
           onKeyDown={(event) => {
@@ -225,7 +225,6 @@ export function CastPanel({
 
       <MasterDetail
         className="cast-layout"
-        masterWidth={230}
         master={master}
         detail={
           selected ? (

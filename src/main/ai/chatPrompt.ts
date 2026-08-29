@@ -148,14 +148,13 @@ export const STATS_EXAMPLE = `{
   ],
   "items": [
     {
-      "id": "stt_0000000002", "name": "brass_key", "category": "Keys",
+      "id": "stt_0000000002", "name": "brass_key",
       "description": "",
       "display": "Brass Key", "blurb": "Cold, heavy, older than the door.",
       "icon": "icons/key.png",
       "custom": [{ "label": "slot", "value": "offhand" }]
     }
-  ],
-  "categories": ["Keys"]
+  ]
 }`
 
 export const CODEX_ENTRY_EXAMPLE = `---
@@ -348,7 +347,7 @@ CHOOSE STATS, VARS OR ITEMS IN THIS ORDER:
 3. VAR — Is it private story logic the player should not see as a status value? Put it in variables. Typical vars are met_queen, door_unlocked, chosen_route, times_slept and current_disguise. Vars may be numbers, booleans or text, but they are not carried objects.
 4. CAST — If the value belongs to a particular character, such as Maren's trust, status or whether she knows a secret, use write_cast instead.
 
-Stats and vars both become ink VAR declarations. An item is a member of a LIST, and every category becomes one list. ink/state.ink is GENERATED from this file, so declare things here rather than writing VAR or LIST by hand, and never edit ink/state.ink — it is overwritten. Names are lower_snake_case and share one namespace: no stat, var, item or category may collide, and inventory is reserved for the carried-items variable. The name field is the ink identifier; stats additionally carry display and blurb for the player; description is the author's note and becomes a comment above the declaration. Stats and items may also carry custom export fields. A stat or var needs a name; an item needs a name and category. Other fields may be omitted.
+Stats and vars both become ink VAR declarations. Every item is a member of one LIST called items. ink/state.ink is GENERATED from this file, so declare things here rather than writing VAR or LIST by hand, and never edit ink/state.ink — it is overwritten. Names are lower_snake_case and share one namespace: no stat, var or item may collide, and inventory and items are both reserved. The name field is the ink identifier; stats additionally carry display and blurb for the player; description is the author's note and becomes a comment above the declaration. Stats and items may also carry custom export fields. A stat, var or item needs nothing but a name. Other fields may be omitted.
 ${STATS_EXAMPLE}
 
 npcs.json — the cast, and the state the story tracks about them. Their sprites are in media.json under the name "sprite" gives, written by the same tool. WRITE IT WITH write_cast, never with write_file, for exactly the same reason as stats.json: the declarations live in the generated ink/state.ink. Each attribute becomes one ink variable named <inkId>_<key>, so Maren's trust is maren_trust — branch on it with {maren_trust >= 3}, and move it from the story with a tag: # npc: maren trust += 1. One list of variables, each saying its own kind — the same three words a player stat uses. Three kinds because flattening them loses the check that makes each safe: a number has a floor and a ceiling, text is one of a fixed set of words, a boolean is true or false. min and max are read only for a number and values only for text, but they are kept whatever the kind, so changing a variable's kind and changing it back does not lose the range or the word list. inkId is lower_snake_case and shares the one namespace with variables and items. Keys keep the case they are written in, because the tag has to match them exactly.

@@ -9,7 +9,8 @@ import {
 } from '@shared/mediaDoc'
 import type { MediaFile } from '@shared/types'
 import type { Project } from '@shared/project'
-import { Button, Field, Hint, Select } from '../design/components'
+import { Button, Field, Hint, IconButton, Select } from '../design/components'
+import { MediaPreview, type PreviewItem } from './MediaPreview'
 
 /** One named audio asset, one file—without a visual-style look selection. */
 export function AudioFileField({
@@ -28,6 +29,7 @@ export function AudioFileField({
   onImported: () => void
 }): React.JSX.Element {
   const [importing, setImporting] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const current = asset.variants[0]?.file ?? ''
   const claimed = claimedFiles(doc)
@@ -69,6 +71,21 @@ export function AudioFileField({
 
   const noun = asset.kind === 'music' ? 'track' : 'sound effect'
 
+  /**
+   * What the preview plays: this asset's one file.
+   *
+   * A list of one, because `MediaPreview` steps through looks and audio has
+   * none — the same reason the stepping bar hides itself below two items.
+   */
+  const previewItems: PreviewItem[] = [
+    {
+      file: current,
+      url: files.find((file) => file.path === current)?.url,
+      bytes: files.find((file) => file.path === current)?.bytes,
+      label: asset.display || asset.name
+    }
+  ]
+
   return (
     <Field
       as="div"
@@ -89,6 +106,18 @@ export function AudioFileField({
           ))}
         </Select>
 
+        {/*
+          Named for the kind rather than for the asset: the list row carries a
+          "Preview <name>" of its own, and two buttons answering to one name is
+          a worse thing to hand a screen reader than a slightly duller label.
+        */}
+        <IconButton
+          icon="play"
+          label={`Preview this ${noun}`}
+          disabled={current.length === 0}
+          onClick={() => setPreviewing(true)}
+        />
+
         {project && (
           <Button icon="folder-open" disabled={importing} onClick={() => void upload()}>
             {importing ? 'Copying…' : 'Upload…'}
@@ -107,6 +136,15 @@ export function AudioFileField({
         </Hint>
       )}
       {problem && <Hint tone="error">{problem}</Hint>}
+
+      {previewing && (
+        <MediaPreview
+          items={previewItems}
+          at={0}
+          onMove={() => {}}
+          onClose={() => setPreviewing(false)}
+        />
+      )}
     </Field>
   )
 }

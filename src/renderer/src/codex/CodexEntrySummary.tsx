@@ -35,7 +35,7 @@ export function CodexEntrySummary({
 
       <p className="entry-mentions">
         {CODEX_TYPE_LABELS[entry.type]} · {libraryTitle} · {mentionCount} mention
-        {mentionCount === 1 ? '' : 's'} in the open file
+        {mentionCount === 1 ? '' : 's'} across the story
       </p>
 
       {entry.aliases.length > 0 && (

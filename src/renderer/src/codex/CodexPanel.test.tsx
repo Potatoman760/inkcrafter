@@ -54,8 +54,8 @@ describe('CodexPanel', () => {
     // Queried as headings: the new-entry type picker also lists these names.
     expect(screen.getByRole('heading', { name: 'Characters' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Locations' })).toBeInTheDocument()
-    expect(screen.getByTitle('4 mentions in this file')).toHaveTextContent('4')
-    expect(screen.getByTitle('0 mentions in this file')).toHaveTextContent('0')
+    expect(screen.getByTitle('4 mentions across the story')).toHaveTextContent('4')
+    expect(screen.getByTitle('0 mentions across the story')).toHaveTextContent('0')
   })
 
   it('selects on a single click and opens the editor on a double click', async () => {
@@ -113,9 +113,9 @@ describe('CodexPanel', () => {
       expect(screen.getByText('archive, staff')).toBeInTheDocument()
     })
 
-    it('says how often it is named in the open file', () => {
+    it('says how often it is named across the story', () => {
       panel({ selectedId: wren.id })
-      expect(screen.getByText(/4 mentions in the open file/)).toBeInTheDocument()
+      expect(screen.getByText(/4 mentions across the story/)).toBeInTheDocument()
     })
 
     /**

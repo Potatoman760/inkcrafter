@@ -1,15 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { isIdOf } from './ids'
 import {
-  addCategory,
   addItem,
   addStat,
   addVariable,
-  categoryProblem,
   emptyStats,
   inkName,
-  itemsInCategory,
-  moveCategory,
   moveItem,
   moveStat,
   nameProblem,
@@ -17,13 +13,10 @@ import {
   newStat,
   newVariable,
   parseStats,
-  removeCategory,
   removeItem,
   removeStat,
-  renameCategory,
   serialiseStats,
   takenNames,
-  updateItem,
   updateStat,
   type StatsDocument
 } from './statsDoc'
@@ -32,9 +25,9 @@ function seeded(): StatsDocument {
   let doc = emptyStats()
   doc = addStat(doc, newStat('Strength'))
   doc = addStat(doc, newStat('Has met Wren', 'boolean'))
-  doc = addItem(doc, newItem('Shovel', 'Tools'))
-  doc = addItem(doc, newItem('Rope', 'Tools'))
-  doc = addItem(doc, newItem('Brass key', 'Keys'))
+  doc = addItem(doc, newItem('Shovel'))
+  doc = addItem(doc, newItem('Rope'))
+  doc = addItem(doc, newItem('Brass key'))
   return doc
 }
 
@@ -98,43 +91,16 @@ describe('hidden vars', () => {
   })
 })
 
-describe('items and categories', () => {
-  it('records a category the first time an item uses it', () => {
-    expect(seeded().categories).toEqual(['Tools', 'Keys'])
+describe('items', () => {
+  it('keeps them in one flat list, in the order they were added', () => {
+    expect(seeded().items.map((item) => item.name)).toEqual(['shovel', 'rope', 'brass_key'])
   })
 
-  it('does not record the same category twice', () => {
-    const doc = addItem(seeded(), newItem('Lantern', 'Tools'))
-    expect(doc.categories).toEqual(['Tools', 'Keys'])
-  })
-
-  it('records a category added on its own, before it has items', () => {
-    expect(addCategory(emptyStats(), 'Documents').categories).toEqual(['Documents'])
-  })
-
-  it('records a category an item is moved into', () => {
-    const doc = seeded()
-    const next = updateItem(doc, doc.items[0]!.id, { category: 'Curios' })
-
-    expect(next.categories).toContain('Curios')
-    expect(itemsInCategory(next, 'Curios').map((item) => item.name)).toEqual(['shovel'])
-  })
-
-  // Emptying it instead would leave items in a category that generates no LIST,
-  // and every use of them would fail to compile.
-  it('takes a category’s items with it when removed', () => {
-    const next = removeCategory(seeded(), 'Tools')
-
-    expect(next.categories).toEqual(['Keys'])
-    expect(next.items.map((item) => item.name)).toEqual(['brass_key'])
-  })
-
-  it('removes one item and leaves its category', () => {
+  it('removes one and leaves the rest', () => {
     const doc = seeded()
     const next = removeItem(doc, doc.items[0]!.id)
 
     expect(next.items.map((item) => item.name)).toEqual(['rope', 'brass_key'])
-    expect(next.categories).toEqual(['Tools', 'Keys'])
   })
 })
 
@@ -159,8 +125,9 @@ describe('nameProblem', () => {
     expect(nameProblem(doc, 'inventory')).toMatch(/inventory variable/)
   })
 
-  it('refuses a name that collides with a category', () => {
-    expect(nameProblem(doc, 'Tools')).toMatch(/already a category/)
+  // The list every item is declared in shares ink's one namespace with them.
+  it('refuses the name of the list items are declared in', () => {
+    expect(nameProblem(doc, 'items')).toMatch(/list every item/)
   })
 
   it('lets an entry keep its own name while being edited', () => {
@@ -178,53 +145,6 @@ describe('renaming', () => {
     expect(next.stats[0]!.name).toBe('might')
   })
 
-  it('carries a category’s items with it', () => {
-    // Left behind, they would be in a category that generates no LIST — the
-    // same broken state removeCategory avoids by taking its items along.
-    const next = renameCategory(seeded(), 'Tools', 'Equipment')
-
-    expect(next.categories).toEqual(['Equipment', 'Keys'])
-    expect(itemsInCategory(next, 'Equipment').map((item) => item.name)).toEqual(['shovel', 'rope'])
-    expect(itemsInCategory(next, 'Tools')).toEqual([])
-  })
-
-  it('refuses a category rename onto one that exists', () => {
-    const doc = seeded()
-    expect(renameCategory(doc, 'Tools', 'Keys')).toBe(doc)
-  })
-
-  it('refuses a category rename to nothing', () => {
-    const doc = seeded()
-    expect(renameCategory(doc, 'Tools', '   ')).toBe(doc)
-  })
-})
-
-describe('categoryProblem', () => {
-  const doc = seeded()
-
-  it('accepts a name nothing else claims', () => {
-    expect(categoryProblem(doc, 'Documents')).toBeNull()
-  })
-
-  it('refuses one that already exists', () => {
-    expect(categoryProblem(doc, 'Tools')).toMatch(/already a Tools/)
-  })
-
-  // The hole this closes: nameProblem guarded a stat colliding with a category,
-  // but nothing guarded the other direction, and the result was ink that would
-  // not compile.
-  it('refuses one colliding with a stat or an item', () => {
-    expect(categoryProblem(doc, 'Strength')).toMatch(/collides with/)
-    expect(categoryProblem(doc, 'Shovel')).toMatch(/collides with/)
-  })
-
-  it('refuses one colliding with the inventory variable', () => {
-    expect(categoryProblem(doc, 'Inventory')).toMatch(/inventory variable/)
-  })
-
-  it('lets a category keep its own name while being renamed', () => {
-    expect(categoryProblem(doc, 'Tools', 'Tools')).toBeNull()
-  })
 })
 
 describe('reordering', () => {
@@ -242,29 +162,20 @@ describe('reordering', () => {
     expect(moveStat(doc, doc.stats.at(-1)!.id, 1)).toBe(doc)
   })
 
-  // Items are ordered within their category, which is the order the author
-  // sees; moving one must not disturb another category's places.
-  it('moves an item within its category, leaving other categories alone', () => {
-    const doc = addItem(seeded(), newItem('Lantern', 'Tools'))
+  it('moves an item up and down the one list', () => {
+    const doc = seeded()
     const rope = doc.items.find((item) => item.name === 'rope')!
-    const next = moveItem(doc, rope.id, 1)
 
-    expect(itemsInCategory(next, 'Tools').map((item) => item.name)).toEqual([
+    expect(moveItem(doc, rope.id, 1).items.map((item) => item.name)).toEqual([
       'shovel',
-      'lantern',
+      'brass_key',
       'rope'
     ])
-    expect(itemsInCategory(next, 'Keys').map((item) => item.name)).toEqual(['brass_key'])
   })
 
-  it('refuses to move an item past the end of its own category', () => {
+  it('refuses to move an item past the end', () => {
     const doc = seeded()
-    const key = doc.items.find((item) => item.name === 'brass_key')!
-    expect(moveItem(doc, key.id, 1)).toBe(doc)
-  })
-
-  it('moves a category', () => {
-    expect(moveCategory(seeded(), 'Keys', -1).categories).toEqual(['Keys', 'Tools'])
+    expect(moveItem(doc, doc.items.at(-1)!.id, 1)).toBe(doc)
   })
 })
 
@@ -277,7 +188,6 @@ describe('the inventory variable', () => {
     const doc = emptyStats()
     expect(nameProblem(doc, 'inventory')).toBe('inventory is the inventory variable.')
     expect(nameProblem(doc, 'Inventory')).toBe('inventory is the inventory variable.')
-    expect(categoryProblem(doc, 'Inventory')).toBe('Inventory is the inventory variable.')
   })
 
   it('is taken, so nothing else can be given the name', () => {
@@ -288,7 +198,7 @@ describe('the inventory variable', () => {
 describe('presentation fields', () => {
   it('seeds the display name from what was typed', () => {
     // "Brass Key" is what a player should see; brass_key is not.
-    const item = newItem('Brass Key', 'Keys')
+    const item = newItem('Brass Key')
     expect(item.name).toBe('brass_key')
     expect(item.display).toBe('Brass Key')
   })
@@ -324,18 +234,20 @@ describe('parseStats', () => {
     expect(doc.stats.map((stat) => stat.name)).toEqual(['strength'])
   })
 
-  it('drops an item naming no category, since the category decides its LIST', () => {
-    const doc = parseStats('{"items":[{"name":"shovel"},{"name":"rope","category":"Tools"}]}')
-    expect(doc.items.map((item) => item.name)).toEqual(['rope'])
+  it('keeps an item that names no category, which no longer decides anything', () => {
+    const doc = parseStats('{"items":[{"name":"shovel"},{"name":"rope"}]}')
+    expect(doc.items.map((item) => item.name)).toEqual(['shovel', 'rope'])
   })
 
-  // A hand-edited file can list an item whose category the array forgot; that
-  // category still has to generate, or the item declares nothing.
-  it('recovers a category an item claims but the list omits', () => {
+  /** The fields items used to be grouped by. */
+  it('reads a file that still carries categories, dropping them', () => {
     const doc = parseStats(
       '{"categories":["Tools"],"items":[{"name":"rope","category":"Tools"},{"name":"brass_key","category":"Keys"}]}'
     )
-    expect(doc.categories).toEqual(['Tools', 'Keys'])
+
+    expect(doc.items.map((item) => item.name)).toEqual(['rope', 'brass_key'])
+    expect(doc.items[0]).not.toHaveProperty('category')
+    expect(doc).not.toHaveProperty('categories')
   })
 
   it('cleans a name that was hand-written in prose', () => {
@@ -400,7 +312,7 @@ describe('a catalogue written before the presentation fields existed', () => {
       icon: '',
       custom: []
     })
-    expect(doc.items[0]).toMatchObject({ name: 'shovel', category: 'Tools', display: '' })
+    expect(doc.items[0]).toMatchObject({ name: 'shovel', display: '' })
   })
 
   it('keeps the ids it was written with', () => {

@@ -101,7 +101,6 @@ describe('the formats the assistant is shown', () => {
 
     expect(doc.stats.map((stat) => stat.name)).toEqual(['strength'])
     expect(doc.items.map((item) => item.name)).toEqual(['brass_key'])
-    expect(doc.categories).toEqual(['Keys'])
 
     // The presentation half, which is the reason the export exists.
     expect(doc.items[0]).toMatchObject({

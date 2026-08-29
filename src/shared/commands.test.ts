@@ -46,9 +46,10 @@ describe('the command index', () => {
 
   it('sections the palette by the menus it mirrors', () => {
     const sections = new Set(APP_COMMANDS.map((command) => command.section))
-    // Edit is all roles, so it has no palette entries — the other three are the
-    // menu bar, verbatim.
-    expect([...sections].sort()).toEqual(['File', 'Settings', 'View'])
+    // All four menus, verbatim. Edit was once all clipboard roles and carried
+    // nothing the palette could dispatch; Find in files is the first command in
+    // it that the renderer actually handles.
+    expect([...sections].sort()).toEqual(['Edit', 'File', 'Settings', 'View'])
   })
 
   it('writes a label an author would recognise, not an action id', () => {

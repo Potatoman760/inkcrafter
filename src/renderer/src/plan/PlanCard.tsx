@@ -302,7 +302,7 @@ export function PlanCard({
           <Input
             value={newScene}
             aria-label={`New scene in ${node.title}`}
-            placeholder="New scene…"
+            placeholder="Name"
             onChange={(event) => setNewScene(event.target.value)}
             onKeyDown={(event) => {
               if (event.key !== 'Enter' || newScene.trim().length === 0) return

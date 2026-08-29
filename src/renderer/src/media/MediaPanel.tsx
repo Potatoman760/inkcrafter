@@ -83,16 +83,6 @@ const SINGULAR: Record<MediaKind, string> = {
   combatant: 'combatant'
 }
 
-const NEW_PLACEHOLDER: Record<MediaKind, string> = {
-  character: 'New character, e.g. Wren',
-  animation: 'New animation, e.g. Rain',
-  background: 'New background, e.g. The cove',
-  music: 'New track, e.g. The grove',
-  sound: 'New sound effect, e.g. Door slam',
-  hotspot: 'New hotspot, e.g. Seedblossom',
-  combatant: 'New combatant, e.g. Alley guard'
-}
-
 /**
  * The media catalogue.
  *
@@ -237,7 +227,6 @@ export function MediaPanel({
       />
 
       <MasterDetail
-        masterWidth={260}
         masterClassName="media-master"
         detailClassName="media-detail"
         master={
@@ -248,7 +237,7 @@ export function MediaPanel({
             <Input
               value={draftName}
               aria-label={`New ${SINGULAR[kind]} name`}
-              placeholder={NEW_PLACEHOLDER[kind]}
+              placeholder="Name"
               onChange={(event) => setDraftName(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') create()

@@ -42,6 +42,7 @@ import type {
   NameUse
 } from '@shared/types'
 import type { BundleExportResult } from '@shared/bundle/result'
+import type { MentionCountRequest, SearchRequest, SearchResult } from '@shared/types'
 import {
   createLibrary,
   deleteEntry,
@@ -91,6 +92,8 @@ import { readMinigames, writeMinigames } from './minigames'
 import { importLook, IMPORTABLE } from './mediaImport'
 import { chooseUploadFile } from './uploadPicker'
 import { cutoutLook } from './mediaCutout'
+import { countMentionsAcross } from './mentions'
+import { searchInk } from './search'
 import { exportBundle } from './bundle'
 import { generateProjectProtection, installProjectProtection } from './releaseProtection'
 import {
@@ -281,6 +284,15 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('codex:move', async (_event, entry: CodexEntry, toFile: string): Promise<void> =>
     moveEntry(await libraryById(entry.libraryId), entry.file, toFile)
+  )
+
+  ipcMain.handle(
+    'codex:mentionCounts',
+    (
+      _event,
+      project: Project,
+      request: MentionCountRequest
+    ): Promise<Record<string, number>> => countMentionsAcross(project, request)
   )
 
   ipcMain.handle(
@@ -508,6 +520,12 @@ export function registerIpcHandlers(): void {
     'minigames:write',
     (_event, project: Project, doc: MinigameDocument): Promise<void> =>
       writeMinigames(project, doc)
+  )
+
+  ipcMain.handle(
+    'search:ink',
+    (_event, project: Project, request: SearchRequest): Promise<SearchResult> =>
+      searchInk(project, request)
   )
 
   ipcMain.handle(

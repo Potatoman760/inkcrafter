@@ -608,6 +608,46 @@ describe('previewing', () => {
     expect(screen.getByText('The Harbour · day')).toBeInTheDocument()
   })
 
+  // Audio has no thumbnail to judge, so the preview is the only way to hear a
+  // track without leaving the app for the file manager.
+  it('plays a track from its row', async () => {
+    dialog(seeded(), MUSIC_FILES)
+    await userEvent.click(screen.getByRole('tab', { name: /^Music/ }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Preview The Grove' }))
+
+    expect(screen.getByRole('dialog', { name: /Preview of music\/grove\.mp3/ })).toBeInTheDocument()
+    expect(document.querySelector('audio')).toHaveAttribute(
+      'src',
+      'app://media/p/media/music/grove.mp3'
+    )
+  })
+
+  it('plays the chosen track from the detail pane', async () => {
+    dialog(seeded(), MUSIC_FILES)
+    await userEvent.click(screen.getByRole('tab', { name: /^Music/ }))
+    await userEvent.click(screen.getByText('the_grove'))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Preview this track' }))
+
+    expect(document.querySelector('audio')).toHaveAttribute(
+      'src',
+      'app://media/p/media/music/grove.mp3'
+    )
+  })
+
+  it('has nothing to play until a file is chosen', async () => {
+    let doc = seeded()
+    const silent = newAsset('Silence', 'music')
+    doc = addAsset(doc, silent)
+
+    dialog(doc, MUSIC_FILES)
+    await userEvent.click(screen.getByRole('tab', { name: /^Music/ }))
+    await userEvent.click(screen.getByText('silence'))
+
+    expect(screen.getByRole('button', { name: 'Preview this track' })).toBeDisabled()
+  })
+
   it('steps through that asset’s other looks, and no one else’s', async () => {
     dialog()
 

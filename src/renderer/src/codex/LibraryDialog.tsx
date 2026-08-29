@@ -122,7 +122,8 @@ export function LibraryDialog({
           <div className="detail-row">
             <Input
               value={newTitle}
-              placeholder="New library…"
+              aria-label="New library"
+              placeholder="Name"
               onChange={(event) => setNewTitle(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') void create()

@@ -70,11 +70,9 @@ export interface Stat extends Variable, Presentation {}
 
 export interface Item extends Presentation {
   id: string
-  /** The ink identifier: `shovel`. Unique across *every* category — ink list
-   * members share one namespace once they are mixed in a single variable. */
+  /** The ink identifier: `shovel`. Unique across every item — they share one
+   * ink `LIST`, and one namespace with it. */
   name: string
-  /** Which `LIST` it is declared in. */
-  category: string
   description: string
 }
 
@@ -84,16 +82,15 @@ export interface StatsDocument {
   stats: Stat[]
   /** Story-only variables, absent from player-facing status screens. */
   variables: Variable[]
+  /** Declared order is the order of the generated `LIST`, so it is stable. */
   items: Item[]
-  /** Declared order of the `LIST`s, so generated ink is stable between saves. */
-  categories: string[]
 }
 
 /**
  * The ink variable holding what the player carries.
  *
- * One variable across every category, which is what makes `inventory ? shovel`
- * work regardless of which list `shovel` came from — and one fixed name, not a
+ * One variable and one list, which is what makes `inventory ? shovel` work
+ * wherever it is asked — and one fixed name, not a
  * setting. It was configurable once, and nothing honoured it: the assistant is
  * told outright to write `{inventory ? ring}`, and renaming it rewrote no ink,
  * so the rename silently broke every condition already written. Every other
@@ -104,13 +101,22 @@ export interface StatsDocument {
  */
 export const INVENTORY = 'inventory'
 
+/**
+ * The one ink `LIST` every item is declared in.
+ *
+ * There used to be one list per author-named category, which put a second
+ * naming system in front of anyone who wanted a single item: a name for the
+ * thing, and a name for the box to put it in. The box is gone, so the list is
+ * fixed here and reserved by `nameProblem` the way `inventory` is.
+ */
+export const ITEM_LIST = 'items'
+
 export function emptyStats(): StatsDocument {
   return {
     version: 1,
     stats: [],
     variables: [],
-    items: [],
-    categories: []
+    items: []
   }
 }
 
@@ -163,11 +169,10 @@ export function newVariable(name: string, kind: StatKind = 'number'): Variable {
   }
 }
 
-export function newItem(name: string, category: string): Item {
+export function newItem(name: string): Item {
   return {
     id: newId('stt'),
     name: inkName(name),
-    category,
     description: '',
     ...blankPresentation(name)
   }
@@ -212,66 +217,23 @@ export function removeVariable(doc: StatsDocument, id: string): StatsDocument {
 }
 
 export function addItem(doc: StatsDocument, item: Item): StatsDocument {
-  return {
-    ...doc,
-    items: [...doc.items, item],
-    categories: doc.categories.includes(item.category)
-      ? doc.categories
-      : [...doc.categories, item.category]
-  }
+  return { ...doc, items: [...doc.items, item] }
 }
 
 export function updateItem(doc: StatsDocument, id: string, changes: Partial<Item>): StatsDocument {
-  const items = doc.items.map((item) => (item.id === id ? { ...item, ...changes } : item))
-  const next = { ...doc, items }
-  return changes.category === undefined ? next : withCategory(next, changes.category)
+  return {
+    ...doc,
+    items: doc.items.map((item) => (item.id === id ? { ...item, ...changes } : item))
+  }
 }
 
 export function removeItem(doc: StatsDocument, id: string): StatsDocument {
   return { ...doc, items: doc.items.filter((item) => item.id !== id) }
 }
 
-export function addCategory(doc: StatsDocument, name: string): StatsDocument {
-  return withCategory(doc, name)
-}
-
-/**
- * Drops a category and everything in it. Emptying it instead would leave items
- * with a category that no longer generates a `LIST`, which compiles to nothing
- * and fails at the first use.
- */
-export function removeCategory(doc: StatsDocument, name: string): StatsDocument {
-  return {
-    ...doc,
-    categories: doc.categories.filter((category) => category !== name),
-    items: doc.items.filter((item) => item.category !== name)
-  }
-}
-
-/**
- * Renames a category, carrying its items with it.
- *
- * Both halves have to move together: an item left pointing at the old name would
- * be in a category that no longer generates a `LIST`, which is the same broken
- * state `removeCategory` avoids by taking its items with it.
- */
-export function renameCategory(doc: StatsDocument, from: string, to: string): StatsDocument {
-  const trimmed = to.trim()
-  if (trimmed.length === 0 || trimmed === from || doc.categories.includes(trimmed)) return doc
-
-  return {
-    ...doc,
-    categories: doc.categories.map((category) => (category === from ? trimmed : category)),
-    items: doc.items.map((item) => (item.category === from ? { ...item, category: trimmed } : item))
-  }
-}
-
 /**
  * Moves an entry within its list. Array order is what both the generated ink and
  * the export follow, so this is the only control over how either reads.
- *
- * Items move within their own category rather than across the flat array, since
- * that is the order the author sees.
  */
 export function moveStat(doc: StatsDocument, id: string, by: number): StatsDocument {
   const stats = shift(doc.stats, (stat) => stat.id === id, by)
@@ -286,25 +248,8 @@ export function moveVariable(doc: StatsDocument, id: string, by: number): StatsD
 }
 
 export function moveItem(doc: StatsDocument, id: string, by: number): StatsDocument {
-  const moving = doc.items.find((item) => item.id === id)
-  if (!moving) return doc
-
-  const within = doc.items.filter((item) => item.category === moving.category)
-  const reordered = shift(within, (item) => item.id === id, by)
-  if (reordered === within) return doc
-
-  // Spliced back over the positions the category occupied, so items in other
-  // categories keep their places in the flat array.
-  const slots = doc.items.flatMap((item, index) => (item.category === moving.category ? [index] : []))
-  const items = [...doc.items]
-  for (const [at, index] of slots.entries()) items[index] = reordered[at]!
-
-  return { ...doc, items }
-}
-
-export function moveCategory(doc: StatsDocument, name: string, by: number): StatsDocument {
-  const categories = shift(doc.categories, (category) => category === name, by)
-  return categories === doc.categories ? doc : { ...doc, categories }
+  const items = shift(doc.items, (item) => item.id === id, by)
+  return items === doc.items ? doc : { ...doc, items }
 }
 
 function shift<T>(list: T[], match: (item: T) => boolean, by: number): T[] {
@@ -316,12 +261,6 @@ function shift<T>(list: T[], match: (item: T) => boolean, by: number): T[] {
   const [moving] = next.splice(from, 1)
   next.splice(to, 0, moving!)
   return next
-}
-
-function withCategory(doc: StatsDocument, name: string): StatsDocument {
-  const trimmed = name.trim()
-  if (trimmed.length === 0 || doc.categories.includes(trimmed)) return doc
-  return { ...doc, categories: [...doc.categories, trimmed] }
 }
 
 /** Keeps `initial` consistent with `kind` after the kind is changed. */
@@ -369,44 +308,12 @@ export function nameProblem(doc: StatsDocument, name: string, exceptId?: string)
   if (clash) return `${cleaned} is already used.`
   if (cleaned === INVENTORY) return `${cleaned} is the inventory variable.`
 
-  // Ink list members and variables share a namespace with the list types
-  // themselves, so a category name is equally unavailable.
-  if (doc.categories.some((category) => inkName(category) === cleaned)) {
-    return `${cleaned} is already a category.`
-  }
+  // Ink list members share a namespace with the list type itself, so the name
+  // of the list every item is declared in is equally unavailable. This used to
+  // guard the author's category names for the same reason.
+  if (cleaned === ITEM_LIST) return `${cleaned} is the list every item is declared in.`
 
   return null
-}
-
-/**
- * Why this category name cannot be used, or null when it can.
- *
- * The mirror of `nameProblem`, and the reason it exists: a category becomes a
- * `LIST`, whose name shares a namespace with every stat and item. Guarding only
- * one direction left the collision reachable from the other.
- */
-export function categoryProblem(doc: StatsDocument, name: string, except?: string): string | null {
-  const trimmed = name.trim()
-  if (trimmed.length === 0) return 'A category needs a name.'
-  if (inkName(trimmed).length === 0) return 'A name needs at least one letter or digit.'
-
-  if (doc.categories.some((category) => category !== except && category === trimmed)) {
-    return `There is already a ${trimmed} category.`
-  }
-
-  const identifier = inkName(trimmed)
-  if (identifier === INVENTORY) return `${trimmed} is the inventory variable.`
-
-  const clash =
-    doc.stats.find((stat) => stat.name === identifier) ??
-    doc.variables.find((variable) => variable.name === identifier) ??
-    doc.items.find((item) => item.name === identifier)
-
-  return clash ? `${trimmed} collides with the ${identifier} already declared.` : null
-}
-
-export function itemsInCategory(doc: StatsDocument, category: string): Item[] {
-  return doc.items.filter((item) => item.category === category)
 }
 
 /* Persistence. */
@@ -486,13 +393,13 @@ function asItem(value: unknown): Item | null {
   const record = value as Record<string, unknown>
 
   const name = typeof record['name'] === 'string' ? inkName(record['name']) : ''
-  const category = typeof record['category'] === 'string' ? record['category'].trim() : ''
-  if (name.length === 0 || category.length === 0) return null
+  // A `category` written by an older version is read and dropped: items are
+  // one list now, and the field named the list each one went into.
+  if (name.length === 0) return null
 
   return {
     id: typeof record['id'] === 'string' && record['id'].length > 0 ? record['id'] : newId('stt'),
     name,
-    category,
     description: asText(record['description']),
     ...asPresentation(record)
   }
@@ -514,20 +421,7 @@ export function parseStats(json: string): StatsDocument {
       ? record['items'].map(asItem).filter((item): item is Item => item !== null)
       : []
 
-    const declared = Array.isArray(record['categories'])
-      ? record['categories'].filter(
-          (category): category is string => typeof category === 'string' && category.trim().length > 0
-        )
-      : []
-
-    // A category an item claims but the list forgot still has to generate, or
-    // that item declares nothing and every use of it fails to compile.
-    const categories = [...declared]
-    for (const item of items) {
-      if (!categories.includes(item.category)) categories.push(item.category)
-    }
-
-    // `inventoryName` was a field here once. A file that still carries it is
+    // `inventoryName` and `categories` were fields here once. A file that still carries it is
     // read without it rather than refused: the name is fixed now, and the value
     // it held was never reflected in the ink the assistant wrote anyway.
     return {
@@ -538,8 +432,7 @@ export function parseStats(json: string): StatsDocument {
       variables: Array.isArray(record['variables'])
         ? record['variables'].map(asVariable).filter((variable): variable is Variable => variable !== null)
         : [],
-      items,
-      categories
+      items
     }
   } catch {
     return emptyStats()
