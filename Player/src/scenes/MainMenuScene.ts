@@ -4,10 +4,19 @@ import { getAssetIndex, getBundle } from "@/bundle/registry";
 import { isVideoFile } from "@/bundle/spec/mediaDoc";
 import { getGameState } from "@/state/registry";
 import { SaveManager } from "@/save/SaveManager";
-import { makeButton } from "@/ui/Button";
+import { BUTTON_HEIGHT, makeButton } from "@/ui/Button";
 import { UI_TEXT } from "@/config/uiText";
 import { desktopBridge } from "@/platform/desktop";
 import { setControllerActions } from "@/input/FocusNavigation";
+
+/**
+ * Where the menu starts, and so how much room is left above it.
+ *
+ * The title fits itself into the space these leave, and `create` lays the
+ * buttons out from the same number, so the two cannot drift apart.
+ */
+const FIRST_BUTTON_Y = GAME_HEIGHT / 2 - 40;
+const TITLE_MARGIN = 24;
 
 /** Title screen: starting, loading, and player-wide settings. */
 export class MainMenuScene extends Phaser.Scene {
@@ -51,11 +60,25 @@ export class MainMenuScene extends Phaser.Scene {
     if (title.art) {
       const resolved = getAssetIndex(this).resolveRef(title.art);
       if (resolved && !isVideoFile(resolved.path)) {
-        const art = this.add.image(GAME_WIDTH / 2, 210, resolved.key).setOrigin(0.5);
-        // Fitted rather than stretched: a wordmark drawn to the wrong aspect is
-        // worse than a small one.
-        const fit = Math.min(1, (GAME_WIDTH - 160) / Math.max(art.width, 1));
-        art.setScale(fit);
+        // The room above the menu, which is all the wordmark gets. Art is
+        // authored at whatever size it was drawn at, so the one that fits is
+        // found here rather than asked of the author.
+        const top = TITLE_MARGIN;
+        const bottom = FIRST_BUTTON_Y - BUTTON_HEIGHT / 2 - TITLE_MARGIN;
+
+        const art = this.add
+          .image(GAME_WIDTH / 2, (top + bottom) / 2, resolved.key)
+          .setOrigin(0.5);
+        // Contained, not stretched or cropped: the whole wordmark at its own
+        // aspect, bounded by whichever side runs out first. Never enlarged past
+        // its own pixels, where a drawn wordmark only turns soft.
+        art.setScale(
+          Math.min(
+            1,
+            (GAME_WIDTH - 160) / Math.max(art.width, 1),
+            (bottom - top) / Math.max(art.height, 1),
+          ),
+        );
         return;
       }
       // Falls through to the text, which is the only other name it has.
@@ -83,7 +106,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.showTitle();
 
     const cx = GAME_WIDTH / 2;
-    let y = GAME_HEIGHT / 2 - 40;
+    let y = FIRST_BUTTON_Y;
 
     makeButton(this, cx, y, UI_TEXT.mainMenuNewGame, () => this.startNewGame());
     y += 65;

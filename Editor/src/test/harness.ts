@@ -112,6 +112,10 @@ export function installApi(overrides: DeepPartial<InkCrafterApi> = {}): InkCraft
     projects: {
       list: vi.fn(async () => [])
     },
+    project: {
+      check: vi.fn(async () => ({ diagnostics: [], problems: [], files: 0 })),
+      mediaUsage: vi.fn(async () => ({}))
+    },
     libraries: {},
     codex: {},
     manuscript: {

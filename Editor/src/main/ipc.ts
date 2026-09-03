@@ -44,6 +44,7 @@ import type {
 import type { BundleExportResult } from '@shared/bundle/result'
 import type {
   MentionCountRequest,
+  MediaUsage,
   ProjectCheck,
   SearchRequest,
   SearchResult
@@ -100,6 +101,7 @@ import { cutoutLook } from './mediaCutout'
 import { countMentionsAcross } from './mentions'
 import { searchInk } from './search'
 import { checkProject } from './check'
+import { mediaUsage } from './mediaUsage'
 import { readGame, writeGame } from './game'
 import type { GameDocument } from '@shared/bundle/gameDoc'
 import { exportBundle } from './bundle'
@@ -536,6 +538,11 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'project:check',
     (_event, project: Project): Promise<ProjectCheck> => checkProject(project)
+  )
+
+  ipcMain.handle(
+    'media:usage',
+    (_event, project: Project): Promise<MediaUsage> => mediaUsage(project)
   )
 
   ipcMain.handle(

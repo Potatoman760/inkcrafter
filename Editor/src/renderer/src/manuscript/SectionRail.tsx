@@ -4,7 +4,8 @@ import {
   formatTag,
   type StageSlot,
   type TagCommand,
-  type TagOp
+  type TagOp,
+  type VideoLoopRange
 } from '@shared/bundle/tagSpec'
 import type { MediaAsset, MediaDocument, MediaVariant } from '@shared/mediaDoc'
 import type { ResolvedMedia } from '@shared/mediaTag'
@@ -18,7 +19,13 @@ import {
 } from '@shared/sectionScene'
 import type { MediaFile } from '@shared/types'
 import { Chip, ChipRow, Hint, Icon, IconButton, Thumb, type IconName } from '../design/components'
-import { ActivePicker, ChangePicker, MediaPicker, SpeakerPicker } from './TagPicker'
+import {
+  ActivePicker,
+  ChangePicker,
+  DisplayPicker,
+  MediaPicker,
+  SpeakerPicker
+} from './TagPicker'
 
 /**
  * What the reader is looking at, beside the words.
@@ -106,7 +113,13 @@ export function railRows(scene: SectionScene, files: MediaFile[]): RailRow[] {
       icon: 'image',
       label: nameOf(after.background),
       detail:
-        [after.backgroundOnce ? 'plays once' : '', after.backgroundFlipped ? 'flipped' : '']
+        [
+          after.backgroundOnce ? 'plays once' : '',
+          after.backgroundLoop
+            ? `loops ${after.backgroundLoop.start}–${after.backgroundLoop.end}s`
+            : '',
+          after.backgroundFlipped ? 'flipped' : ''
+        ]
           .filter(Boolean)
           .join(' · ') || undefined,
       thumb: urlOf(files, after.background),
@@ -143,7 +156,15 @@ export function railRows(scene: SectionScene, files: MediaFile[]): RailRow[] {
       icon: 'sparkles',
       label: nameOf(animation),
       // No slot: an animation fills the frame rather than taking a third of it.
-      detail: after.animFlipped[animation.asset.name] ? 'flipped' : undefined,
+      detail:
+        [
+          after.animLoops[animation.asset.name]
+            ? `loops ${after.animLoops[animation.asset.name]!.start}–${after.animLoops[animation.asset.name]!.end}s`
+            : '',
+          after.animFlipped[animation.asset.name] ? 'flipped' : ''
+        ]
+          .filter(Boolean)
+          .join(' · ') || undefined,
       thumb: urlOf(files, animation),
       here: declaresAnimation(scene, animation.asset.name)
     })
@@ -221,7 +242,15 @@ export function railRows(scene: SectionScene, files: MediaFile[]): RailRow[] {
 
 /** Which picker is open, where it was opened from, and what it is changing. */
 interface Picking {
-  kind: 'background' | 'character' | 'animation' | 'music' | 'speaker' | 'active' | 'change'
+  kind:
+    | 'background'
+    | 'character'
+    | 'animation'
+    | 'music'
+    | 'speaker'
+    | 'active'
+    | 'change'
+    | 'display'
   x: number
   y: number
   /**
@@ -240,8 +269,10 @@ interface Picking {
     slot?: StageSlot
     flipped?: boolean
     once?: boolean
+    loop?: VideoLoopRange | null
   }
   editing?: { stat: string; op: TagOp; value: number; attr?: string }
+  displaying?: { variable: string; label: string }
   current?: string
 }
 
@@ -372,7 +403,8 @@ export function SectionRail({
               name: after.background.asset.name,
               variant: after.background.variant.name,
               once: after.backgroundOnce,
-              flipped: after.backgroundFlipped
+              flipped: after.backgroundFlipped,
+              loop: after.backgroundLoop
             }
           : undefined
       })
@@ -412,7 +444,8 @@ export function SectionRail({
         selected: {
           name,
           variant: running?.variant.name ?? null,
-          flipped: after.animFlipped[name] ?? false
+          flipped: after.animFlipped[name] ?? false,
+          loop: after.animLoops[name] ?? null
         }
       })
       return
@@ -459,6 +492,15 @@ export function SectionRail({
           value: Number(command.value)
         }
       })
+      return
+    }
+
+    if (command.kind === 'display') {
+      setPicking({
+        ...where,
+        kind: 'display',
+        displaying: { variable: command.variable, label: command.label }
+      })
     }
   }
 
@@ -485,7 +527,8 @@ export function SectionRail({
     variant: MediaVariant | null,
     slot: StageSlot | null,
     flipped: boolean,
-    once: boolean
+    once: boolean,
+    loop: VideoLoopRange | null
   ): void => {
     const name = asset.name
     const look = variant?.name ?? null
@@ -497,9 +540,23 @@ export function SectionRail({
 
     setPicking(null)
     if (kind === 'character') onSet({ kind: 'show', name, variant: look, slot, flipped }, replacing)
-    else if (kind === 'animation') onSet({ kind: 'anim', name, variant: look, flipped }, replacing)
+    else if (kind === 'animation') {
+      onSet(
+        loop
+          ? { kind: 'anim', name, variant: look, flipped, loop }
+          : { kind: 'anim', name, variant: look, flipped },
+        replacing
+      )
+    }
     else if (kind === 'music') onSet({ kind: 'music', name, variant: null }, replacing)
-    else onSet({ kind: 'bg', name, variant: look, once, flipped }, replacing)
+    else {
+      onSet(
+        loop
+          ? { kind: 'bg', name, variant: look, once: false, flipped, loop }
+          : { kind: 'bg', name, variant: look, once, flipped },
+        replacing
+      )
+    }
   }
 
   const empty = rows.length === 0 && events.length === 0 && unresolved.length === 0
@@ -571,6 +628,7 @@ export function SectionRail({
         />
         <IconButton icon="music" size="sm" label="Set the music" onClick={openAt('music')} />
         <IconButton icon="gauge" size="sm" label="Change something tracked" onClick={openAt('change')} />
+        <IconButton icon="eye" size="sm" label="Display a tracked value" onClick={openAt('display')} />
         <IconButton
           icon="save"
           size="sm"
@@ -583,6 +641,18 @@ export function SectionRail({
         <ChangePicker
           at={picking}
           editing={picking.editing}
+          onPick={(command) => {
+            setPicking(null)
+            onSet(command, picking.replacing)
+          }}
+          onClose={() => setPicking(null)}
+        />
+      )}
+
+      {picking?.kind === 'display' && (
+        <DisplayPicker
+          at={picking}
+          editing={picking.displaying}
           onPick={(command) => {
             setPicking(null)
             onSet(command, picking.replacing)
@@ -628,6 +698,7 @@ export function SectionRail({
           kind={picking.kind}
           withSlot={picking.kind === 'character'}
           withBackdrop={picking.kind === 'background'}
+          withVideoLoop={picking.kind === 'background' || picking.kind === 'animation'}
           selected={picking.selected}
           otherLabel={
             picking.kind === 'character'

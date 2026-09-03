@@ -30,4 +30,5 @@ export {
   type TagOp,
   type StageSlot,
   type ActiveRule,
+  type VideoLoopRange,
 } from "@/bundle/spec/bundle/tagSpec";

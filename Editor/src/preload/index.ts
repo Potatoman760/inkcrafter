@@ -114,7 +114,8 @@ const api: InkCrafterApi = {
   },
 
   project: {
-    check: (project) => ipcRenderer.invoke('project:check', project)
+    check: (project) => ipcRenderer.invoke('project:check', project),
+    mediaUsage: (project) => ipcRenderer.invoke('media:usage', project)
   },
 
   search: {

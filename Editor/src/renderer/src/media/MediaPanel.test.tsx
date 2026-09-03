@@ -63,6 +63,7 @@ interface Harness {
   onChange: ReturnType<typeof vi.fn>
   onRescan: ReturnType<typeof vi.fn>
   onReveal: ReturnType<typeof vi.fn>
+  onOpenUse: ReturnType<typeof vi.fn>
 }
 
 /** A picture can only be brought into a project, so the panel needs one. */
@@ -72,6 +73,10 @@ function dialog(doc = seeded(), files = FILES): Harness {
   const onChange = vi.fn()
   const onRescan = vi.fn()
   const onReveal = vi.fn()
+  const onOpenUse = vi.fn()
+  // The detail pane reads where an asset is used, so the bridge has to exist
+  // even for the tests that are about something else.
+  if (!('inkcrafter' in window)) installApi()
 
   render(
     <MediaPanel
@@ -83,13 +88,16 @@ function dialog(doc = seeded(), files = FILES): Harness {
       onChange={onChange}
       onRescan={onRescan}
       onReveal={onReveal}
+      onOpenUse={onOpenUse}
     />
   )
 
-  return { onChange, onRescan, onReveal }
+  return { onChange, onRescan, onReveal, onOpenUse }
 }
 
 function live(initial = seeded()): void {
+  if (!('inkcrafter' in window)) installApi()
+
   function Host(): React.JSX.Element {
     const [doc, setDoc] = useState(initial)
     return (
@@ -101,6 +109,7 @@ function live(initial = seeded()): void {
         onChange={setDoc}
         onRescan={vi.fn()}
         onReveal={vi.fn()}
+        onOpenUse={vi.fn()}
       />
     )
   }

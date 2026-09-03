@@ -134,6 +134,7 @@ describe('railRows', () => {
     expect(bgRow('bg: the_cove flipped')).toBe('flipped')
     expect(bgRow('bg: the_cove once')).toBe('plays once')
     expect(bgRow('bg: the_cove once flipped')).toBe('plays once · flipped')
+    expect(bgRow('bg: the_cove loop=5-10')).toBe('loops 5–10s')
   })
 
   it('gives a look its thumbnail when the file is in the folder', () => {

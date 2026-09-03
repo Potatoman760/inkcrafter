@@ -942,6 +942,7 @@ export function App(): React.JSX.Element {
         onChange: media.apply,
         onRescan: () => void media.rescan(),
         onReveal: () => void window.inkcrafter.media.reveal(project),
+        onOpenUse: openProjectFile,
       }}
       stats={{
         doc: stats.doc,

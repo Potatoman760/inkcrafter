@@ -1,8 +1,8 @@
 import { findAsset, isVideoFile, type MediaDocument } from '../mediaDoc'
 import { scanTags, type TagUse } from '../inkTags'
 import { isKnownTag, mediaRefOf, parseTag } from './tagSpec'
-import type { StatsDocument } from '../statsDoc'
-import { attrKind, findNpc, npcVar, npcVariable, type NpcDocument } from './npcDoc'
+import { INVENTORY, type StatsDocument } from '../statsDoc'
+import { attrKind, findNpc, npcVar, npcVariable, npcVarNames, type NpcDocument } from './npcDoc'
 import { referencedPaths } from './condition'
 import { findMap, mapsLinkingTo, type MapArea, type MapDocument } from './mapDoc'
 import { galleryMedia, type GalleryDocument, type GalleryMediaRef } from './galleryDoc'
@@ -155,7 +155,7 @@ function checkMinigames(input: PreflightInput): Preflight[] {
         ['hazard penalty', game.hazardPenalty],
         ['missed target penalty', game.missedTargetPenalty]
       ]
-    } else {
+    } else if (game.kind === 'carry') {
       if (game.loadArt) {
         const art = galleryMedia(input.media, game.loadArt)
         if (!art) {
@@ -174,6 +174,34 @@ function checkMinigames(input: PreflightInput): Preflight[] {
         ['wobble limit', game.wobbleLimit],
         ['correction strength', game.correctionStrength],
         ['tilt drain', game.tiltDrainMultiplier]
+      ]
+    } else {
+      const arts: [string, GalleryMediaRef][] = [
+        ...game.targetArt.map((ref): [string, GalleryMediaRef] => ['target', ref]),
+        ...(game.toolArt ? [['tool', game.toolArt] as [string, GalleryMediaRef]] : [])
+      ]
+      for (const [label, ref] of arts) {
+        const art = galleryMedia(input.media, ref)
+        if (!art) {
+          problems.push(at(`${game.display || game.name}'s ${label} picture is no longer in the media catalogue.`))
+        } else if (art.kind !== 'animation') {
+          problems.push(at(`${game.display || game.name}'s ${label} picture is not an animation look.`))
+        } else if (isVideoFile(art.file)) {
+          problems.push(at(`${game.display || game.name}'s ${label} picture must be an image, not a video.`))
+        }
+      }
+      tunings = [
+        ['target durability', game.targetDurability],
+        ['strike limit', game.strikeLimit],
+        ['charge duration', game.chargeDurationMs],
+        ['ideal power', game.idealPowerPercent],
+        ['perfect window', game.perfectWindowPercent],
+        ['good window', game.goodWindowPercent],
+        ['perfect damage', game.perfectDamage],
+        ['good damage', game.goodDamage],
+        ['weak damage', game.weakDamage],
+        ['wrong-side damage', game.wrongSideDamagePercent],
+        ['recovery time', game.recoveryMs]
       ]
     }
 
@@ -602,6 +630,23 @@ function checkTag(use: TagUse, input: PreflightInput): string | null {
     }
 
     return null
+  }
+
+  if (use.command.kind === 'display') {
+    // These catalogues generate the globals in the compiled story. Inventory
+    // is a fixed list variable, and NPC attributes use their generated backing
+    // names so the tag can display those as readily as an ordinary stat.
+    const known = new Set([
+      INVENTORY,
+      ...input.stats.stats.map((one) => one.name),
+      ...input.stats.variables.map((one) => one.name),
+      ...npcVarNames(input.npcs)
+    ])
+    if (known.size === 1 && input.npcs.npcs.length === 0) return null
+
+    return known.has(use.command.variable)
+      ? null
+      : `#${use.raw} — ${use.command.variable} is not a variable in the catalogue, so there is nothing to display.`
   }
 
   if (use.command.kind === 'npc') {

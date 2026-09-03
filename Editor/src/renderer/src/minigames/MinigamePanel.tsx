@@ -3,11 +3,13 @@ import {
   minigameName,
   newCarryMinigame,
   newCombatMinigame,
+  newPowerStrikeMinigame,
   newQuickhandsMinigame,
   type CarryMinigame,
   type CombatMinigame,
   type MinigameDefinition,
   type MinigameDocument,
+  type PowerStrikeMinigame,
   type QuickhandsMinigame,
   type TunableNumber
 } from '@shared/bundle/minigameDoc'
@@ -85,7 +87,8 @@ const QUICKHANDS_TUNINGS: Array<{ key: keyof Pick<QuickhandsMinigame,
 const KIND_LABELS: Record<MinigameDefinition['kind'], string> = {
   combat: 'Combat',
   quickhands: 'Quick-hands',
-  carry: 'The Carry'
+  carry: 'The Carry',
+  powerstrike: 'Power Strike'
 }
 
 const CARRY_TUNINGS: Array<{ key: keyof Pick<CarryMinigame,
@@ -98,6 +101,23 @@ const CARRY_TUNINGS: Array<{ key: keyof Pick<CarryMinigame,
   { key: 'wobbleLimit', label: 'Drop at tilt', unit: 'tilt' },
   { key: 'correctionStrength', label: 'Correction', unit: 'tilt' },
   { key: 'tiltDrainMultiplier', label: 'Tilt drain', unit: '× at full lean' }
+]
+
+const POWERSTRIKE_TUNINGS: Array<{ key: keyof Pick<PowerStrikeMinigame,
+  'targetDurability' | 'strikeLimit' | 'chargeDurationMs' | 'idealPowerPercent' |
+  'perfectWindowPercent' | 'goodWindowPercent' | 'perfectDamage' | 'goodDamage' |
+  'weakDamage' | 'wrongSideDamagePercent' | 'recoveryMs'>; label: string; unit: string }> = [
+  { key: 'targetDurability', label: 'Target durability', unit: 'points' },
+  { key: 'strikeLimit', label: 'Strike limit', unit: 'strikes' },
+  { key: 'chargeDurationMs', label: 'Charge duration', unit: 'ms' },
+  { key: 'idealPowerPercent', label: 'Ideal power', unit: '%' },
+  { key: 'perfectWindowPercent', label: 'Perfect window', unit: '%' },
+  { key: 'goodWindowPercent', label: 'Good window', unit: '%' },
+  { key: 'perfectDamage', label: 'Perfect strike', unit: 'damage' },
+  { key: 'goodDamage', label: 'Good strike', unit: 'damage' },
+  { key: 'weakDamage', label: 'Weak strike', unit: 'damage' },
+  { key: 'wrongSideDamagePercent', label: 'Wrong-side damage', unit: '%' },
+  { key: 'recoveryMs', label: 'Recovery', unit: 'ms' }
 ]
 
 interface ArtworkOption {
@@ -120,7 +140,10 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
   const numeric = [...stats.stats, ...stats.variables].filter((one) => one.kind === 'number')
   const textual = [...stats.stats, ...stats.variables].filter((one) => one.kind === 'text')
   const opponent = selected?.kind === 'combat'
-    ? media.assets.find((asset) => asset.id === selected.opponentAssetId && asset.kind === 'combatant') ?? null
+    // Early combat minigames created their private opponent as a `character`.
+    // Accept the stable id regardless of that legacy kind so the art remains
+    // editable and, importantly, is removed with the minigame that owns it.
+    ? media.assets.find((asset) => asset.id === selected.opponentAssetId) ?? null
     : null
   const byPath = useMemo(() => new Map(files.map((file) => [file.path, file])), [files])
   const backgrounds = useMemo(
@@ -154,7 +177,7 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
    * in the panel. Looks are still chosen from every animation above — this only
    * gives a picture somewhere to land without leaving for the Media panel.
    */
-  const cabinetArt = selected?.kind === 'quickhands'
+  const minigameArt = selected?.kind === 'quickhands' || selected?.kind === 'powerstrike'
     ? media.assets.find(
         (one) => one.kind === 'animation' && one.name === mediaName(selected.name)
       ) ?? null
@@ -170,7 +193,8 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
   }, [doc.minigames, selectedId])
 
   const patch = (
-    changes: Partial<CombatMinigame> | Partial<QuickhandsMinigame> | Partial<CarryMinigame>
+    changes: Partial<CombatMinigame> | Partial<QuickhandsMinigame> |
+      Partial<CarryMinigame> | Partial<PowerStrikeMinigame>
   ): void => {
     if (!selected) return
     onChange({
@@ -201,6 +225,13 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
   const createCarry = (): void => {
     const count = doc.minigames.filter((game) => game.kind === 'carry').length + 1
     const game = newCarryMinigame(`New carry ${count}`)
+    onChange({ ...doc, minigames: [...doc.minigames, game] })
+    setSelectedId(game.id)
+  }
+
+  const createPowerStrike = (): void => {
+    const count = doc.minigames.filter((game) => game.kind === 'powerstrike').length + 1
+    const game = newPowerStrikeMinigame(`New power strike ${count}`)
     onChange({ ...doc, minigames: [...doc.minigames, game] })
     setSelectedId(game.id)
   }
@@ -279,6 +310,14 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
                         }}
                       >
                         The Carry
+                      </MenuItem>
+                      <MenuItem
+                        onClick={() => {
+                          createPowerStrike()
+                          setAdding(false)
+                        }}
+                      >
+                        Power Strike
                       </MenuItem>
                     </Menu>
                   </div>
@@ -455,10 +494,10 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
                       choose. This is the Media panel's own look list, pointed at
                       an animation of this cabinet's, so a picture can be brought
                       in here rather than in another panel and back. */}
-                  {cabinetArt ? (
+                  {minigameArt ? (
                     <LooksField
                       doc={media}
-                      asset={cabinetArt}
+                      asset={minigameArt}
                       files={files}
                       byPath={byPath}
                       project={project}
@@ -494,7 +533,7 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
                   </div>
                 </section>
               </>
-            ) : (
+            ) : selected.kind === 'carry' ? (
               <>
                 <section className="minigame-section">
                   <h3>The load</h3>
@@ -514,6 +553,66 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
                   <h3>Carry tuning</h3>
                   <div className="minigame-tunings">
                     {CARRY_TUNINGS.map((field) => (
+                      <TuningField
+                        key={field.key}
+                        label={field.label}
+                        unit={field.unit}
+                        value={selected[field.key]}
+                        stats={numeric.map((one) => one.name)}
+                        onChange={(value) => patch({ [field.key]: value })}
+                      />
+                    ))}
+                  </div>
+                </section>
+              </>
+            ) : (
+              <>
+                <section className="minigame-section">
+                  <h3>Power-strike graphics</h3>
+                  <Hint>Target looks are ordered from intact to broken. Leave them empty for the built-in log and splitting maul.</Hint>
+                  <div className="quickhands-art-grid">
+                    <ArtworkListField
+                      label="Target stage"
+                      value={selected.targetArt}
+                      options={artwork}
+                      byPath={byPath}
+                      onChange={(targetArt) => patch({ targetArt })}
+                    />
+                    <ArtworkField
+                      label="Tool"
+                      value={selected.toolArt}
+                      options={artwork}
+                      byPath={byPath}
+                      onChange={(toolArt) => patch({ toolArt })}
+                    />
+                  </div>
+                  {minigameArt ? (
+                    <LooksField
+                      doc={media}
+                      asset={minigameArt}
+                      files={files}
+                      byPath={byPath}
+                      project={project}
+                      onChange={onMediaChange}
+                      onImported={onMediaRescan}
+                      note="Pictures brought in here become choices for the target stages and tool."
+                    />
+                  ) : (
+                    <Button
+                      icon="folder-plus"
+                      onClick={() =>
+                        onMediaChange(addAsset(media, newAsset(selected.name, 'animation')))
+                      }
+                    >
+                      Add artwork for this power strike
+                    </Button>
+                  )}
+                </section>
+
+                <section className="minigame-section">
+                  <h3>Power-strike tuning</h3>
+                  <div className="minigame-tunings">
+                    {POWERSTRIKE_TUNINGS.map((field) => (
                       <TuningField
                         key={field.key}
                         label={field.label}

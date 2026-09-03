@@ -36,9 +36,15 @@ export function tabLabel(view: ViewMode, tab: RightTab): string {
   return tab === 'assistant' && isWriteView(view) ? 'Write' : RIGHT_TAB_LABELS[tab]
 }
 
-/** In the order they are shown. The assistant leads, in every view. */
+/**
+ * In the order they are shown.
+ *
+ * The assistant leads everywhere except the editor, where the preview does: the
+ * editor is the one view whose own work is on the left, and what an author
+ * wants beside a line they are writing is that line running.
+ */
 export const RIGHT_TABS: Record<ViewMode, readonly RightTab[]> = {
-  editor: ['assistant', 'preview', 'debug'],
+  editor: ['preview', 'assistant', 'debug'],
   manuscript: ['assistant', 'reading', 'debug'],
   plan: ['assistant', 'structure', 'debug'],
   game: ['assistant', 'debug']

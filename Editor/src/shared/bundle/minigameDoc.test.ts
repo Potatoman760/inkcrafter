@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   newCarryMinigame,
   newCombatMinigame,
+  newPowerStrikeMinigame,
   newQuickhandsMinigame,
   parseMinigames,
   resolveTunable,
@@ -129,6 +130,21 @@ describe('minigame catalogue', () => {
     expect(resolveTunable(carry.staminaMax, (name) => (name === 'strength' ? 3 : 0))).toBe(130)
   })
 
+  it('round-trips a power strike with ordered target damage and stat tuning', () => {
+    const strike = newPowerStrikeMinigame('Honeyed Bee woodpile')
+    strike.resultVariable = 'powerstrike_result'
+    strike.targetArt = [
+      { assetId: 'med_log', variantId: 'med_whole' },
+      { assetId: 'med_log', variantId: 'med_split' }
+    ]
+    strike.toolArt = { assetId: 'med_maul', variantId: 'med_idle' }
+    strike.perfectDamage.modifiers.push({ stat: 'strength', perPoint: 3 })
+
+    const back = parseMinigames(serialiseMinigames({ version: 1, minigames: [strike] }))
+
+    expect(back.minigames).toEqual([strike])
+  })
+
   it('drops malformed rows and tolerates an unreadable document', () => {
     expect(parseMinigames('not json').minigames).toEqual([])
     expect(parseMinigames(JSON.stringify({
@@ -137,7 +153,8 @@ describe('minigame catalogue', () => {
         { kind: 'puzzle', name: 'x' },
         { kind: 'combat', name: '' },
         { kind: 'quickhands', name: '' },
-        { kind: 'carry', name: '' }
+        { kind: 'carry', name: '' },
+        { kind: 'powerstrike', name: '' }
       ]
     })).minigames).toEqual([])
   })

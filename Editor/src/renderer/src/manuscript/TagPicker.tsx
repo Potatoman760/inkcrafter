@@ -4,7 +4,8 @@ import {
   STAGE_SLOTS,
   type ActiveRule,
   type StageSlot,
-  type TagCommand
+  type TagCommand,
+  type VideoLoopRange
 } from '@shared/bundle/tagSpec'
 import type { MediaAsset, MediaDocument, MediaKind, MediaVariant } from '@shared/mediaDoc'
 import type { MediaFile } from '@shared/types'
@@ -97,6 +98,7 @@ export function MediaPicker({
   title,
   withSlot = false,
   withBackdrop = false,
+  withVideoLoop = false,
   selected,
   otherLabel,
   onPick,
@@ -111,6 +113,8 @@ export function MediaPicker({
    * whether the art is mirrored.
    */
   withBackdrop?: boolean
+  /** Offer an intro-once, partial-loop range for video-backed media. */
+  withVideoLoop?: boolean
   /** What is staged now, when a row is being changed rather than added. */
   selected?: {
     name: string
@@ -118,6 +122,7 @@ export function MediaPicker({
     slot?: StageSlot
     flipped?: boolean
     once?: boolean
+    loop?: VideoLoopRange | null
   } | null
   /** What the item back to the whole list says: "Show somebody else…". */
   otherLabel?: string
@@ -126,7 +131,8 @@ export function MediaPicker({
     variant: MediaVariant | null,
     slot: StageSlot | null,
     flipped: boolean,
-    once: boolean
+    once: boolean,
+    loop: VideoLoopRange | null
   ) => void
   /** An action that is not an asset — "none", "stop the music". */
   extra?: { label: string; onPick: () => void }
@@ -156,6 +162,18 @@ export function MediaPicker({
   // the slot: changing only her look must not quietly turn her round.
   const [flipped, setFlipped] = useState(selected?.flipped ?? false)
   const [once, setOnce] = useState(selected?.once ?? false)
+  const [loopEnabled, setLoopEnabled] = useState(selected?.loop !== null && selected?.loop !== undefined)
+  const [loopStart, setLoopStart] = useState(String(selected?.loop?.start ?? 5))
+  const [loopEnd, setLoopEnd] = useState(String(selected?.loop?.end ?? 10))
+
+  const videoLoop = (): VideoLoopRange | null => {
+    if (!loopEnabled) return null
+    const start = Number(loopStart)
+    const end = Number(loopEnd)
+    return Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end > start
+      ? { start, end }
+      : null
+  }
 
   const assets = media.assets
     .filter((asset) => asset.kind === kind)
@@ -186,7 +204,9 @@ export function MediaPicker({
         onChange={(next) => {
           const side = next as StageSlot
           setSlot(side)
-          if (openOnStaged && chosen) onPick(chosen, staying(chosen), side, flipped, once)
+          if (openOnStaged && chosen) {
+            onPick(chosen, staying(chosen), side, flipped, once, videoLoop())
+          }
         }}
         options={STAGE_SLOTS.map((one) => ({ value: one, label: one }))}
       />
@@ -201,7 +221,9 @@ export function MediaPicker({
         onChange={(event) => {
           const turned = event.target.checked
           setFlipped(turned)
-          if (openOnStaged && chosen) onPick(chosen, staying(chosen), slot, turned, once)
+          if (openOnStaged && chosen) {
+            onPick(chosen, staying(chosen), slot, turned, once, videoLoop())
+          }
         }}
       />
     </div>
@@ -223,9 +245,10 @@ export function MediaPicker({
         onChange={(event) => {
           const playOnce = event.target.checked
           setOnce(playOnce)
+          if (playOnce) setLoopEnabled(false)
           const background = chosen ?? staged
           if (background) {
-            onPick(background, staying(background), null, flipped, playOnce)
+            onPick(background, staying(background), null, flipped, playOnce, null)
           }
         }}
       />
@@ -239,10 +262,60 @@ export function MediaPicker({
           setFlipped(turned)
           const background = chosen ?? staged
           if (background) {
-            onPick(background, staying(background), null, turned, once)
+            onPick(background, staying(background), null, turned, once, videoLoop())
           }
         }}
       />
+    </div>
+  ) : null
+
+  const loopRange = videoLoop()
+  const videoTiming = withVideoLoop ? (
+    <div className="picker-slot">
+      <Checkbox
+        label="Loop only part of the video"
+        checked={loopEnabled}
+        onChange={(event) => {
+          const enabled = event.target.checked
+          setLoopEnabled(enabled)
+          if (enabled) {
+            setOnce(false)
+            return
+          }
+          const subject = chosen ?? staged
+          if (subject) onPick(subject, staying(subject), null, flipped, once, null)
+        }}
+      />
+      {loopEnabled && (
+        <div className="picker-change">
+          <Input
+            value={loopStart}
+            aria-label="Loop starts at (seconds)"
+            placeholder="5"
+            onChange={(event) => setLoopStart(event.target.value)}
+          />
+          <Input
+            value={loopEnd}
+            aria-label="Loop ends at (seconds)"
+            placeholder="10"
+            onChange={(event) => setLoopEnd(event.target.value)}
+          />
+          {(chosen ?? staged) && (
+            <Button
+              icon="check"
+              disabled={loopRange === null}
+              onClick={() => {
+                const subject = chosen ?? staged
+                if (subject && loopRange) {
+                  onPick(subject, staying(subject), null, flipped, false, loopRange)
+                }
+              }}
+            >
+              Save loop
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   ) : null
 
@@ -258,6 +331,7 @@ export function MediaPicker({
         <>
           {where}
           {backdrop}
+          {videoTiming}
 
           {media.assets.filter((asset) => asset.kind === kind).length > 4 && (
             <div className="picker-filter">
@@ -279,7 +353,14 @@ export function MediaPicker({
                 // One look and nothing to choose between: skip the second step
                 // rather than asking a question with one answer.
                 if (kind === 'music' || asset.variants.length <= 1) {
-                  onPick(asset, asset.variants[0] ?? null, withSlot ? slot : null, flipped, once)
+                  onPick(
+                    asset,
+                    asset.variants[0] ?? null,
+                    withSlot ? slot : null,
+                    flipped,
+                    once,
+                    videoLoop()
+                  )
                   return
                 }
                 setChosen(asset)
@@ -314,6 +395,7 @@ export function MediaPicker({
         <>
           {where}
           {backdrop}
+          {videoTiming}
 
           {chosen.variants.map((variant) => (
             <MenuItem
@@ -324,7 +406,9 @@ export function MediaPicker({
                   ? 'is-current'
                   : ''
               }
-              onClick={() => onPick(chosen, variant, withSlot ? slot : null, flipped, once)}
+              onClick={() =>
+                onPick(chosen, variant, withSlot ? slot : null, flipped, once, videoLoop())
+              }
             >
               <Thumb className="picker-thumb" src={thumbOf(files, variant)} missing={false} />
               {variant.name}
@@ -387,6 +471,57 @@ export function SpeakerPicker({
         />
         <Button icon="check" onClick={() => onPick({ kind: 'speaker', name: name.trim() })}>
           Save
+        </Button>
+      </div>
+    </Menu>
+  )
+}
+
+/** A live Ink value shown in the player HUD for the knot that declares it. */
+export function DisplayPicker({
+  at,
+  editing,
+  onPick,
+  onClose
+}: {
+  at: { x: number; y: number }
+  editing?: { variable: string; label: string } | null
+  onPick: (command: TagCommand) => void
+  onClose: () => void
+}): React.JSX.Element {
+  const box = useDismiss(onClose)
+  const [variable, setVariable] = useState(editing?.variable ?? '')
+  const [label, setLabel] = useState(editing?.label ?? '')
+  const name = variable.trim()
+  const usable = /^[A-Za-z_]\w*$/.test(name) && label.trim().length > 0
+
+  return (
+    <Menu
+      ref={box}
+      className="tag-picker"
+      aria-label="Display a tracked value"
+      label={editing ? 'Change displayed value' : 'Display a tracked value'}
+      style={{ position: 'fixed', left: at.x, top: at.y }}
+    >
+      <div className="picker-change">
+        <Input
+          value={variable}
+          aria-label="Variable to display"
+          placeholder="faye_progress"
+          onChange={(event) => setVariable(event.target.value)}
+        />
+        <Input
+          value={label}
+          aria-label="Display name"
+          placeholder="Faye Progress"
+          onChange={(event) => setLabel(event.target.value)}
+        />
+        <Button
+          icon={editing ? 'check' : 'plus'}
+          disabled={!usable}
+          onClick={() => onPick({ kind: 'display', variable: name, label: label.trim() })}
+        >
+          {editing ? 'Save' : 'Add'}
         </Button>
       </div>
     </Menu>

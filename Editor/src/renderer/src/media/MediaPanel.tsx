@@ -20,6 +20,7 @@ import {
 import { TAG_PREFIX } from '@shared/mediaTag'
 import { LooksField } from './LooksField'
 import { AudioFileField } from './AudioFileField'
+import { UsageField } from './UsageField'
 import type { MediaFile } from '@shared/types'
 import type { Project } from '@shared/project'
 import { Icon } from '../design/Icon'
@@ -50,6 +51,8 @@ interface MediaPanelProps {
   /** Which project's folder a picture would be brought into. */
   project?: Project | null
   onReveal: () => void
+  /** Opens the ink where a tag names the selected asset. */
+  onOpenUse: (path: string, line: number) => void
 }
 
 const KIND_LABELS: Record<MediaKind, string> = {
@@ -101,7 +104,8 @@ export function MediaPanel({
   onChange,
   onRescan,
   project = null,
-  onReveal
+  onReveal,
+  onOpenUse
 }: MediaPanelProps): React.JSX.Element {
   const [kind, setKind] = useState<MediaKind>('background')
   const [filter, setFilter] = useState('')
@@ -339,6 +343,7 @@ export function MediaPanel({
               onChange={onChange}
               onRescan={onRescan}
               onRemoved={() => setSelectedId(null)}
+              onOpenUse={onOpenUse}
             />
           ) : (
             <Unfiled
@@ -546,7 +551,8 @@ function AssetDetail({
   project,
   onChange,
   onRescan,
-  onRemoved
+  onRemoved,
+  onOpenUse
 }: {
   doc: MediaDocument
   asset: MediaAsset
@@ -556,6 +562,8 @@ function AssetDetail({
   onChange: (next: MediaDocument) => void
   onRescan: () => void
   onRemoved: () => void
+  /** Opens the ink where a tag names this asset. */
+  onOpenUse: (path: string, line: number) => void
 }): React.JSX.Element {
   const [name, setName] = useState(asset.name)
 
@@ -634,6 +642,8 @@ function AssetDetail({
           onImported={onRescan}
         />
       )}
+
+      <UsageField project={project} asset={asset} onOpen={onOpenUse} />
 
       <div className="detail-row detail-row--danger">
         <Button

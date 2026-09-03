@@ -129,6 +129,8 @@ interface GameManagerViewProps {
     onChange: (next: MediaDocument) => void;
     onRescan: () => void;
     onReveal: () => void;
+    /** Opens the ink where a tag names the selected asset. */
+    onOpenUse: (path: string, line: number) => void;
   };
 
   stats: {
@@ -224,7 +226,9 @@ export function GameManagerView({
         }))}
       />
 
-      {section === "media" && <MediaPanel {...media} project={project} />}
+      {section === "media" && (
+        <MediaPanel {...media} project={project} />
+      )}
       {section === "stats" && <StatsPanel {...stats} />}
       {/* The cast edits the character half of the media catalogue, so it takes
           the same document and files the media section does. */}

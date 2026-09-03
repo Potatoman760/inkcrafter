@@ -590,6 +590,14 @@ describe('animations', () => {
     expect(scene.animations.map((one) => one.asset.name)).toEqual(['rain'])
   })
 
+  it('tracks and replaces a partial video loop', () => {
+    let scene = sceneFrom(withRain(), [['anim: rain loop=5-10']])
+    expect(scene.animLoops['rain']).toEqual({ start: 5, end: 10 })
+
+    scene = applyTags(withRain(), scene, ['anim: rain/heavy'])
+    expect(scene.animLoops['rain']).toBeUndefined()
+  })
+
   /**
    * It fills the frame, so there is nothing for a slot to mean. Refused rather
    * than ignored: a word that quietly does nothing is a word an author goes on
@@ -640,6 +648,7 @@ describe('animations', () => {
 
     expect(scene.animations).toEqual([])
     expect(scene.animFlipped).toEqual({})
+    expect(scene.animLoops).toEqual({})
     expect(scene.characters).toHaveLength(1)
   })
 

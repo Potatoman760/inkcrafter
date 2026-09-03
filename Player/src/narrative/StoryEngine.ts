@@ -5,6 +5,8 @@ import { parseTags, type TagCommand } from "./tags";
 export interface StoryLine {
   text: string;
   tags: TagCommand[];
+  /** The top-level Ink knot this line belongs to, before Continue moves past it. */
+  knot: string | null;
 }
 
 /** A presentable choice. `index` is the value passed back to `choose`. */
@@ -27,9 +29,11 @@ export interface StoryChoice {
  */
 export class StoryEngine {
   readonly story: Story;
+  private readonly knots: string[];
 
-  constructor(story: Story) {
+  constructor(story: Story, knots: readonly string[] = []) {
     this.story = story;
+    this.knots = [...new Set(knots.map((knot) => knot.split(".")[0]!).filter(Boolean))];
   }
 
   /**
@@ -42,8 +46,8 @@ export class StoryEngine {
    * `VisitCountAtPathString` keeps working for every knot — that flag is baked
    * into the JSON as a per-container property, so it survives the trip.
    */
-  static fromJson(storyJson: string): StoryEngine {
-    return new StoryEngine(new Story(storyJson));
+  static fromJson(storyJson: string, knots: readonly string[] = []): StoryEngine {
+    return new StoryEngine(new Story(storyJson), knots);
   }
 
   get canContinue(): boolean {
@@ -55,9 +59,17 @@ export class StoryEngine {
    * Skips over blank lines that ink sometimes emits for tag-only content.
    */
   continue(): StoryLine {
+    const before = this.currentKnot()?.split(".")[0] ?? null;
+    const visits = new Map(
+      this.knots.map((knot) => [knot, this.story.state.VisitCountAtPathString(knot) ?? 0]),
+    );
     const text = (this.story.Continue() ?? "").trim();
     const tags = parseTags(this.story.currentTags);
-    return { text, tags };
+    const entered = this.knots.find(
+      (knot) => (this.story.state.VisitCountAtPathString(knot) ?? 0) > (visits.get(knot) ?? 0),
+    );
+    const after = this.currentKnot()?.split(".")[0] ?? null;
+    return { text, tags, knot: entered ?? before ?? after };
   }
 
   /** Choices available at the current stopping point (empty if none). */

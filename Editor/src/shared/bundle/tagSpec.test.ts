@@ -83,6 +83,35 @@ describe('parseTag', () => {
     expect(formatTag(parseTag('bg: the_cove/storm once')!)).toBe('bg: the_cove/storm once')
   })
 
+  it('plays a video intro once, then loops only the authored interval', () => {
+    const command = {
+      kind: 'bg',
+      name: 'the_cove',
+      variant: 'storm',
+      once: false,
+      flipped: true,
+      loop: { start: 5, end: 10 }
+    } as const
+
+    expect(parseTag('bg: the_cove/storm flipped loop=5-10')).toEqual(command)
+    expect(parseTag('bg: the_cove/storm loop=5-10 flipped')).toEqual(command)
+    expect(formatTag(command)).toBe('bg: the_cove/storm loop=5-10 flipped')
+  })
+
+  it('refuses invalid or conflicting partial video loops', () => {
+    for (const raw of [
+      'bg: the_cove loop=10-5',
+      'bg: the_cove loop=5-5',
+      'bg: the_cove loop=-1-5',
+      'bg: the_cove loop=5-ten',
+      'bg: the_cove loop=1-2 loop=3-4',
+      'bg: the_cove once loop=5-10',
+      'bg: none loop=5-10'
+    ]) {
+      expect(parseTag(raw)).toBeNull()
+    }
+  })
+
   it('treats char and show as the same command', () => {
     expect(parseTag('char: wren')).toEqual(parseTag('show: wren'))
   })
@@ -118,6 +147,20 @@ describe('parseTag', () => {
       kind: 'speaker',
       name: 'Sister Abeline'
     })
+  })
+
+  it('reads a knot-scoped variable display with a free-text label', () => {
+    const command = {
+      kind: 'display',
+      variable: 'faye_progress',
+      label: 'Faye Progress'
+    } as const
+
+    expect(parseTag('display:faye_progress Faye Progress')).toEqual(command)
+    expect(formatTag(command)).toBe('display:faye_progress Faye Progress')
+    expect(parseTag('display:faye_progress')).toBeNull()
+    expect(parseTag('display:9lives Lives')).toBeNull()
+    expect(isKnownTag('display:anything')).toBe(true)
   })
 
   it('reads a stat change with or without spaces', () => {
@@ -681,6 +724,17 @@ describe('parseTag: animations', () => {
       variant: 'heavy',
       flipped: true
     })
+  })
+
+  it('takes a partial video loop with or without a flip', () => {
+    expect(parseTag('anim: rain/heavy loop=1.5-4 flipped')).toEqual({
+      kind: 'anim',
+      name: 'rain',
+      variant: 'heavy',
+      flipped: true,
+      loop: { start: 1.5, end: 4 }
+    })
+    expect(formatTag(parseTag('anim: rain loop=5-10')!)).toBe('anim: rain loop=5-10')
   })
 
   /** Stops every one of them, without touching who is on stage. */

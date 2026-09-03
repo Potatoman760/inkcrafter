@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { GAME_WIDTH, GAME_HEIGHT } from "@/config/gameConfig";
 import type { AssetIndex } from "@/bundle/AssetIndex";
 import type { Emphasis, SceneMeta } from "@/state/GameState";
-import { slotFor, type StageSlot } from "@/narrative/tags";
+import { slotFor, type StageSlot, type VideoLoopRange } from "@/narrative/tags";
 import {
   ANIM_COVER,
   DEPTH,
@@ -76,7 +76,8 @@ export class MediaLayer {
     name: string,
     variant: string | null = null,
     once = false,
-    flipped = false
+    flipped = false,
+    loop: VideoLoopRange | null = null
   ): Promise<void> {
     const found = this.assets.resolve("background", name, variant);
     if (!found) {
@@ -105,8 +106,7 @@ export class MediaLayer {
       // decoded frame visible until another background replaces it.
       clip.setMute(false);
       clip.setVolume(AudioSettings.sfxVolume);
-      clip.setLoop(!once);
-      clip.play(!once);
+      playVideo(clip, once, loop);
       // A clip knows nothing of its own size until it has metadata.
       clip.once(Phaser.GameObjects.Events.VIDEO_PLAY, () => {
         fitToScreen(clip);
@@ -191,7 +191,12 @@ export class MediaLayer {
    * asked directly. A still one simply sits there, which is a reasonable thing
    * for a placeholder to do.
    */
-  async showAnim(name: string, variant: string | null = null, flipped = false): Promise<void> {
+  async showAnim(
+    name: string,
+    variant: string | null = null,
+    flipped = false,
+    loop: VideoLoopRange | null = null
+  ): Promise<void> {
     const found = this.assets.resolve("animation", name, variant);
     if (!found) {
       console.warn(`Unknown animation "${describe(name, variant)}"`);
@@ -212,8 +217,7 @@ export class MediaLayer {
       const clip = this.scene.add.video(width / 2, height / 2, ready.key);
       clip.setMute(false);
       clip.setVolume(AudioSettings.sfxVolume);
-      clip.setLoop(true);
-      clip.play(true);
+      playVideo(clip, false, loop);
       // A video knows nothing of its own size until it has metadata, so the fit
       // is made again once it does; the first one keeps it from flashing.
       clip.once(Phaser.GameObjects.Events.VIDEO_PLAY, () => {
@@ -338,7 +342,8 @@ export class MediaLayer {
         meta.background.name,
         meta.background.variant,
         meta.background.once ?? false,
-        meta.background.flipped ?? false
+        meta.background.flipped ?? false,
+        meta.background.loop ?? null
       );
     }
     else this.clearBackground();
@@ -355,7 +360,7 @@ export class MediaLayer {
     // as none — the same as a scene that never started one.
     this.clearAnims();
     for (const anim of meta.anims ?? []) {
-      await this.showAnim(anim.name, anim.variant, anim.flipped);
+      await this.showAnim(anim.name, anim.variant, anim.flipped, anim.loop ?? null);
     }
   }
 
@@ -375,6 +380,29 @@ export class MediaLayer {
       if (anim instanceof Phaser.GameObjects.Video) anim.setVolume(AudioSettings.sfxVolume);
     }
   }
+}
+
+/** Play an optional intro once, then repeat only the authored marker interval. */
+function playVideo(
+  clip: Phaser.GameObjects.Video,
+  once: boolean,
+  loop: VideoLoopRange | null
+): void {
+  if (!loop) {
+    clip.setLoop(!once);
+    clip.play(!once);
+    return;
+  }
+
+  // Marker playback is keyframe-seeked by the browser. Reaching the marker out
+  // point emits the same completion event as reaching the physical end, which
+  // gives the intro one clean pass before the inner interval takes over.
+  clip.setLoop(false);
+  clip.once(Phaser.GameObjects.Events.VIDEO_COMPLETE, () => {
+    if (!clip.active) return;
+    clip.play(true, loop.start, loop.end);
+  });
+  clip.play(false, 0, loop.end);
 }
 
 /** A tag's name as it was written, for a warning that can be searched for. */

@@ -52,6 +52,12 @@ export type ActiveRule =
   | { rule: "nobody" }
   | { rule: "character"; name: string };
 
+/** Seconds delimiting the part of a video that repeats after its intro. */
+export interface VideoLoopRange {
+  start: number;
+  end: number;
+}
+
 export type TagCommand =
   /**
    * `name: null` clears the background — `# bg: none`.
@@ -72,6 +78,7 @@ export type TagCommand =
       variant: string | null;
       once?: boolean;
       flipped?: boolean;
+      loop?: VideoLoopRange;
     }
   /**
    * `slot: null` is a tag that said nothing about where, which is not "middle".
@@ -113,7 +120,13 @@ export type TagCommand =
    * `name: null` is `# anim: none`, which takes them all down without touching
    * who is on stage.
    */
-  | { kind: "anim"; name: string | null; variant: string | null; flipped: boolean }
+  | {
+      kind: "anim";
+      name: string | null;
+      variant: string | null;
+      flipped: boolean;
+      loop?: VideoLoopRange;
+    }
   /**
    * The track under the scene. `name: null` is `# music: stop`.
    *
@@ -139,6 +152,8 @@ export type TagCommand =
     }
   /** `name: ""` clears the speaker. */
   | { kind: "speaker"; name: string }
+  /** Show one live Ink variable in the player's top-left corner for this knot. */
+  | { kind: "display"; variable: string; label: string }
   | { kind: "stat"; stat: string; op: TagOp; value: number }
   | { kind: "npc"; id: string; attr: string; op: TagOp; value: string }
   | { kind: "map"; enabled: boolean }
@@ -179,6 +194,7 @@ export const TAG_KEYS = [
   "music",
   "speaker",
   "who",
+  "display",
   "stat",
   "npc",
   "map",
@@ -195,6 +211,9 @@ const STAT = /^([A-Za-z_][A-Za-z0-9_]*)\s*([+\-=])\s*(-?\d+)$/;
 
 /** `abeline affection +2`, `abeline status = married`. The value stays a string. */
 const NPC = /^([A-Za-z_]\w*)\s+([A-Za-z_]\w*)\s*([+\-=])\s*(.+)$/;
+
+/** `strength Strength`, with the first word looked up and the rest shown. */
+const DISPLAY = /^([A-Za-z_][A-Za-z0-9_]*)\s+(.+)$/;
 
 /** The name a tag uses to mean "nothing here now". */
 const NONE = "none";
@@ -234,6 +253,9 @@ const FLIPPED = /\s+flipped\s*$/i;
 
 /** A video background that plays through once and holds on its final frame. */
 const ONCE = /\s+once\s*$/i;
+
+/** `loop=5-10`, in seconds, on the end of a video background or animation. */
+const VIDEO_LOOP = /\s+loop=(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)\s*$/i;
 
 /**
  * `# music: theme loop` — the track repeats until something else replaces it.
@@ -320,17 +342,26 @@ function parseShow(value: string): ShowRef | null {
  * once: a second `once` is left on the subject, where it fails as a name, which
  * is how a typo stays visible instead of being quietly absorbed.
  */
-function parseBackground(value: string): {
+function parseVideoOptions(value: string, allowOnce: boolean): {
   subject: string;
   once: boolean;
   flipped: boolean;
-} {
+  loop?: VideoLoopRange;
+} | null {
   let subject = value;
   let once = false;
   let flipped = false;
+  let loop: VideoLoopRange | undefined;
 
   for (;;) {
-    if (!once && ONCE.test(subject)) {
+    const range = VIDEO_LOOP.exec(subject);
+    if (range && loop === undefined) {
+      const start = Number(range[1]);
+      const end = Number(range[2]);
+      if (end <= start) return null;
+      loop = { start, end };
+      subject = subject.slice(0, range.index);
+    } else if (allowOnce && !once && ONCE.test(subject)) {
       once = true;
       subject = subject.replace(ONCE, "");
     } else if (!flipped && FLIPPED.test(subject)) {
@@ -339,7 +370,10 @@ function parseBackground(value: string): {
     } else break;
   }
 
-  return { subject: subject.trim(), once, flipped };
+  if (once && loop) return null;
+  return loop
+    ? { subject: subject.trim(), once, flipped, loop }
+    : { subject: subject.trim(), once, flipped };
 }
 
 /** Parse a single raw ink tag, already stripped of its `#`. */
@@ -352,16 +386,22 @@ export function parseTag(raw: string): TagCommand | null {
   switch (key) {
     case "bg":
     case "background": {
-      const { subject, once, flipped } = parseBackground(value);
+      const parsed = parseVideoOptions(value, true);
+      if (!parsed) return null;
+      const { subject, once, flipped, loop } = parsed;
       if (subject.toLowerCase() === NONE) {
         // Nothing to hold a final frame and nothing to mirror: an empty frame
         // has no artwork for either word to be about.
-        return once || flipped
+        return once || flipped || loop
           ? null
           : { kind: "bg", name: null, variant: null, once: false, flipped: false };
       }
       const ref = parseName(subject);
-      return ref ? { kind: "bg", ...ref, once, flipped } : null;
+      return ref
+        ? loop
+          ? { kind: "bg", ...ref, once, flipped, loop }
+          : { kind: "bg", ...ref, once, flipped }
+        : null;
     }
 
     // `char` is the editor's spelling and `show` the player's. They are the
@@ -384,12 +424,17 @@ export function parseTag(raw: string): TagCommand | null {
       // it is about animations specifically and `clear` is about the stage.
       if (value === NONE) return { kind: "anim", name: null, variant: null, flipped: false };
 
-      const ref = parseShow(value);
+      const parsed = parseVideoOptions(value, false);
+      if (!parsed) return null;
+      const ref = parseShow(parsed.subject);
       // An animation fills the frame, so `at left` names nothing it could do.
       // Refused rather than ignored: a word that quietly does nothing is a word
       // an author goes on writing. `preflight` reports it on the way out.
       if (!ref || ref.name === NONE || ref.slot !== null) return null;
-      return { kind: "anim", name: ref.name, variant: ref.variant, flipped: ref.flipped };
+      const flipped = parsed.flipped || ref.flipped;
+      return parsed.loop
+        ? { kind: "anim", name: ref.name, variant: ref.variant, flipped, loop: parsed.loop }
+        : { kind: "anim", name: ref.name, variant: ref.variant, flipped };
     }
 
     case "hide": {
@@ -423,6 +468,12 @@ export function parseTag(raw: string): TagCommand | null {
     case "speaker":
     case "who":
       return { kind: "speaker", name: value };
+
+    case "display": {
+      const match = DISPLAY.exec(value);
+      if (!match || match[2]!.trim().length === 0) return null;
+      return { kind: "display", variable: match[1]!, label: match[2]!.trim() };
+    }
 
     case "stat": {
       const match = STAT.exec(value);
@@ -504,6 +555,8 @@ export function formatTag(command: TagCommand): string {
         command.name === null
           ? NONE
           : `${withVariant(command.name, command.variant)}${command.once ? " once" : ""}${
+              command.loop ? ` loop=${command.loop.start}-${command.loop.end}` : ""
+            }${
               command.flipped ? " flipped" : ""
             }`
       }`;
@@ -515,7 +568,9 @@ export function formatTag(command: TagCommand): string {
       return `anim: ${
         command.name === null
           ? NONE
-          : `${withVariant(command.name, command.variant)}${command.flipped ? " flipped" : ""}`
+          : `${withVariant(command.name, command.variant)}${
+              command.loop ? ` loop=${command.loop.start}-${command.loop.end}` : ""
+            }${command.flipped ? " flipped" : ""}`
       }`;
     case "hide":
       return `hide: ${command.name}`;
@@ -530,6 +585,8 @@ export function formatTag(command: TagCommand): string {
       return `music: ${STOP}${command.fade ? ` ${command.fade}` : ""}`;
     case "speaker":
       return `speaker: ${command.name}`;
+    case "display":
+      return `display:${command.variable} ${command.label}`;
     // `+1` reads as one thing and `= married` as two, which is how each is
     // written by hand. Both parse either way; this is only about the ink an
     // author has to read afterwards.
@@ -599,6 +656,7 @@ export function mediaRefOf(
     case "active":
     case "clear":
     case "speaker":
+    case "display":
     case "stat":
     case "npc":
     case "map":

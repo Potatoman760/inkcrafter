@@ -17,7 +17,8 @@ import {
   slotFor,
   tagKeyOf,
   type ActiveRule,
-  type StageSlot
+  type StageSlot,
+  type VideoLoopRange
 } from './bundle/tagSpec'
 
 /**
@@ -162,6 +163,8 @@ export interface Scene {
   background: ResolvedMedia | null
   /** Whether a video background stops on its final frame instead of looping. */
   backgroundOnce: boolean
+  /** Intro plays once, then this interval repeats. */
+  backgroundLoop: VideoLoopRange | null
   /**
    * Whether the background is drawn mirrored left to right.
    *
@@ -226,6 +229,8 @@ export interface Scene {
    */
   animations: ResolvedMedia[]
   animFlipped: Record<string, boolean>
+  /** Partial video loops, keyed by animation asset name. */
+  animLoops: Record<string, VideoLoopRange>
   /** Empty when nobody in particular is speaking. */
   speaker: string
   /**
@@ -242,6 +247,7 @@ export interface Scene {
 export const EMPTY_SCENE: Scene = {
   background: null,
   backgroundOnce: false,
+  backgroundLoop: null,
   backgroundFlipped: false,
   music: null,
   musicFade: 0,
@@ -250,6 +256,7 @@ export const EMPTY_SCENE: Scene = {
   flipped: {},
   animations: [],
   animFlipped: {},
+  animLoops: {},
   speaker: '',
   activeRule: { rule: 'speaker' },
   mapEnabled: true,
@@ -279,13 +286,20 @@ export function applyTags(doc: MediaDocument, scene: Scene, tags: string[]): Sce
     switch (command.kind) {
       case 'bg':
         if (command.name === null) {
-          next = { ...next, background: null, backgroundOnce: false, backgroundFlipped: false }
+          next = {
+            ...next,
+            background: null,
+            backgroundOnce: false,
+            backgroundLoop: null,
+            backgroundFlipped: false
+          }
           break
         }
         next = place(next, resolveRef(doc, 'background', command.name, command.variant), raw, (m) => ({
           ...next,
           background: m,
           backgroundOnce: command.once ?? false,
+          backgroundLoop: command.loop ?? null,
           backgroundFlipped: command.flipped ?? false
         }))
         break
@@ -299,9 +313,9 @@ export function applyTags(doc: MediaDocument, scene: Scene, tags: string[]): Sce
       case 'anim':
         next =
           command.name === null
-            ? { ...next, animations: [], animFlipped: {} }
+            ? { ...next, animations: [], animFlipped: {}, animLoops: {} }
             : place(next, resolveRef(doc, 'animation', command.name, command.variant), raw, (m) =>
-                animating(next, m, command.flipped)
+                animating(next, m, command.flipped, command.loop ?? null)
               )
         break
 
@@ -335,7 +349,8 @@ export function applyTags(doc: MediaDocument, scene: Scene, tags: string[]): Sce
           slots: without(next.slots, command.name),
           flipped: without(next.flipped, command.name),
           animations: next.animations.filter((one) => one.asset.name !== command.name),
-          animFlipped: without(next.animFlipped, command.name)
+          animFlipped: without(next.animFlipped, command.name),
+          animLoops: without(next.animLoops, command.name)
         }
         break
 
@@ -346,12 +361,14 @@ export function applyTags(doc: MediaDocument, scene: Scene, tags: string[]): Sce
           ...next,
           background: null,
           backgroundOnce: false,
+          backgroundLoop: null,
           backgroundFlipped: false,
           characters: [],
           slots: {},
           flipped: {},
           animations: [],
           animFlipped: {},
+          animLoops: {},
           activeRule: { rule: 'speaker' }
         }
         break
@@ -370,6 +387,7 @@ export function applyTags(doc: MediaDocument, scene: Scene, tags: string[]): Sce
 
       case 'stat':
       case 'npc':
+      case 'display':
       case 'autosave':
         break
     }
@@ -442,7 +460,12 @@ function showing(
  * Not `staged`: that folds a slot forward, and an animation has none. What is
  * left is a list and a flip, which is little enough to say outright.
  */
-function animating(scene: Scene, media: ResolvedMedia, flipped: boolean): Scene {
+function animating(
+  scene: Scene,
+  media: ResolvedMedia,
+  flipped: boolean,
+  loop: VideoLoopRange | null
+): Scene {
   const name = media.asset.name
   const at = scene.animations.findIndex((one) => one.asset.name === name)
 
@@ -452,7 +475,10 @@ function animating(scene: Scene, media: ResolvedMedia, flipped: boolean): Scene 
       at === -1
         ? [...scene.animations, media]
         : scene.animations.map((one, index) => (index === at ? media : one)),
-    animFlipped: { ...scene.animFlipped, [name]: flipped }
+    animFlipped: { ...scene.animFlipped, [name]: flipped },
+    animLoops: loop
+      ? { ...scene.animLoops, [name]: loop }
+      : without(scene.animLoops, name)
   }
 }
 

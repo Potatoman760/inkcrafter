@@ -20,6 +20,7 @@ import { GalleryScene } from "@/scenes/GalleryScene";
 import { CombatScene } from "@/scenes/CombatScene";
 import { QuickhandsScene } from "@/scenes/QuickhandsScene";
 import { CarryScene } from "@/scenes/CarryScene";
+import { PowerStrikeScene } from "@/scenes/PowerStrikeScene";
 import { GalleryUnlocks } from "@/gallery/GalleryUnlocks";
 import { formatUiText, UI_TEXT } from "@/config/uiText";
 import { PlayerStorage } from "@/platform/Storage";
@@ -97,6 +98,7 @@ async function start(): Promise<void> {
       CombatScene,
       QuickhandsScene,
       CarryScene,
+      PowerStrikeScene,
     ],
   });
   installLifecycleHandling(game);

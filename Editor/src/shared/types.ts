@@ -52,6 +52,23 @@ export interface InkDiagnostic {
   raw: string
 }
 
+/** One tag naming a media asset, and where it sits. */
+export interface MediaUse {
+  /** Project-relative path, so a row can also open. */
+  file: string
+  /** 1-based. */
+  line: number
+  /** The knot the tag sits in, or null for a tag above the first one. */
+  knot: string | null
+  /** The look the tag named, when it named one. */
+  variant: string | null
+  /** The tag as written, without the `#`. */
+  raw: string
+}
+
+/** Uses keyed by media kind and name — `background:harbour`, `music:the_grove`. */
+export type MediaUsage = Record<string, MediaUse[]>
+
 /** What a whole-project check found, from `project:check`. */
 export interface ProjectCheck {
   /** The compiler's own errors and warnings: whether the ink is ink. */
@@ -624,8 +641,12 @@ export interface InkCrafterApi {
   achievements: AchievementsApi
   minigames: MinigamesApi
   bundle: BundleApi
-  /** Whole-project checks that do not write anything. */
-  project: { check(project: Project): Promise<ProjectCheck> }
+  /** Whole-project reads that write nothing. */
+  project: {
+    check(project: Project): Promise<ProjectCheck>
+    /** Where every catalogued asset is named in the ink. */
+    mediaUsage(project: Project): Promise<MediaUsage>
+  }
   search: SearchApi
   ai: AiApi
   settings: SettingsApi

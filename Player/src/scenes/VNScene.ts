@@ -10,6 +10,7 @@ import { DialogueBox } from "@/ui/DialogueBox";
 import { ChoiceMenu } from "@/ui/ChoiceMenu";
 import { makeButton } from "@/ui/Button";
 import { QuickMenu } from "@/ui/QuickMenu";
+import { VariableDisplay } from "@/ui/VariableDisplay";
 import { History } from "@/state/History";
 import type { StoryLine } from "@/narrative/StoryEngine";
 import { assertNever } from "@/util/exhaustive";
@@ -24,6 +25,15 @@ import { setControllerActions } from "@/input/FocusNavigation";
  * not staring at a blank box until it stops.
  */
 const SKIP_STEP_MS = 100;
+
+/**
+ * How much wheel delta buys one step.
+ *
+ * About one notch of a mouse wheel, which reports 100 or so per notch on every
+ * browser worth naming. Small enough that a notch always registers, large
+ * enough that a trackpad's stream of ones and twos does not run away.
+ */
+const WHEEL_STEP = 50;
 
 /** Compact, evenly spaced controls along the top-right edge. */
 const TOOLBAR = {
@@ -53,11 +63,14 @@ export class VNScene extends Phaser.Scene {
   private music!: MusicPlayer;
   private dialogue!: DialogueBox;
   private choices!: ChoiceMenu;
+  private variableDisplay!: VariableDisplay;
   private mapButton?: Phaser.GameObjects.Container;
   private characterButton?: Phaser.GameObjects.Container;
   private menuButton?: Phaser.GameObjects.Container;
   /** True while the reader is looking at the art with everything else out of the way. */
   private uiHidden = false;
+  /** Wheel delta banked since the last step it paid for. */
+  private wheeled = 0;
   private quick!: QuickMenu;
   private readonly history = new History();
   private skipTimer?: Phaser.Time.TimerEvent;
@@ -102,9 +115,9 @@ export class VNScene extends Phaser.Scene {
     this.events.on(Phaser.Scenes.Events.RESUME, this.onSceneResume, this);
     this.dialogue = new DialogueBox(this);
     this.choices = new ChoiceMenu(this);
-    // Neither the player's stats nor the cast's are shown on screen. Both are
-    // tracked by `GameState` and both persist in a save; what a reader is meant
-    // to know about them is the story's to say, in words.
+    // Stats remain private by default. A story can opt one live value into this
+    // compact HUD for a single knot with `# display:`.
+    this.variableDisplay = new VariableDisplay(this);
     this.buildToolbar();
 
     // A full-screen, transparent "advance zone" beneath the UI. Because Phaser
@@ -119,6 +132,14 @@ export class VNScene extends Phaser.Scene {
         // Only the left button advances. The right one is the art's.
         if (pointer.leftButtonDown()) this.onAdvanceInput();
       });
+    // The wheel, as the two things a reader already does with the mouse: down
+    // is the click, up is Back. Nothing new happens — both route into the
+    // methods the button and the click already use.
+    this.input.on(
+      Phaser.Input.Events.POINTER_WHEEL,
+      (_pointer: Phaser.Input.Pointer, _over: unknown, _deltaX: number, deltaY: number) =>
+        this.onWheel(deltaY),
+    );
     this.input.keyboard?.on("keydown-SPACE", this.onAdvanceInput, this);
     this.input.keyboard?.on("keydown-ENTER", this.onAdvanceInput, this);
     // The other way in, and the only one on a keyboard. Held to the same
@@ -147,6 +168,7 @@ export class VNScene extends Phaser.Scene {
     await this.media.rebuildFrom(meta, this.state.emphasis());
     this.music.restore(meta.music?.name, meta.music?.variant ?? null);
     this.dialogue.setLine(meta.speaker, meta.lastText);
+    this.refreshVariableDisplay();
 
     // A frame left at a choice point has the choices waiting inside ink but
     // nothing on screen: the buttons are not part of the saved frame, they are
@@ -195,6 +217,33 @@ export class VNScene extends Phaser.Scene {
   }
 
   // --- input ---
+
+  /**
+   * One step per notch, whatever the device sends.
+   *
+   * A mouse wheel reports one large delta per notch; a trackpad reports a
+   * stream of small ones, and acting on each would run a single flick through a
+   * dozen lines. So the deltas are banked and spent a step at a time, and a
+   * change of direction starts again rather than spending what the other
+   * direction had banked.
+   */
+  private onWheel(deltaY: number): void {
+    if (deltaY === 0) return;
+    if (Math.sign(deltaY) !== Math.sign(this.wheeled)) this.wheeled = 0;
+    this.wheeled += deltaY;
+    if (Math.abs(this.wheeled) < WHEEL_STEP) return;
+    this.wheeled = 0;
+
+    // With everything hidden, neither direction is legible — so both ask for
+    // the words back, which is the answer a click gives for the same reason.
+    if (this.uiHidden) {
+      this.toggleChrome();
+      return;
+    }
+
+    if (deltaY > 0) this.onAdvanceInput();
+    else this.goBack();
+  }
 
   private onAdvanceInput(): void {
     // With everything hidden there is nothing to read, so a click asks for the
@@ -260,9 +309,10 @@ export class VNScene extends Phaser.Scene {
   }
 
   private async presentLine(line: StoryLine): Promise<void> {
+    this.state.enterKnot(line.knot);
     let minigame: string | null = null;
     for (const cmd of line.tags) {
-      this.state.trackTag(cmd);
+      this.state.trackTag(cmd, line.knot);
       switch (cmd.kind) {
         case "bg":
           if (cmd.name === null) this.media.clearBackground();
@@ -271,7 +321,8 @@ export class VNScene extends Phaser.Scene {
               cmd.name,
               cmd.variant,
               cmd.once ?? false,
-              cmd.flipped ?? false
+              cmd.flipped ?? false,
+              cmd.loop ?? null
             );
           break;
         case "show":
@@ -286,7 +337,7 @@ export class VNScene extends Phaser.Scene {
           break;
         case "anim":
           if (cmd.name === null) this.media.clearAnims();
-          else await this.media.showAnim(cmd.name, cmd.variant, cmd.flipped);
+          else await this.media.showAnim(cmd.name, cmd.variant, cmd.flipped, cmd.loop ?? null);
           break;
         case "hide":
           this.media.hideSprite(cmd.name);
@@ -314,6 +365,7 @@ export class VNScene extends Phaser.Scene {
           minigame ??= cmd.name;
           break;
         case "speaker":
+        case "display":
         case "map":
         case "active":
           break; // tracked into sceneMeta above
@@ -321,6 +373,7 @@ export class VNScene extends Phaser.Scene {
           assertNever(cmd);
       }
     }
+    this.refreshVariableDisplay();
     // The map button reflects mapEnabled, which the tags above may have changed.
     this.refreshMapButton();
     // So does who the frame leans on — and unlike the commands above it cannot
@@ -434,6 +487,17 @@ export class VNScene extends Phaser.Scene {
     this.mapButton?.setVisible(shown);
     this.characterButton?.setVisible(shown);
     this.menuButton?.setVisible(shown);
+    this.variableDisplay.setChromeVisible(shown);
+  }
+
+  /** Draw the currently requested live value, or remove it at a knot boundary. */
+  private refreshVariableDisplay(): void {
+    const display = this.state.sceneMeta.display ?? null;
+    if (!display) {
+      this.variableDisplay.hide();
+      return;
+    }
+    this.variableDisplay.show(display.label, this.state.engine.getVariable(display.variable));
   }
 
   // --- quick menu ---

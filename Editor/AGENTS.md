@@ -73,6 +73,42 @@ sides depend on, so a type that main needs and the renderer displays is
 *declared in shared* and imported by main — not the other way around. This has
 been violated once and caught in review.
 
+## Editor mode
+
+InkCrafter has an assistant inside it that builds stories in the author's
+workspace. **Editor mode is that same job done from outside** — by a tool with a
+filesystem where the assistant has an IPC bridge. Its instructions are the ones
+to follow here too, and they are files rather than lore:
+
+| | |
+| --- | --- |
+| [prompts/assistant.md](src/main/ai/prompts/assistant.md) | working in a workspace: which tool owns what, every file format with a worked example, the ink rules |
+| [prompts/prose.md](src/main/ai/prompts/prose.md) | drafting prose for one section |
+| [prompts/ink.md](src/main/ai/prompts/ink.md) | writing ink |
+
+These are the shipped defaults themselves, not a description of them. Each is
+inlined into the main bundle at build time with `?raw`, so the markdown *is* the
+prompt — edit it and the model is sent something different. Read
+`assistant.md` before working on a project's contents; it is the same briefing
+the in-app assistant gets.
+
+Where editor mode differs from the assistant, and what to do instead:
+
+- **No tools.** It calls `write_plan`, `write_variables`, `write_cast`,
+  `write_media`, `write_map`; you edit `plan.json`, `stats.json`, `npcs.json`,
+  `media.json`, `map.json` by hand. Every rule those tools enforce still holds —
+  they are written out in `assistant.md` — and nothing is enforcing them for you.
+- **`ink/state.ink` is generated**, from `stats.json` and `npcs.json`. The tools
+  regenerate it; editing it by hand is lost at the next save. After changing
+  either catalogue, regenerate with `renderStateInk` from
+  [statsInk.ts](src/shared/statsInk.ts) rather than editing the declarations.
+- **Ids are minted, never invented** — `newId` in [ids.ts](src/shared/ids.ts).
+  The tools mint their own; you have to remember to.
+- **Nothing checks your work as you go.** The assistant's tools validate on the
+  way in — that a media file is really in `media/`, that a map target is really
+  a knot. Run the project check instead: it is the same `preflight` the export
+  runs, and it is in the editor's Debug tab.
+
 ## Words in the UI
 
 Short. A control is a control, not a sentence explaining itself. The rule is

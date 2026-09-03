@@ -24,9 +24,11 @@ describe('the right-hand dock', () => {
     }
   })
 
-  it('leads with the assistant, wherever you are', () => {
+  // Reachable everywhere is the invariant; leading is not. The editor puts the
+  // preview first because the line being written is what belongs beside it.
+  it('leads with the assistant everywhere but the editor', () => {
     for (const view of VIEWS) {
-      expect(RIGHT_TABS[view][0], view).toBe('assistant')
+      expect(RIGHT_TABS[view][0], view).toBe(view === 'editor' ? 'preview' : 'assistant')
     }
   })
 

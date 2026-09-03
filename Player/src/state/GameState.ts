@@ -2,7 +2,13 @@ import { StoryEngine } from "@/narrative/StoryEngine";
 import { StatsManager, statDefsFrom } from "@/state/StatsManager";
 import { NpcManager } from "@/state/NpcManager";
 import type { LoadedBundle } from "@/bundle/loadBundle";
-import { slotFor, type ActiveRule, type StageSlot, type TagCommand } from "@/narrative/tags";
+import {
+  slotFor,
+  type ActiveRule,
+  type StageSlot,
+  type TagCommand,
+  type VideoLoopRange,
+} from "@/narrative/tags";
 import { findMap, mapForKnot, type MapArea } from "@/bundle/spec/bundle/mapDoc";
 import { spriteForSpeaker } from "@/state/npcs";
 import { assertNever } from "@/util/exhaustive";
@@ -52,6 +58,8 @@ export interface BackgroundRef extends MediaRef {
    * is one: nothing restates it until another background tag arrives.
    */
   flipped?: boolean;
+  /** Intro plays once, then this interval repeats. Absent means a full loop. */
+  loop?: VideoLoopRange;
 }
 
 /** A character on stage: which asset, which look, and where they are standing. */
@@ -88,6 +96,15 @@ export type Emphasis =
 /** An effect over the scene: which asset, which look, and whether mirrored. */
 export interface AnimRef extends MediaRef {
   flipped: boolean;
+  /** Intro plays once, then this interval repeats. Absent means a full loop. */
+  loop?: VideoLoopRange;
+}
+
+/** One live Ink value requested by `# display:` for a single top-level knot. */
+export interface VariableDisplayRef {
+  variable: string;
+  label: string;
+  knot: string | null;
 }
 
 export interface SceneMeta {
@@ -127,6 +144,8 @@ export interface SceneMeta {
   mapArea: string | null;
   /** Whether the map button is usable here (toggled by `# map:` tags). */
   mapEnabled: boolean;
+  /** The optional top-left readout, automatically dropped at the next knot. */
+  display: VariableDisplayRef | null;
   /**
    * Who the frame leans on, as the last `# active:` tag left it.
    *
@@ -147,6 +166,7 @@ function emptyMeta(): SceneMeta {
     lastText: "",
     mapArea: null,
     mapEnabled: true,
+    display: null,
     activeRule: { rule: "speaker" },
   };
 }
@@ -170,7 +190,7 @@ export class GameState {
     // here any more: the NPC `VAR`s live in the authored ink, so the editor is
     // the only thing that writes declarations, and the two can never both
     // declare the same name and fail the compile.
-    this.engine = StoryEngine.fromJson(bundle.storyJson);
+    this.engine = StoryEngine.fromJson(bundle.storyJson, bundle.manifest.knots);
     this.stats = new StatsManager(this.engine, statDefsFrom(bundle.catalogue));
     this.npcs = new NpcManager(this.engine, bundle.npcs.npcs);
     this.achievements = new AchievementManager(
@@ -214,7 +234,7 @@ export class GameState {
    * this so the saved frame stays in sync with what is on screen. Returns
    * nothing; media side effects are handled separately by the scene.
    */
-  trackTag(cmd: TagCommand): void {
+  trackTag(cmd: TagCommand, knot: string | null): void {
     switch (cmd.kind) {
       case "bg":
         // `# bg: none` clears it. An empty tag set means "unchanged", so
@@ -227,6 +247,7 @@ export class GameState {
                 variant: cmd.variant,
                 once: cmd.once ?? false,
                 flipped: cmd.flipped ?? false,
+                ...(cmd.loop ? { loop: cmd.loop } : {}),
               };
         if (cmd.name !== null) GalleryUnlocks.activate("background", cmd.name, cmd.variant);
         break;
@@ -259,7 +280,12 @@ export class GameState {
         }
         GalleryUnlocks.activate("animation", cmd.name, cmd.variant);
         const at = this.sceneMeta.anims.findIndex((a) => a.name === cmd.name);
-        const ref: AnimRef = { name: cmd.name, variant: cmd.variant, flipped: cmd.flipped };
+        const ref: AnimRef = {
+          name: cmd.name,
+          variant: cmd.variant,
+          flipped: cmd.flipped,
+          ...(cmd.loop ? { loop: cmd.loop } : {}),
+        };
         if (at === -1) this.sceneMeta.anims.push(ref);
         else this.sceneMeta.anims[at] = ref;
         break;
@@ -273,6 +299,9 @@ export class GameState {
         break;
       case "speaker":
         this.sceneMeta.speaker = cmd.name;
+        break;
+      case "display":
+        this.sceneMeta.display = { variable: cmd.variable, label: cmd.label, knot };
         break;
       case "map":
         this.sceneMeta.mapEnabled = cmd.enabled;
@@ -289,6 +318,12 @@ export class GameState {
       default:
         assertNever(cmd);
     }
+  }
+
+  /** Remove a readout inherited from a different knot before presenting a line. */
+  enterKnot(knot: string | null): void {
+    const display = this.sceneMeta.display;
+    if (display && display.knot !== knot) this.sceneMeta.display = null;
   }
 
   /**

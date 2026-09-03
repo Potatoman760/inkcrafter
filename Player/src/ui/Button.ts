@@ -2,6 +2,9 @@ import Phaser from "phaser";
 import { PlayerSettings } from "@/settings/PlayerSettings";
 import { registerFocusable } from "@/input/FocusNavigation";
 
+/** The height every menu button is drawn at unless a caller says otherwise. */
+export const BUTTON_HEIGHT = 60;
+
 export interface ButtonOptions {
   width?: number;
   height?: number;
@@ -26,7 +29,7 @@ export function makeButton(
   opts: ButtonOptions = {},
 ): Phaser.GameObjects.Container {
   const width = opts.width ?? 320;
-  const height = opts.height ?? 60;
+  const height = opts.height ?? BUTTON_HEIGHT;
   const enabled = opts.enabled ?? true;
   const contrast = PlayerSettings.values.highContrast;
   const baseFill = opts.selected ? 0x425b91 : contrast ? 0x090d18 : 0x1b2238;

@@ -42,6 +42,7 @@ function manager(section: ManagerSection = "media") {
         onChange: vi.fn(),
         onRescan: vi.fn(),
         onReveal: vi.fn(),
+        onOpenUse: vi.fn(),
       }}
       stats={{
         doc: addStat(emptyStats(), newStat("Courage")),

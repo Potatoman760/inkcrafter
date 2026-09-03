@@ -2,7 +2,12 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { newQuickhandsMinigame, type MinigameDocument } from '@shared/bundle/minigameDoc'
+import {
+  newCombatMinigame,
+  newPowerStrikeMinigame,
+  newQuickhandsMinigame,
+  type MinigameDocument
+} from '@shared/bundle/minigameDoc'
 import { addAsset, addVariant, emptyMedia, newAsset, newVariant } from '@shared/mediaDoc'
 import { emptyStats, newVariable } from '@shared/statsDoc'
 import { MinigamePanel } from './MinigamePanel'
@@ -42,6 +47,19 @@ function panel(doc: MinigameDocument, media = emptyMedia()) {
 }
 
 describe('MinigamePanel quick-hands authoring', () => {
+  it('removes a legacy character opponent from the media catalogue with its combat minigame', async () => {
+    const combat = newCombatMinigame('Old combat')
+    const opponent = newAsset('Old opponent', 'character')
+    combat.opponentAssetId = opponent.id
+    const media = addAsset(emptyMedia(), opponent)
+    const onChange = panel({ version: 1, minigames: [combat] }, media)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove this minigame' }))
+
+    expect(onChange).toHaveBeenCalledWith({ version: 1, minigames: [] })
+    expect(onMediaChangeSpy).toHaveBeenCalledWith({ version: 1, assets: [] })
+  })
+
   it('creates a quick-hands encounter without manufacturing media assets', async () => {
     const onChange = panel({ version: 1, minigames: [] })
 
@@ -75,6 +93,7 @@ describe('MinigamePanel quick-hands authoring', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add' }))
     expect(screen.getByRole('menuitem', { name: 'Quick-hands' })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'The Carry' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Power Strike' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('menuitem', { name: 'Combat' }))
 
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
@@ -182,5 +201,31 @@ describe('MinigamePanel quick-hands authoring', () => {
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
       minigames: [expect.objectContaining({ targetArt: [{ assetId: asset.id, variantId: silver.id }] })]
     }))
+  })
+
+  it('creates and tunes a power-strike encounter', async () => {
+    const onChange = panel({ version: 1, minigames: [] })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Power Strike' }))
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      minigames: [expect.objectContaining({
+        kind: 'powerstrike',
+        targetDurability: { base: 100, modifiers: [] },
+        strikeLimit: { base: 7, modifiers: [] }
+      })]
+    }))
+  })
+
+  it('offers ordered target art and power tuning', () => {
+    const strike = newPowerStrikeMinigame('Honeyed Bee woodpile')
+    strike.resultVariable = 'quickhands_result'
+    panel({ version: 1, minigames: [strike] })
+
+    expect(screen.getByRole('combobox', { name: 'Target stage 1' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Tool' })).toBeInTheDocument()
+    expect(screen.getByRole('spinbutton', { name: 'Ideal power base' })).toHaveValue(78)
+    expect(screen.getByRole('button', { name: 'Add artwork for this power strike' })).toBeInTheDocument()
   })
 })
