@@ -48,7 +48,8 @@ const FILES = [
   'bundle/galleryDoc.ts',
   'bundle/gameDoc.ts',
   'bundle/achievementDoc.ts',
-  'bundle/minigameDoc.ts'
+  'bundle/minigameDoc.ts',
+  'bundle/estate.ts'
 ]
 
 const BANNER = `// Vendored from InkCrafter/src/shared — do not edit.

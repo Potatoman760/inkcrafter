@@ -36,18 +36,32 @@
 .ic-toolbar__group { display: flex; align-items: center; gap: var(--space-1); }
 .ic-toolbar__rule { width: 1px; height: 16px; background: var(--border-default); }
 
-/* Tabs. Underline for the primary view switch, pill-less text for panes. */
-.ic-tabs { display: flex; align-items: stretch; gap: var(--space-1); }
+/* Tabs, drawn as tabs.
+   A row of tabs standing on the rule that tops the panel they switch. The open
+   one is joined to that panel: its bottom edge is cut through the rule, and the
+   signal runs along its top. The others stand recessed behind it. The rule is
+   an inset shadow rather than a border so a tab can cover it, which a border
+   would not allow in a strip that scrolls. One shape at every level, so a
+   strip is never mistaken for a row of links. */
+.ic-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-1);
+  padding: 0 var(--space-3);
+  box-shadow: inset 0 calc(-1 * var(--border-width)) 0 var(--border-default);
+}
 
 .ic-tab {
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
-  height: var(--tabstrip-height);
+  height: calc(var(--tabstrip-height) - var(--space-1));
   padding: 0 var(--space-5);
-  border: 0;
-  background: transparent;
+  border: var(--border-width) solid var(--border-hairline);
+  border-bottom-color: var(--border-default);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--surface-inset);
   color: var(--text-tertiary);
   font: var(--weight-medium) var(--text-sm) / 1 var(--font-ui);
   white-space: nowrap;
@@ -55,24 +69,33 @@
   transition: var(--transition-hover);
 }
 
-.ic-tab:hover { color: var(--text-primary); }
-.ic-tab.is-active { color: var(--text-primary); }
+.ic-tab:hover { color: var(--text-primary); background: var(--surface-hover); }
 
-.ic-tab.is-active::after {
+.ic-tab:focus-visible {
+  outline: var(--focus-width) solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.ic-tab.is-active {
+  z-index: 1;
+  color: var(--text-primary);
+  background: var(--surface-raised);
+  border-color: var(--border-default);
+  /* Transparent shows the tab's own background through the rule: open below. */
+  border-bottom-color: transparent;
+}
+
+.ic-tab.is-active::before {
   content: "";
   position: absolute;
-  left: var(--space-4);
-  right: var(--space-4);
-  bottom: 0;
+  inset: calc(-1 * var(--border-width)) calc(-1 * var(--border-width)) auto;
   height: 2px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
   background: var(--accent-signal);
 }
 
 .ic-tabs--pane {
   height: var(--tabstrip-height);
-  padding: 0 var(--space-3);
-  border-bottom: var(--border-width) solid var(--border-hairline);
   background: var(--surface-pane);
   /* A narrow pane scrolls its strip rather than clipping the actions at
      the right end. */
@@ -90,8 +113,8 @@
   text-transform: uppercase;
 }
 
-.ic-tabs--sub .ic-tab { height: var(--control-md); font-size: var(--text-xs); text-transform: none; letter-spacing: 0; }
-.ic-tabs__trail { margin-left: auto; display: flex; align-items: center; gap: var(--space-1); padding-right: var(--space-2); }
+.ic-tabs--sub .ic-tab { height: calc(var(--control-md) - var(--space-1)); font-size: var(--text-xs); text-transform: none; letter-spacing: 0; }
+.ic-tabs__trail { margin-left: auto; align-self: center; display: flex; align-items: center; gap: var(--space-1); padding-right: var(--space-2); }
 
 /* Pane header: the pane's name on the left, its own actions on the right.
    Nothing global is allowed in here. */

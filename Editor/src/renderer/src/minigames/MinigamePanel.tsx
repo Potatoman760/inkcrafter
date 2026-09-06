@@ -5,14 +5,16 @@ import {
   newCombatMinigame,
   newPowerStrikeMinigame,
   newQuickhandsMinigame,
+  newEstateMinigame,
+  type EstateMinigame,
   type CarryMinigame,
   type CombatMinigame,
   type MinigameDefinition,
   type MinigameDocument,
   type PowerStrikeMinigame,
-  type QuickhandsMinigame,
-  type TunableNumber
+  type QuickhandsMinigame
 } from '@shared/bundle/minigameDoc'
+import type { GalleryMediaRef } from '@shared/bundle/galleryDoc'
 import {
   addAsset,
   isVideoFile,
@@ -21,6 +23,7 @@ import {
   removeAsset,
   type MediaDocument
 } from '@shared/mediaDoc'
+import { npcVar, type NpcDocument } from '@shared/bundle/npcDoc'
 import type { Project } from '@shared/project'
 import type { MediaFile } from '@shared/types'
 import {
@@ -39,10 +42,15 @@ import {
   Textarea
 } from '../design/components'
 import { LooksField } from '../media/LooksField'
+import { ArtField, refKey, type ArtHome, type ArtOption } from './ArtField'
+import { EstateFields } from './EstateFields'
+import { TuningField } from './TuningField'
 
 interface MinigamePanelProps {
   doc: MinigameDocument
   stats: import('@shared/statsDoc').StatsDocument
+  /** For the true/false variables an NPC declares, which a villa gate can name. */
+  npcs: NpcDocument
   media: MediaDocument
   files: MediaFile[]
   project: Project | null
@@ -88,7 +96,8 @@ const KIND_LABELS: Record<MinigameDefinition['kind'], string> = {
   combat: 'Combat',
   quickhands: 'Quick-hands',
   carry: 'The Carry',
-  powerstrike: 'Power Strike'
+  powerstrike: 'Power Strike',
+  estate: 'Villa'
 }
 
 const CARRY_TUNINGS: Array<{ key: keyof Pick<CarryMinigame,
@@ -120,17 +129,25 @@ const POWERSTRIKE_TUNINGS: Array<{ key: keyof Pick<PowerStrikeMinigame,
   { key: 'recoveryMs', label: 'Recovery', unit: 'ms' }
 ]
 
-interface ArtworkOption {
-  ref: { assetId: string; variantId: string }
-  label: string
-  file: string
+/** Every still look of one kind, with its picture found, ready to be chosen from. */
+function stills(
+  media: MediaDocument,
+  byPath: Map<string, MediaFile>,
+  kind: 'background' | 'animation' | 'character'
+): ArtOption[] {
+  return media.assets
+    .filter((asset) => asset.kind === kind)
+    .flatMap((asset) => asset.variants
+      .filter((variant) => !isVideoFile(variant.file))
+      .map((variant) => ({
+        ref: { assetId: asset.id, variantId: variant.id },
+        label: `${asset.display || asset.name} — ${variant.name}`,
+        url: byPath.get(variant.file)?.url ?? null
+      })))
 }
 
-const refKey = (ref: { assetId: string; variantId: string }): string =>
-  `${ref.assetId}:${ref.variantId}`
-
 export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
-  const { doc, stats, media, files, project, saving, error, onChange, onMediaChange,
+  const { doc, stats, npcs, media, files, project, saving, error, onChange, onMediaChange,
     onMediaRescan, onTest } = props
   const [selectedId, setSelectedId] = useState<string | null>(doc.minigames[0]?.id ?? null)
   const [testing, setTesting] = useState(false)
@@ -139,6 +156,13 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
   const selected = doc.minigames.find((game) => game.id === selectedId) ?? null
   const numeric = [...stats.stats, ...stats.variables].filter((one) => one.kind === 'number')
   const textual = [...stats.stats, ...stats.variables].filter((one) => one.kind === 'text')
+  /** Every declared true/false, an NPC's included: what a gate or an invitation names. */
+  const flags = [
+    ...[...stats.stats, ...stats.variables].filter((one) => one.kind === 'boolean').map((one) => one.name),
+    ...npcs.npcs.flatMap((npc) =>
+      npc.variables.filter((one) => one.kind === 'boolean').map((one) => npcVar(npc.inkId, one.key)))
+  ]
+  const portraits = media.assets.filter((asset) => asset.kind === 'character').map((asset) => asset.name)
   const opponent = selected?.kind === 'combat'
     // Early combat minigames created their private opponent as a `character`.
     // Accept the stable id regardless of that legacy kind so the art remains
@@ -146,30 +170,9 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
     ? media.assets.find((asset) => asset.id === selected.opponentAssetId) ?? null
     : null
   const byPath = useMemo(() => new Map(files.map((file) => [file.path, file])), [files])
-  const backgrounds = useMemo(
-    () => media.assets
-      .filter((asset) => asset.kind === 'background')
-      .flatMap((asset) => asset.variants
-        .filter((variant) => !isVideoFile(variant.file))
-        .map((variant) => ({
-          ref: { assetId: asset.id, variantId: variant.id },
-          label: `${asset.display || asset.name} — ${variant.name}`,
-          file: variant.file
-        }))),
-    [media]
-  )
-  const artwork = useMemo<ArtworkOption[]>(
-    () => media.assets
-      .filter((asset) => asset.kind === 'animation')
-      .flatMap((asset) => asset.variants
-        .filter((variant) => !isVideoFile(variant.file))
-        .map((variant) => ({
-          ref: { assetId: asset.id, variantId: variant.id },
-          label: `${asset.display || asset.name} — ${variant.name}`,
-          file: variant.file
-        }))),
-    [media]
-  )
+  const backgrounds = useMemo(() => stills(media, byPath, 'background'), [media, byPath])
+  const artwork = useMemo(() => stills(media, byPath, 'animation'), [media, byPath])
+  const characterArt = useMemo(() => stills(media, byPath, 'character'), [media, byPath])
   /**
    * The animation asset this cabinet keeps its own pictures in, if it has one.
    *
@@ -182,10 +185,22 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
         (one) => one.kind === 'animation' && one.name === mediaName(selected.name)
       ) ?? null
     : null
-  const selectedBackground = selected?.background
-    ? backgrounds.find((one) => refKey(one.ref) === refKey(selected.background!)) ?? null
-    : null
-  const backgroundUrl = selectedBackground ? byPath.get(selectedBackground.file)?.url ?? null : null
+  /**
+   * Where a picture uploaded from one of a minigame's slots is filed: a
+   * background asset named after the minigame, made on first use. Backgrounds,
+   * because every slot besides a sprite is one — the scene, and for the villa
+   * its plans, interiors and notice board. Sprites keep the animation asset
+   * `minigameArt` above.
+   */
+  const homeOf = (game: MinigameDefinition): ArtHome => ({
+    project,
+    media,
+    kind: 'background',
+    asset: game.name,
+    display: game.display,
+    onMediaChange,
+    onImported: onMediaRescan
+  })
 
   useEffect(() => {
     if (selectedId !== null && doc.minigames.some((game) => game.id === selectedId)) return
@@ -194,7 +209,7 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
 
   const patch = (
     changes: Partial<CombatMinigame> | Partial<QuickhandsMinigame> |
-      Partial<CarryMinigame> | Partial<PowerStrikeMinigame>
+      Partial<CarryMinigame> | Partial<PowerStrikeMinigame> | Partial<EstateMinigame>
   ): void => {
     if (!selected) return
     onChange({
@@ -319,6 +334,12 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
                       >
                         Power Strike
                       </MenuItem>
+                      <MenuItem onClick={() => {
+                        const game = newEstateMinigame(`New villa ${doc.minigames.length + 1}`)
+                        onChange({ ...doc, minigames: [...doc.minigames, game] })
+                        setSelectedId(game.id)
+                        setAdding(false)
+                      }}>Villa</MenuItem>
                     </Menu>
                   </div>
                 )}
@@ -388,7 +409,7 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
                   </Select>
                 </Field>
               )}
-              <Field label="Result" note="Set to victory or defeat before the story continues.">
+              <Field label="Result" note={selected.kind === 'estate' ? 'Returns a scene token or return to Ink.' : 'Set to victory or defeat before the story continues.'}>
                 <Select value={selected.resultVariable} onChange={(event) => patch({ resultVariable: event.target.value })}>
                   <option value="">Choose a text variable…</option>
                   {textual.map((variable) => <option key={variable.id} value={variable.name}>{variable.name}</option>)}
@@ -396,36 +417,31 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
               </Field>
             </div>
 
-            <Field as="div" label="Tutorial prompts" note="Enable transient instructions and action feedback during the encounter.">
+            {selected.kind !== 'estate' && <Field as="div" label="Tutorial prompts" note="Enable transient instructions and action feedback during the encounter.">
               <Checkbox
                 label={`Show helper text during ${KIND_LABELS[selected.kind].toLowerCase()}`}
                 checked={selected.showStateHints}
                 onChange={(event) => patch({ showStateHints: event.target.checked })}
               />
-            </Field>
+            </Field>}
 
-            <section className="minigame-section">
-              <h3>Scene background</h3>
-              <Field label="Background image" note="Choose one background look to fill the minigame scene.">
-                <Select
-                  value={selected.background ? refKey(selected.background) : ''}
-                  onChange={(event) => {
-                    const look = backgrounds.find((one) => refKey(one.ref) === event.target.value)
-                    patch({ background: look?.ref ?? null })
-                  }}
-                >
-                  <option value="">No background</option>
-                  {backgrounds.map((look) => (
-                    <option key={refKey(look.ref)} value={refKey(look.ref)}>{look.label}</option>
-                  ))}
-                </Select>
-              </Field>
-              {backgroundUrl ? (
-                <img className="minigame-background-preview" src={backgroundUrl} alt="" />
-              ) : backgrounds.length === 0 ? (
-                <Hint>Add an image under Media → Backgrounds first.</Hint>
-              ) : null}
-            </section>
+            {/* The villa's background is its floor plan, chosen beside the plan
+                rather than here. */}
+            {selected.kind !== 'estate' && (
+              <section className="minigame-section">
+                <h3>Scene background</h3>
+                <ArtField
+                  label="Background image"
+                  value={selected.background}
+                  options={backgrounds}
+                  shape="wide"
+                  emptyLabel="No background"
+                  home={homeOf(selected)}
+                  look="background"
+                  onChange={(background) => patch({ background })}
+                />
+              </section>
+            )}
 
             {selected.kind === 'combat' ? (
               <>
@@ -471,21 +487,18 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
                       label="Valuable tokens"
                       value={selected.targetArt}
                       options={artwork}
-                      byPath={byPath}
                       onChange={(targetArt) => patch({ targetArt })}
                     />
                     <ArtworkListField
                       label="Hazards"
                       value={selected.hazardArt}
                       options={artwork}
-                      byPath={byPath}
                       onChange={(hazardArt) => patch({ hazardArt })}
                     />
                     <ArtworkField
                       label="Catcher"
                       value={selected.catcherArt}
                       options={artwork}
-                      byPath={byPath}
                       onChange={(catcherArt) => patch({ catcherArt })}
                     />
                   </div>
@@ -543,7 +556,6 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
                       label="Load"
                       value={selected.loadArt}
                       options={artwork}
-                      byPath={byPath}
                       onChange={(loadArt) => patch({ loadArt })}
                     />
                   </div>
@@ -565,6 +577,19 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
                   </div>
                 </section>
               </>
+            ) : selected.kind === 'estate' ? (
+              <EstateFields
+                key={selected.id}
+                game={selected}
+                options={backgrounds}
+                home={homeOf(selected)}
+                characterArt={characterArt}
+                textVariables={textual.map((one) => one.name)}
+                stats={numeric.map((one) => one.name)}
+                flags={flags}
+                portraits={portraits}
+                onChange={patch}
+              />
             ) : (
               <>
                 <section className="minigame-section">
@@ -575,14 +600,12 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
                       label="Target stage"
                       value={selected.targetArt}
                       options={artwork}
-                      byPath={byPath}
                       onChange={(targetArt) => patch({ targetArt })}
                     />
                     <ArtworkField
                       label="Tool"
                       value={selected.toolArt}
                       options={artwork}
-                      byPath={byPath}
                       onChange={(toolArt) => patch({ toolArt })}
                     />
                   </div>
@@ -649,14 +672,13 @@ export function MinigamePanel(props: MinigamePanelProps): React.JSX.Element {
  * an empty label, and a select with no accessible name is one a screen reader
  * cannot announce and a test cannot find.
  */
-function ArtworkListField({ label, value, options, byPath, onChange }: {
+function ArtworkListField({ label, value, options, onChange }: {
   label: string
-  value: { assetId: string; variantId: string }[]
-  options: ArtworkOption[]
-  byPath: Map<string, MediaFile>
-  onChange: (next: { assetId: string; variantId: string }[]) => void
+  value: GalleryMediaRef[]
+  options: ArtOption[]
+  onChange: (next: GalleryMediaRef[]) => void
 }): React.JSX.Element {
-  const rows: ({ assetId: string; variantId: string } | null)[] = [...value, null]
+  const rows: (GalleryMediaRef | null)[] = [...value, null]
 
   return (
     <div className="quickhands-art-list">
@@ -666,7 +688,6 @@ function ArtworkListField({ label, value, options, byPath, onChange }: {
           label={`${label} ${index + 1}`}
           value={ref}
           options={options}
-          byPath={byPath}
           onChange={(next) => {
             const kept = value.filter((_, at) => at !== index)
             onChange(next ? [...value.slice(0, index), next, ...value.slice(index + 1)] : kept)
@@ -677,91 +698,21 @@ function ArtworkListField({ label, value, options, byPath, onChange }: {
   )
 }
 
-function ArtworkField({ label, value, options, byPath, onChange }: {
+/** A sprite slot: the shared picker, whose empty choice is the built-in shape. */
+function ArtworkField({ label, value, options, onChange }: {
   label: string
-  value: { assetId: string; variantId: string } | null
-  options: ArtworkOption[]
-  byPath: Map<string, MediaFile>
-  onChange: (next: { assetId: string; variantId: string } | null) => void
-}): React.JSX.Element {
-  const selected = value
-    ? options.find((option) => refKey(option.ref) === refKey(value)) ?? null
-    : null
-  const url = selected ? byPath.get(selected.file)?.url ?? null : null
-
-  return (
-    <Field label={label}>
-      <Select
-        value={value ? refKey(value) : ''}
-        onChange={(event) => {
-          const option = options.find((one) => refKey(one.ref) === event.target.value)
-          onChange(option?.ref ?? null)
-        }}
-      >
-        <option value="">Built-in shape</option>
-        {options.map((option) => (
-          <option key={refKey(option.ref)} value={refKey(option.ref)}>{option.label}</option>
-        ))}
-      </Select>
-      {url && <img className="quickhands-art-preview" src={url} alt="" />}
-    </Field>
-  )
-}
-
-function TuningField({ label, unit, value, stats, onChange }: {
-  label: string
-  unit: string
-  value: TunableNumber
-  stats: string[]
-  onChange: (next: TunableNumber) => void
+  value: GalleryMediaRef | null
+  options: ArtOption[]
+  onChange: (next: GalleryMediaRef | null) => void
 }): React.JSX.Element {
   return (
-    <Field as="div" label={label} note={`Resolved as base + stat × per point (${unit}).`}>
-      <div className="minigame-tuning-base">
-        <Input
-          type="number"
-          aria-label={`${label} base`}
-          value={value.base}
-          onChange={(event) => onChange({ ...value, base: Number(event.target.value) || 0 })}
-        />
-        <span>{unit}</span>
-      </div>
-      {value.modifiers.map((modifier, index) => (
-        <div className="minigame-modifier" key={`${index}:${modifier.stat}`}>
-          <Select
-            aria-label={`${label} modifier stat`}
-            value={modifier.stat}
-            onChange={(event) => onChange({
-              ...value,
-              modifiers: value.modifiers.map((one, at) => at === index ? { ...one, stat: event.target.value } : one)
-            })}
-          >
-            <option value="">Choose stat…</option>
-            {stats.map((stat) => <option key={stat} value={stat}>{stat}</option>)}
-          </Select>
-          <span>×</span>
-          <Input
-            type="number"
-            aria-label={`${label} per point`}
-            value={modifier.perPoint}
-            onChange={(event) => onChange({
-              ...value,
-              modifiers: value.modifiers.map((one, at) => at === index ? { ...one, perPoint: Number(event.target.value) || 0 } : one)
-            })}
-          />
-          <Button
-            size="sm"
-            variant="quiet"
-            onClick={() => onChange({ ...value, modifiers: value.modifiers.filter((_one, at) => at !== index) })}
-          >Remove</Button>
-        </div>
-      ))}
-      <Button
-        size="sm"
-        variant="quiet"
-        disabled={stats.length === 0}
-        onClick={() => onChange({ ...value, modifiers: [...value.modifiers, { stat: stats[0] ?? '', perPoint: 1 }] })}
-      >Add stat modifier</Button>
-    </Field>
+    <ArtField
+      label={label}
+      value={value}
+      options={options}
+      shape="sprite"
+      emptyLabel="Built-in shape"
+      onChange={onChange}
+    />
   )
 }

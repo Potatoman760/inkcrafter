@@ -10,7 +10,7 @@ import {
   type MapLocation
 } from './mapDoc'
 import type { GalleryDocument } from './galleryDoc'
-import { COMBATANT_STATES, newCombatMinigame, newQuickhandsMinigame } from './minigameDoc'
+import { COMBATANT_STATES, newCombatMinigame, newEstateMinigame, newQuickhandsMinigame } from './minigameDoc'
 import { preflight, type PreflightInput } from './preflight'
 
 /**
@@ -63,6 +63,75 @@ function check(ink: string, overrides: Partial<PreflightInput> = {}): string[] {
     ...overrides
   }).map((problem) => problem.message)
 }
+
+describe('villa room ownership checks', () => {
+  it('validates optional bath portraits as still character looks', () => {
+    const villa = newEstateMinigame('Villa'), asset = MEDIA.assets[0]!
+    villa.residents = [{ key: 'guest', name: 'Guest', sprite: '', eligibilityVariable: '', requirement: '', scenes: [],
+      bathSprite: { assetId: asset.id, variantId: asset.variants[0]!.id } }]
+    const run = (media = MEDIA) => check('', { media, minigames: { version: 1, minigames: [villa] } }).filter(message => message.includes('bath sprite'))
+    expect(run()).toEqual([])
+    expect(run(emptyMedia())).toHaveLength(1)
+    expect(run({ ...MEDIA, assets: [{ ...asset, kind: 'background' }] })).toHaveLength(1)
+    expect(run({ ...MEDIA, assets: [{ ...asset, variants: [{ ...asset.variants[0]!, file: 'bath.mp4' }] }] })).toHaveLength(1)
+    villa.residents[0]!.bathSprite = null
+    expect(run(emptyMedia())).toEqual([])
+  })
+  it('checks the tutorial guide look and room references', () => {
+    const villa = newEstateMinigame('Villa')
+    villa.tutorial = { version: 1, autoStart: true, speaker: { name: 'Abeline', sprite: 'abeline' },
+      steps: [{ title: 'Welcome', text: 'Welcome.', page: 'villa', target: 'room', room: 'hall' }] }
+    const run = () => check('', { media: MEDIA, minigames: { version: 1, minigames: [villa] } }).filter(message => message.includes('tutorial'))
+    expect(run()).toEqual([])
+    villa.tutorial.speaker.expression = 'missing'
+    expect(run()).toHaveLength(1)
+    villa.tutorial.steps[0]!.room = 'missing'
+    expect(run()).toHaveLength(2)
+  })
+  it('validates optional room gates as declared booleans', () => {
+    const villa = newEstateMinigame('Villa')
+    const run = () => check('', { minigames: { version: 1, minigames: [villa] } }).filter(message => message.includes('availability variable'))
+    expect(run()).toEqual([])
+    villa.rooms[1]!.availabilityVariable = 'missing'
+    expect(run()).toEqual(["Villa's Rose suite needs a boolean availability variable."])
+    villa.rooms[1]!.availabilityVariable = STATS.stats.find(one => one.kind === 'boolean')!.name
+    expect(run()).toEqual([])
+    villa.rooms[1]!.availabilityVariable = STATS.stats.find(one => one.kind === 'number')!.name
+    expect(run()).toHaveLength(1)
+  })
+  it('checks every interior and the notice board for stale or unsuitable art', () => {
+    const villa = newEstateMinigame('Villa')
+    const background = newAsset('Interiors', 'background')
+    const look = newVariant('Hall', 'backgrounds/hall.png')
+    const video = newVariant('Clip', 'backgrounds/hall.webm')
+    const media = addVariant(addVariant(addAsset(emptyMedia(), background), background.id, look), background.id, video)
+    const ref = { assetId: background.id, variantId: look.id }
+    villa.rooms[0]!.background = ref
+    villa.rooms[0]!.unrestoredBackground = ref
+    villa.noticeboardBackground = ref
+    const run = () => check('', { media, minigames: { version: 1, minigames: [villa] } }).filter(message => message.includes('background'))
+    expect(run()).toEqual([])
+    villa.rooms[0]!.background = { ...ref, variantId: 'missing' }
+    villa.rooms[0]!.unrestoredBackground = { ...ref, variantId: video.id }
+    villa.noticeboardBackground = { ...ref, variantId: video.id }
+    expect(run()).toEqual(expect.arrayContaining([
+      "Villa's Reception background is no longer in the media catalogue.",
+      "Villa's Reception unrestored background must be a still background image.",
+      "Villa's notice board background must be a still background image."
+    ]))
+    villa.rooms[0]!.unrestoredBackground = { ...ref, variantId: 'missing' }
+    expect(run()).toContain("Villa's Reception unrestored background is no longer in the media catalogue.")
+  })
+  it('reports unknown residents, duplicate homes and unusable custom capacity', () => {
+    const villa = newEstateMinigame('Villa')
+    villa.rooms[1] = { ...villa.rooms[1]!, residentKey: 'missing', beds: 0 }
+    villa.rooms[2] = { ...villa.rooms[2]!, residentKey: 'missing' }
+    const problems = check('', { minigames: { version: 1, minigames: [villa] } })
+    expect(problems.some(one => one.includes('unknown resident'))).toBe(true)
+    expect(problems.some(one => one.includes('more than one home'))).toBe(true)
+    expect(problems.some(one => one.includes('one intended resident'))).toBe(true)
+  })
+})
 
 describe('a change that lands after the branch reading it', () => {
   const GATED = `-> start
@@ -466,5 +535,57 @@ describe('the maps', () => {
 
   it('says none of that about a single map, which is always the one showing', () => {
     expect(checkMaps(maps(world({ locations: [HOTSPOT()] })))).toEqual([])
+  })
+})
+
+describe('villa notice checks', () => {
+  it('accepts the built-in board and flags a notice nobody could ever pin', () => {
+    const villa = newEstateMinigame('Villa')
+    const run = () => check('', { minigames: { version: 1, minigames: [villa] } }).filter(message => message.includes('notice'))
+    expect(run()).toEqual([])
+    villa.contracts = [{ name: 'Roof tiles', needs: [0, 5, 0], pay: 20 }, { name: '', needs: [0, 0, 0], pay: 1 }]
+    expect(run()).toEqual([
+      expect.stringContaining('Roof tiles notice needs more of a crew'),
+      expect.stringContaining('a notice with no name'),
+      expect.stringContaining('needs no crew at all')
+    ])
+    villa.contracts = []
+    expect(run()).toEqual([expect.stringContaining('between one and 6 notices')])
+  })
+})
+
+describe('villa calendar checks', () => {
+  it('rejects an earning deadline beyond the calendar', () => {
+    const villa = newEstateMinigame('Villa')
+    villa.calendar = { day: STATS.stats[0]!.name, settled: STATS.variables[0]!.name, lastDay: 9, lastWorkday: 10 }
+    const run = () => check('', { minigames: { version: 1, minigames: [villa] } }).filter(message => message.includes('last workday'))
+    expect(run()).toEqual([expect.stringContaining('last workday must not be after its last day')])
+    villa.calendar.lastWorkday = 8
+    expect(run()).toEqual([])
+  })
+
+  it('requires the calendar variables to exist with the kinds the villa reads', () => {
+    const villa = newEstateMinigame('Villa')
+    const run = () => check('', { minigames: { version: 1, minigames: [villa] } }).filter(message => message.includes('calendar') || message.includes('settled') || message.includes('phase'))
+    villa.calendar = { day: 'nowhere', settled: 'nowhere', when: { variable: 'nowhere', value: 'evening' } }
+    expect(run()).toEqual([
+      expect.stringContaining('calendar day variable'),
+      expect.stringContaining('settled-day variable'),
+      expect.stringContaining('two different variables'),
+      expect.stringContaining('phase variable')
+    ])
+    // The fixture declares two numbers and no text, so the phase stays unset here.
+    villa.calendar = { day: STATS.stats[0]!.name, settled: STATS.variables[0]!.name }
+    expect(run()).toEqual([])
+  })
+
+  it('requires a scene gate to be a declared boolean', () => {
+    const villa = newEstateMinigame('Villa')
+    villa.residents = [{ key: 'tamsin', name: 'Tamsin', eligibilityVariable: STATS.stats.find(one => one.kind === 'boolean')!.name, requirement: '', sprite: '',
+      scenes: [{ room: 'hall', result: 'villa_tamsin_night', title: 'A door left open', gate: 'nowhere' }] }]
+    const run = () => check('', { minigames: { version: 1, minigames: [villa] } }).filter(message => message.includes('waits on'))
+    expect(run()).toEqual([expect.stringContaining('waits on nowhere')])
+    villa.residents[0]!.scenes[0]!.gate = STATS.stats.find(one => one.kind === 'boolean')!.name
+    expect(run()).toEqual([])
   })
 })

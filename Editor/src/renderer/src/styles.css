@@ -241,30 +241,22 @@ body.is-resizing {
   min-height: 0;
 }
 
-/* Which catalogue, as opposed to which view of it. Heavier than the row it
-   sits above so the two read as different questions rather than one long
-   chain of tabs. */
+/* Which catalogue, as opposed to which view of it. Larger and heavier than
+   the row it sits above so the two read as different questions rather than
+   one long chain of tabs; open and closed are told apart the way every tab
+   is, by shape. */
 .manager-tabs {
+  padding-top: var(--space-2);
   background: var(--surface-canvas);
-  border-bottom-width: 2px;
 }
 
-/* Louder than the strip beneath it: this row asks which catalogue and the next
-   asks which view of it, and dimming rather than recolouring keeps the two
-   questions apart without introducing a second accent. */
 .manager-tabs .ic-tab {
   height: var(--control-lg);
   padding: 0 var(--space-7);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
-  color: var(--text-primary);
-  opacity: 0.55;
   text-transform: none;
   letter-spacing: var(--tracking-none);
-}
-
-.manager-tabs .ic-tab.is-active {
-  opacity: 1;
 }
 
 .achievement-layout {
@@ -720,7 +712,6 @@ body.is-resizing {
 /* The entry editor's second-level strip. .ic-tabs--sub is this exact shape. */
 .entry-tabs {
   padding: 0 10px;
-  border-bottom: 1px solid var(--border-default);
 }
 
 .entry-body {
@@ -970,11 +961,16 @@ body.is-resizing {
    than the tab strip's, and its marker meets the border below it. */
 .view-tabs {
   flex: none;
-  align-items: stretch;
+  position: relative;
+  z-index: 1;
+  padding-top: var(--space-2);
+  /* Over the bar's own rule, so the open view's tab is cut through it and
+     joins the view below rather than stopping one line short of it. */
+  margin-bottom: calc(-1 * var(--border-width));
 }
 
 .view-tabs .ic-tab {
-  height: auto;
+  height: var(--control-lg);
   padding: 0 var(--space-6);
   font-size: var(--text-md);
 }
@@ -2231,11 +2227,41 @@ body.is-resizing {
 .minigame-bindings, .minigame-tunings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
 .minigame-section { display: grid; gap: var(--space-2); }
 .minigame-section h3 { margin: 0; font-size: var(--font-size-sm); }
-.minigame-background-preview { width: min(100%, 42rem); aspect-ratio: 16 / 9; object-fit: cover; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-1); }
+.estate-floorplan { display: grid; gap: var(--space-3); container-type: inline-size; }
+.estate-floorplan__toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+.estate-floorplan__toolbar h3 { flex: 1; }
+.estate-floorplan__layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+.estate-floorplan__canvas { min-width: 0; }
+.estate-plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+/* The villa's other lists: a resident's fields two-up, and rows of scenes and
+   notices under one header row rather than a label on every cell. */
+.estate-resident__fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.estate-rows { display: grid; gap: var(--space-2); }
+.estate-row { display: grid; gap: var(--space-2); align-items: center; }
+.estate-row--scene { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, 1fr) auto; }
+.estate-row--notice { grid-template-columns: minmax(0, 2fr) repeat(4, minmax(3.5rem, 1fr)) auto; }
+.estate-row--head { font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.estate-list__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.estate-floorplan__fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+.estate-floorplan__coordinates { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.estate-floorplan__advanced { margin-top: var(--space-3); }
+.estate-floorplan__advanced summary { cursor: pointer; padding: var(--space-2) 0; }
+.estate-floorplan.is-expanded { position: fixed; inset: 48px 24px 24px; z-index: 90; padding: var(--space-5); overflow: auto; align-content: start; background: var(--surface-base, #11191e); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: 0 12px 80px #000a; }
+@container (min-width: 700px) {
+  .estate-floorplan__layout { grid-template-columns: minmax(0, 1fr) 210px; }
+  .estate-floorplan__fields { grid-template-columns: minmax(0, 1fr); }
+}
 .quickhands-art-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
 /* The rows of one set, stacked under a single label. */
 .quickhands-art-list { display: flex; flex-direction: column; gap: var(--space-2); }
-.quickhands-art-preview { width: 100%; height: 8rem; object-fit: contain; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-1); }
+/* One picture slot. The preview is a Thumb at the shape the player draws it:
+   16:9 for a scene, the plan's own shape for a plan, so what is cropped here is
+   what will be cropped there. A sprite is the exception and is drawn whole. */
+.art-field__preview { margin-top: var(--space-2); max-width: 24rem; }
+.art-field__preview--plan { aspect-ratio: var(--art-aspect); }
+.art-field__preview--whole { height: 8rem; aspect-ratio: auto; }
+.art-field__preview--whole img { object-fit: contain; }
+.art-field__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
 .minigame-tuning-base, .minigame-modifier { display: flex; align-items: center; gap: var(--space-2); }
 .minigame-tuning-base .ic-input, .minigame-modifier .ic-input { width: 7rem; }
 .minigame-modifier .ic-select { min-width: 9rem; flex: 1; }
@@ -5275,3 +5301,7 @@ body.is-resizing {
 .media-use__look {
   font-family: var(--font-mono);
 }
+.estate-floorplan .map-hotspot { border-color: #b99b65; background: rgb(190 163 109 / 12%); }
+.estate-floorplan .map-hotspot.is-selected { border-color: #f0ce8d; background: rgb(219 188 131 / 20%); box-shadow: 0 0 0 1px #f0ce8d; }
+.estate-floorplan .map-hotspot:hover { border-color: #f0ce8d; }
+.estate-floorplan .map-handle { background: #ddbc7d; border-color: #f5dfb1; }

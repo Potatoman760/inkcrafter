@@ -36,6 +36,7 @@ export const SceneKey = {
   Quickhands: "Quickhands",
   Carry: "Carry",
   PowerStrike: "PowerStrike",
+  Estate: "Estate",
 } as const;
 export type SceneKey = (typeof SceneKey)[keyof typeof SceneKey];
 
@@ -53,6 +54,7 @@ export const MINIGAME_SCENES: Record<MinigameDefinition["kind"], SceneKey> = {
   quickhands: SceneKey.Quickhands,
   carry: SceneKey.Carry,
   powerstrike: SceneKey.PowerStrike,
+  estate: SceneKey.Estate,
 };
 
 /**

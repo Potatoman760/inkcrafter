@@ -4,11 +4,13 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import {
   newCombatMinigame,
+  newEstateMinigame,
   newPowerStrikeMinigame,
   newQuickhandsMinigame,
   type MinigameDocument
 } from '@shared/bundle/minigameDoc'
 import { addAsset, addVariant, emptyMedia, newAsset, newVariant } from '@shared/mediaDoc'
+import { emptyNpcs } from '@shared/bundle/npcDoc'
 import { emptyStats, newVariable } from '@shared/statsDoc'
 import { MinigamePanel } from './MinigamePanel'
 
@@ -32,6 +34,7 @@ function panel(doc: MinigameDocument, media = emptyMedia()) {
     <MinigamePanel
       doc={doc}
       stats={{ ...emptyStats(), variables: [newVariable('Quickhands result', 'text')] }}
+      npcs={emptyNpcs()}
       media={media}
       files={[]}
       project={{ id: 'p', name: 'Test', path: '/tmp/test' } as never}
@@ -83,6 +86,30 @@ describe('MinigamePanel quick-hands authoring', () => {
     expect(carry).toEqual(expect.objectContaining({ kind: 'carry', staminaMax: { base: 100, modifiers: [] } }))
     // Combat damages a bound variable; a training exercise must not.
     expect(carry).not.toHaveProperty('playerHealthVariable')
+  })
+
+  it('creates a villa with an expandable household and a separate persistent ledger', async () => {
+    const onChange = panel({ version: 1, minigames: [] })
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Villa' }))
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      minigames: [expect.objectContaining({ kind: 'estate', startingFunds: { base: 80, modifiers: [] }, residents: [] })]
+    }))
+  })
+
+  // The ledger's numbers are tunings like every other kind's, so they can
+  // scale with a stat rather than being plain numbers with a floor.
+  it('edits the villa ledger as tunings, on its own tab', async () => {
+    const game = newEstateMinigame('Consort villa')
+    const onChange = panel({ version: 1, minigames: [game] })
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Ledger' }))
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Daily stipend base' }), { target: { value: '23' } })
+
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      minigames: [expect.objectContaining({ dailyStipend: { base: 23, modifiers: [] } })]
+    }))
+    expect(screen.queryByText('Advanced household')).toBeNull()
   })
 
   it('offers every kind under the one Add button, and closes after choosing', async () => {
@@ -177,7 +204,37 @@ describe('MinigamePanel quick-hands authoring', () => {
     panel({ version: 1, minigames: [quickhands] }, addAsset(emptyMedia(), asset))
 
     expect(screen.queryByRole('button', { name: 'Add artwork for this cabinet' })).toBeNull()
-    expect(screen.getByRole('button', { name: /Upload/ })).toBeInTheDocument()
+    // The look list's own upload; every picture slot has one of its own too.
+    expect(screen.getByRole('button', { name: 'Upload…' })).toBeInTheDocument()
+  })
+
+  it('gives the villa its plans, interiors and notice board as picture slots, each with upload', async () => {
+    panel({ version: 1, minigames: [newEstateMinigame('Consort villa')] })
+
+    // The floor plan is the villa's background, so the generic slot would be
+    // the same picture twice.
+    expect(screen.queryByText('Scene background')).toBeNull()
+    const slots = async (...labels: string[]) => {
+      for (const slot of labels) {
+        expect(screen.getByLabelText(slot)).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: `Upload for ${slot}` })).toBeInTheDocument()
+      }
+    }
+    await slots('Floor plan', 'Disabled map', 'Room background', 'Unrestored art')
+    await userEvent.click(screen.getByRole('tab', { name: 'Commissions' }))
+    await slots('Notice board')
+  })
+
+  it('authors an earning deadline without changing the calendar countdown', async () => {
+    const villa = newEstateMinigame('Consort villa')
+    villa.calendar = { day: 'villa_day', settled: 'villa_settled', lastDay: 9, lastWorkday: 8 }
+    const changed = panel({ version: 1, minigames: [villa] })
+    await userEvent.click(screen.getByRole('tab', { name: 'Ledger' }))
+    expect(screen.getByRole('spinbutton', { name: 'Calendar last workday' })).toHaveValue(8)
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Calendar last workday' }), { target: { value: '7' } })
+    expect(changed).toHaveBeenLastCalledWith(expect.objectContaining({ minigames: [expect.objectContaining({
+      calendar: { day: 'villa_day', settled: 'villa_settled', lastDay: 9, lastWorkday: 7 }
+    })] }))
   })
 
   it('drops a look when its row is set back to the built-in shape', async () => {

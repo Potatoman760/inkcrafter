@@ -280,6 +280,7 @@ export function GameManagerView({
           {...minigames}
           project={project}
           stats={stats.doc}
+          npcs={cast.doc}
           media={media.doc}
           files={media.files}
           onMediaChange={media.onChange}
