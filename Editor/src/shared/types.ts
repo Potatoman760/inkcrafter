@@ -25,6 +25,11 @@ import type { PlanDocument } from './planDoc'
 import type { MediaDocument, MediaKind } from './mediaDoc'
 import type { BundleExportResult } from './bundle/result'
 import type { DesktopExportOptions, DesktopExportProgress, DesktopExportResult } from './desktop'
+import type {
+  PackageImportResult,
+  PackagePreview,
+  PackageResult
+} from './projectPackage'
 import type { StatsDocument } from './statsDoc'
 import type { NpcDocument } from './bundle/npcDoc'
 import type { MapDocument } from './bundle/mapDoc'
@@ -517,6 +522,26 @@ export interface BundleApi {
   reveal(outDir: string): Promise<void>
 }
 
+/**
+ * A project and its codex libraries as one file, and the way back.
+ *
+ * Both file dialogs are native and belong to main, so the renderer never names
+ * a path of its own: it asks for one to be chosen, then hands that same path
+ * back. A package is read twice — once to say what is in it, and again to
+ * unpack it — because what opening one will do to the workspace is worth
+ * saying before it happens rather than after.
+ */
+export interface PackagesApi {
+  /** Native save dialog, defaulting to a name made from the project's title. */
+  choosePath(project: Project): Promise<string | null>
+  write(project: Project, libraryIds: string[], file: string): Promise<PackageResult>
+  /** Native open dialog. Null when the author cancels. */
+  choose(): Promise<string | null>
+  /** What is in a package, and what opening it would do. Writes nothing. */
+  preview(file: string): Promise<PackagePreview>
+  open(file: string): Promise<PackageImportResult>
+}
+
 export interface AiApi {
   /** Drafts the prose of one section. Runs in the main process, where the key is. */
   writeSection(request: WriteSectionRequest): Promise<WriteSectionResult>
@@ -684,6 +709,7 @@ export interface InkCrafterApi {
   achievements: AchievementsApi
   minigames: MinigamesApi
   bundle: BundleApi
+  packages: PackagesApi
   /** Whole-project reads that write nothing. */
   project: {
     check(project: Project): Promise<ProjectCheck>

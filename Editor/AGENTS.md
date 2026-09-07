@@ -290,6 +290,19 @@ the download, the unzip) comes in through `DesktopTools`, which is how the
 tests run without a network. The shell reads `player.json` in the app folder
 for the game id and Steam App ID.
 
+**A project package** (`src/main/projectPackage.ts`, `File ▸ Package project…`
+and `File ▸ Open a package…`) is the third thing that leaves this app, and the
+only one that comes back. A zip holding `project/`, `codex/<library>/` and a
+manifest — the libraries travel with the project because they are siblings in
+the workspace rather than inside it, so a project folder copied alone loses its
+whole codex. Opening one **never overwrites**: a taken folder name gets a free
+one, a project id already in the workspace is reminted (two projects under one
+id would share the player's save slots), and a library already here is left
+untouched rather than replaced by the sender's copy. Every entry name is
+checked before a byte is written — a package can arrive from anybody, and a zip
+may name an entry `../../anything`. Media is stored rather than deflated, which
+took a nine-hundred-megabyte project from 25s to 3s for four megabytes.
+
 `src/shared/bundle/` is the interchange spec, and it is **copied into the player**
 (`src/bundle/spec/`) by a sync script there. It must stay pure — no Electron, no
 node, no imports outside `src/shared` — because it is compiled by a second

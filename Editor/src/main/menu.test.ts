@@ -91,6 +91,9 @@ describe('the menu', () => {
     expect(actions).toEqual([
       'file:newProject',
       'file:openProject',
+      // A package is a project in a file, so opening one belongs beside opening
+      // one, and writing one beside the other thing that writes a release.
+      'file:openPackage',
       'file:newFile',
       'file:save',
       // Both write files, and File is where every other app puts that. They are
@@ -99,6 +102,7 @@ describe('the menu', () => {
       // it sits directly above it.
       'player:preview',
       'project:export',
+      'file:packageProject',
       'file:closeProject',
       null // Quit, on Windows and Linux.
     ])

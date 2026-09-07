@@ -17,6 +17,7 @@ import { emptyMinigames } from '@shared/bundle/minigameDoc'
 import { emptyStats } from '@shared/statsDoc'
 import type { InkCrafterApi } from '@shared/types'
 import type { DesktopExportOptions } from '@shared/desktop'
+import { PACKAGE_FORMAT } from '@shared/projectPackage'
 
 /**
  * Fixtures and a stub for `window.inkcrafter`.
@@ -213,6 +214,41 @@ export function installApi(overrides: DeepPartial<InkCrafterApi> = {}): InkCraft
       chooseDir: vi.fn(async () => null),
       reveal: vi.fn()
     },
+
+    packages: {
+      choosePath: vi.fn(async () => '/w/packages/the-archive.zip'),
+      write: vi.fn(async (_project, libraryIds: string[], file: string) => ({
+        ok: true,
+        file,
+        files: 12 + libraryIds.length,
+        bytes: 4096,
+        warnings: [],
+        problem: null
+      })),
+      choose: vi.fn(async () => '/w/packages/the-archive.zip'),
+      preview: vi.fn(async (file: string) => ({
+        ok: true,
+        file,
+        manifest: {
+          format: PACKAGE_FORMAT,
+          generatedBy: 'InkCrafter' as const,
+          generatedAt: '2026-09-07T09:00:00.000Z',
+          project: { id: 'prj_0000000001', title: 'The Lighthouse', folder: 'the-lighthouse' },
+          libraries: []
+        },
+        libraries: [],
+        folder: 'the-lighthouse',
+        duplicate: false,
+        problem: null
+      })),
+      open: vi.fn(async () => ({
+        ok: true,
+        projectPath: '/w/projects/the-lighthouse',
+        libraries: [],
+        warnings: [],
+        problem: null
+      }))
+    },
     ai: {
       writeSection: vi.fn(async () => ({ ok: true, text: 'Drafted.', message: null, prompt: 'p' })),
       chat: vi.fn(async () => ({
@@ -291,6 +327,7 @@ export function installApi(overrides: DeepPartial<InkCrafterApi> = {}): InkCraft
     gallery: { ...base.gallery, ...overrides.gallery },
     achievements: { ...base.achievements, ...overrides.achievements },
     bundle: { ...base.bundle, ...overrides.bundle },
+    packages: { ...base.packages, ...overrides.packages },
     ai: { ...base.ai, ...overrides.ai },
     settings: { ...base.settings, ...overrides.settings },
     // Every namespace has to be listed here as well as above: the outer spread

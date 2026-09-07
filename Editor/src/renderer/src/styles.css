@@ -935,8 +935,12 @@ body.is-resizing {
   height: var(--control-lg);
 }
 
-.picker-folder {
-  align-self: flex-start;
+/* The two ways out of the picker that are not a project: open a package, and
+   look at the workspace on disk. One row, so neither reads as the main action. */
+.picker-links {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
   margin-top: 4px;
 }
 

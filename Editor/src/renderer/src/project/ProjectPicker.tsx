@@ -6,13 +6,23 @@ interface ProjectPickerProps {
   onOpen: (project: Project) => void
   /** True when the picker was reached via File › New Project…, to focus the title input. */
   autoFocusNew?: boolean
+  /**
+   * Opens the package dialog. Here as well as in the File menu because this is
+   * the screen somebody who has just been handed a zip is looking at, and they
+   * have no project open to reach a menu item about projects from.
+   */
+  onOpenPackage: () => void
 }
 
 /**
  * The start screen. A project is the top level, so there is nothing useful to
  * show until one is chosen.
  */
-export function ProjectPicker({ onOpen, autoFocusNew = false }: ProjectPickerProps): React.JSX.Element {
+export function ProjectPicker({
+  onOpen,
+  autoFocusNew = false,
+  onOpenPackage
+}: ProjectPickerProps): React.JSX.Element {
   const [projects, setProjects] = useState<Project[]>([])
   const [title, setTitle] = useState('')
   const [busy, setBusy] = useState(true)
@@ -89,9 +99,14 @@ export function ProjectPicker({ onOpen, autoFocusNew = false }: ProjectPickerPro
           </Button>
         </div>
 
-        <Button variant="link" className="picker-folder" onClick={() => void window.inkcrafter.workspace.reveal()}>
-          Open the data folder
-        </Button>
+        <div className="picker-links">
+          <Button variant="link" onClick={onOpenPackage}>
+            Open a package…
+          </Button>
+          <Button variant="link" onClick={() => void window.inkcrafter.workspace.reveal()}>
+            Open the data folder
+          </Button>
+        </div>
       </div>
     </div>
   )

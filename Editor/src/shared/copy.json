@@ -51,6 +51,11 @@
   "media.tags": "Comma separated, for finding things later.",
   "media.unfiled": "{count} in the folder that no catalogue entry claims.",
 
+  "package.incomingLibraries": "A library already in this workspace is left alone; the package's copy is not used.",
+  "package.landing": "Nothing is replaced. A folder name that is taken gets a free one.",
+  "package.libraries": "A project links its codex libraries rather than containing them, so they travel separately or not at all.",
+  "package.whatIsWritten": "One zip holding the project folder and the libraries you tick.",
+
   "plan.aliases": "Comma separated.",
   "plan.attached": "Created with this Scene and kept linked to it.",
   "plan.children": "{count} below this one.",

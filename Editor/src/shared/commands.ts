@@ -28,9 +28,11 @@ export interface AppCommand {
 export const APP_COMMANDS: readonly AppCommand[] = [
   { action: 'file:newProject', section: 'File', label: 'New project…', icon: 'plus' },
   { action: 'file:openProject', section: 'File', label: 'Open project…', accelerator: 'CmdOrCtrl+O', icon: 'folder-open' },
+  { action: 'file:openPackage', section: 'File', label: 'Open a package…', icon: 'file-archive' },
   { action: 'file:newFile', section: 'File', label: 'New file…', accelerator: 'CmdOrCtrl+N', icon: 'file-text' },
   { action: 'file:save', section: 'File', label: 'Save', accelerator: 'CmdOrCtrl+S', icon: 'save' },
   { action: 'project:export', section: 'File', label: 'Export for player…', accelerator: 'CmdOrCtrl+E', icon: 'package' },
+  { action: 'file:packageProject', section: 'File', label: 'Package project…', icon: 'file-archive' },
   { action: 'file:closeProject', section: 'File', label: 'Close project', accelerator: 'CmdOrCtrl+W', icon: 'x' },
 
   { action: 'search:inFiles', section: 'Edit', label: 'Find in files…', accelerator: 'CmdOrCtrl+Shift+F', icon: 'search' },
@@ -119,12 +121,14 @@ export const MENU_LAYOUT: readonly MenuSection[] = [
     entries: [
       { kind: 'command', action: 'file:newProject' },
       { kind: 'command', action: 'file:openProject' },
+      { kind: 'command', action: 'file:openPackage' },
       { kind: 'separator' },
       { kind: 'command', action: 'file:newFile' },
       { kind: 'command', action: 'file:save' },
       { kind: 'separator' },
       { kind: 'command', action: 'player:preview' },
       { kind: 'command', action: 'project:export' },
+      { kind: 'command', action: 'file:packageProject' },
       { kind: 'separator' },
       { kind: 'command', action: 'file:closeProject' }
     ]

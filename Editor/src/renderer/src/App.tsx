@@ -46,6 +46,8 @@ import { useAssistant } from "./assistant/useAssistant";
 import { DebugPanel } from "./editor/DebugPanel";
 import { InkContextMenu, type MenuTarget } from "./editor/InkContextMenu";
 import { ExportDialog } from "./export/ExportDialog";
+import { PackageDialog } from "./export/PackageDialog";
+import { OpenPackageDialog } from "./export/OpenPackageDialog";
 import { useGame } from "./manager/useGame";
 import {
   GameManagerView,
@@ -190,6 +192,8 @@ export function App(): React.JSX.Element {
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [packageOpen, setPackageOpen] = useState(false);
+  const [openPackageOpen, setOpenPackageOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   /** Which catalogue the Game view is showing. */
   const [managerSection, setManagerSection] = useState<ManagerSection>("media");
@@ -492,6 +496,12 @@ export function App(): React.JSX.Element {
           break;
         case "project:export":
           setExportOpen(true);
+          break;
+        case "file:packageProject":
+          setPackageOpen(true);
+          break;
+        case "file:openPackage":
+          setOpenPackageOpen(true);
           break;
         case "search:inFiles":
           setSearchOpen(true);
@@ -1183,6 +1193,45 @@ export function App(): React.JSX.Element {
       />
     ) : null;
 
+  /**
+   * Opens a project by its folder, which is what unpacking a package answers
+   * with. The session wants the whole manifest, and the workspace is the thing
+   * that reads one, so the freshly written project is found in the list rather
+   * than assembled here from a path.
+   */
+  const openProjectAt = async (projectPath: string): Promise<void> => {
+    setWorkspaceNonce((nonce) => nonce + 1);
+    const projects = await window.inkcrafter.projects.list();
+    const opened = projects.find((one) => one.path === projectPath);
+    if (opened) session.open(opened);
+    else
+      toasts.show({
+        tone: "error",
+        title: "The project was unpacked but could not be opened.",
+      });
+  };
+
+  const packageOverlay =
+    packageOpen && project ? (
+      <PackageDialog project={project} onClose={() => setPackageOpen(false)} />
+    ) : null;
+
+  const openPackageOverlay = openPackageOpen ? (
+    <OpenPackageDialog
+      onOpened={(projectPath) => {
+        setOpenPackageOpen(false);
+        void openProjectAt(projectPath);
+      }}
+      onClose={() => {
+        setOpenPackageOpen(false);
+        // The workspace changed even when the author does not open the project
+        // they just unpacked, and the picker behind this dialog is showing the
+        // list it read before that happened.
+        setWorkspaceNonce((nonce) => nonce + 1);
+      }}
+    />
+  ) : null;
+
   const settingsOverlay = settingsOpen ? (
     <SettingsDialog onClose={() => setSettingsOpen(false)} />
   ) : null;
@@ -1211,6 +1260,7 @@ export function App(): React.JSX.Element {
         <ProjectPicker
           key={workspaceNonce}
           onOpen={session.open}
+          onOpenPackage={() => setOpenPackageOpen(true)}
           autoFocusNew={pickerWantsNew}
         />
         <aside className="picker-assistant">{assistantPanel}</aside>
@@ -1816,6 +1866,8 @@ export function App(): React.JSX.Element {
 
       {searchOverlay}
       {exportOverlay}
+      {packageOverlay}
+      {openPackageOverlay}
       {settingsOverlay}
     </div>
   );

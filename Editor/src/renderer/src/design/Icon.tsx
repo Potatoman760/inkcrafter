@@ -11,6 +11,7 @@ import clipboardPaste from 'lucide-static/icons/clipboard-paste.svg?raw'
 import copy from 'lucide-static/icons/copy.svg?raw'
 import cornerDownRight from 'lucide-static/icons/corner-down-right.svg?raw'
 import feather from 'lucide-static/icons/feather.svg?raw'
+import fileArchive from 'lucide-static/icons/file-archive.svg?raw'
 import filePen from 'lucide-static/icons/file-pen.svg?raw'
 import fileText from 'lucide-static/icons/file-text.svg?raw'
 import folder from 'lucide-static/icons/folder.svg?raw'
@@ -88,6 +89,7 @@ const ICONS: Record<string, string> = {
   'corner-down-right': cornerDownRight,
   eye,
   feather,
+  'file-archive': fileArchive,
   'file-pen': filePen,
   'file-text': fileText,
   folder,

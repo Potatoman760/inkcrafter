@@ -44,6 +44,11 @@ import type {
 import type { BundleExportResult } from '@shared/bundle/result'
 import type { DesktopExportOptions, DesktopExportResult } from '@shared/desktop'
 import type {
+  PackageImportResult,
+  PackagePreview,
+  PackageResult
+} from '@shared/projectPackage'
+import type {
   MentionCountRequest,
   MediaUsage,
   ProjectCheck,
@@ -108,6 +113,7 @@ import { readGame, writeGame } from './game'
 import type { GameDocument } from '@shared/bundle/gameDoc'
 import { exportBundle } from './bundle'
 import { desktopTools, exportDesktop } from './desktopExport'
+import { importPackage, packageFileName, packageProject, previewPackage } from './projectPackage'
 import { generateProjectProtection, installProjectProtection } from './releaseProtection'
 import {
   checkPlayer,
@@ -624,6 +630,57 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('bundle:reveal', async (_event, outDir: string): Promise<void> => {
     await shell.openPath(outDir)
+  })
+
+  /*
+   * Packaging, and opening a package.
+   *
+   * Both dialogs are native and both live here rather than in the renderer,
+   * for the ordinary reason: the renderer is sandboxed and has no filesystem.
+   * `openPackage` deliberately takes a path the author picked in a native
+   * dialog rather than one the renderer chose, so the only files this reads
+   * are files somebody pointed at.
+   */
+  ipcMain.handle(
+    'package:choosePath',
+    async (_event, project: Project): Promise<string | null> => {
+      const result = await dialog.showSaveDialog({
+        title: 'Package project as',
+        defaultPath: packageFileName(project),
+        filters: [{ name: 'Project package', extensions: ['zip'] }],
+        properties: ['createDirectory', 'showOverwriteConfirmation']
+      })
+      return result.canceled ? null : (result.filePath ?? null)
+    }
+  )
+
+  ipcMain.handle(
+    'package:write',
+    async (_event, project: Project, libraryIds: string[], file: string): Promise<PackageResult> => {
+      const libraries = (await listLibraries(librariesDir())).filter((one) =>
+        libraryIds.includes(one.id)
+      )
+      return packageProject(project, libraries, file)
+    }
+  )
+
+  ipcMain.handle('package:choose', async (): Promise<string | null> => {
+    const result = await dialog.showOpenDialog({
+      title: 'Open a project package',
+      filters: [{ name: 'Project package', extensions: ['zip'] }],
+      properties: ['openFile']
+    })
+    return result.canceled ? null : (result.filePaths[0] ?? null)
+  })
+
+  ipcMain.handle('package:preview', async (_event, file: string): Promise<PackagePreview> => {
+    await ensureWorkspace()
+    return previewPackage(file, dataDir())
+  })
+
+  ipcMain.handle('package:open', async (_event, file: string): Promise<PackageImportResult> => {
+    await ensureWorkspace()
+    return importPackage(file, dataDir())
   })
 
   ipcMain.handle('settings:load', (): Promise<AppSettings> => loadSettings())

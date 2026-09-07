@@ -25,6 +25,8 @@ export const MAX_INTERFACE_SCALE = 1.5
 export const MENU_ACTIONS = [
   'file:newProject',
   'file:openProject',
+  'file:packageProject',
+  'file:openPackage',
   'file:newFile',
   'file:save',
   'file:closeProject',

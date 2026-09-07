@@ -150,6 +150,15 @@ const api: InkCrafterApi = {
     reveal: (outDir) => ipcRenderer.invoke('bundle:reveal', outDir)
   },
 
+  packages: {
+    choosePath: (project) => ipcRenderer.invoke('package:choosePath', project),
+    write: (project, libraryIds, file) =>
+      ipcRenderer.invoke('package:write', project, libraryIds, file),
+    choose: () => ipcRenderer.invoke('package:choose'),
+    preview: (file) => ipcRenderer.invoke('package:preview', file),
+    open: (file) => ipcRenderer.invoke('package:open', file)
+  },
+
   ai: {
     writeSection: (request) => ipcRenderer.invoke('ai:writeSection', request),
     writeInk: (request, project) => ipcRenderer.invoke('ai:writeInk', request, project),
