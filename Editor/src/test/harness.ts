@@ -16,6 +16,7 @@ import { emptyAchievements } from '@shared/bundle/achievementDoc'
 import { emptyMinigames } from '@shared/bundle/minigameDoc'
 import { emptyStats } from '@shared/statsDoc'
 import type { InkCrafterApi } from '@shared/types'
+import type { DesktopExportOptions } from '@shared/desktop'
 
 /**
  * Fixtures and a stub for `window.inkcrafter`.
@@ -197,6 +198,18 @@ export function installApi(overrides: DeepPartial<InkCrafterApi> = {}): InkCraft
         publicKey: 'public-key'
       })),
       installProtection: vi.fn(async () => ({ ok: true, message: 'Installed.' })),
+      exportDesktop: vi.fn(async (_project, outDir: string, options: DesktopExportOptions) => ({
+        ok: true,
+        outDir,
+        builds: options.platforms.map((platform) => ({
+          platform,
+          outDir: `${outDir}/${platform}`,
+          problem: null
+        })),
+        diagnostics: [],
+        warnings: []
+      })),
+      onDesktopProgress: vi.fn(() => () => {}),
       chooseDir: vi.fn(async () => null),
       reveal: vi.fn()
     },

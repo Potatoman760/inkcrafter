@@ -769,6 +769,26 @@ function checkTag(use: TagUse, input: PreflightInput): string | null {
       : `#${use.raw} — ${use.command.variable} is not a variable in the catalogue, so there is nothing to display.`
   }
 
+  if (use.command.kind === 'word') {
+    // The reader types into this one, so it has to be somewhere a word fits.
+    // A number or a yes/no would take the answer and render it as nonsense.
+    const { variable } = use.command
+    const all = [...input.stats.stats, ...input.stats.variables]
+    if (all.length === 0) return null
+
+    const declared = all.find((one) => one.name === variable)
+    if (!declared) {
+      return `#${use.raw} — ${variable} is not a variable in the catalogue, so the reader's word would have nowhere to go.`
+    }
+    if (declared.kind !== 'text') {
+      return `#${use.raw} — ${variable} holds ${
+        declared.kind === 'boolean' ? 'a yes/no' : 'a number'
+      }, and a word the reader types is text.`
+    }
+
+    return null
+  }
+
   if (use.command.kind === 'npc') {
     // Same rule as stats: an empty catalogue means no opinion.
     if (input.npcs.npcs.length === 0) return null

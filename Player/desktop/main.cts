@@ -1,10 +1,24 @@
 import { app, BrowserWindow, ipcMain, net, powerMonitor, protocol } from "electron";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
 type StoredValues = Record<string, string>;
+
+/**
+ * What a self-contained export tells the shell about the one game inside it.
+ *
+ * Written by InkCrafter beside `package.json` as `player.json`. The engine in
+ * `dist/` is the same build whichever game it ships with — it is the bundle
+ * folder under `dist/` that differs — so the game's id has to reach the shell
+ * some way other than being baked into the renderer, and this is that way.
+ * Absent in development, where `--game=` and the renderer's default do the job.
+ */
+interface PlayerConfig {
+  game: string | null;
+  steamAppId: number | null;
+}
 type SteamClient = {
   localplayer: { getName(): string };
   utils: { getAppId(): number; isSteamRunningOnSteamDeck(): boolean };
@@ -46,7 +60,8 @@ protocol.registerSchemesAsPrivileged([{
   privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
 }]);
 
-const appId = readSteamAppId();
+const config = readPlayerConfig();
+const appId = readSteamAppId(config);
 const steamworks = loadSteamworks();
 if (steamworks && appId !== null) {
   try {
@@ -136,18 +151,13 @@ function createWindow(): void {
     }
   });
 
+  // The command line wins over the shipped config, so one packaged game can
+  // still be pointed at another folder under `dist/` for a quick check.
+  const game = commandLineGame() ?? config.game;
   const devUrl = process.env["INKCRAFTER_PLAYER_DEV_URL"];
-  if (devUrl) {
-    const game = commandLineGame();
-    const url = new URL(devUrl);
-    if (game) url.searchParams.set("game", game);
-    void mainWindow.loadURL(url.href);
-  } else {
-    const query = commandLineGame() ? { query: { game: commandLineGame()! } } : undefined;
-    const url = new URL("inkcrafter://app/index.html");
-    if (query?.query.game) url.searchParams.set("game", query.query.game);
-    void mainWindow.loadURL(url.href);
-  }
+  const url = new URL(devUrl ?? "inkcrafter://app/index.html");
+  if (game) url.searchParams.set("game", game);
+  void mainWindow.loadURL(url.href);
 }
 
 function registerAppProtocol(): void {
@@ -288,10 +298,48 @@ function commandLineGame(): string | null {
   return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value) ? value : null;
 }
 
-function readSteamAppId(): number | null {
-  const fromEnvironment = Number(process.env["STEAM_APP_ID"]);
-  if (Number.isInteger(fromEnvironment) && fromEnvironment > 0) return fromEnvironment;
-  for (const file of [resolve("steam_appid.txt"), join(process.resourcesPath, "steam_appid.txt")]) {
+function readPlayerConfig(): PlayerConfig {
+  const none: PlayerConfig = { game: null, steamAppId: null };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(resolve(__dirname, "..", "player.json"), "utf8"));
+  } catch {
+    // A development checkout has no player.json; the renderer's default game is
+    // played, and Steam is configured through steam_appid.txt or not at all.
+    return none;
+  }
+  if (!parsed || typeof parsed !== "object") return none;
+  const record = parsed as Record<string, unknown>;
+  const game = typeof record["game"] === "string" ? record["game"] : "";
+  const steamAppId = Number(record["steamAppId"]);
+  return {
+    game: /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(game) ? game : null,
+    steamAppId: Number.isInteger(steamAppId) && steamAppId > 0 ? steamAppId : null,
+  };
+}
+
+/**
+ * The Steam App ID, from wherever it has been put.
+ *
+ * `SteamAppId` is what the Steam client itself sets in the environment of a
+ * game it launches, and `STEAM_APP_ID` is the same thing by hand. The text file
+ * is Steamworks' own development convention and is looked for where Steam
+ * looks: beside the executable, and in the working directory. A shipped game
+ * carries none of those and reads the id from its config instead — that is
+ * what lets `restartAppIfNecessary` send a launch from outside Steam back
+ * through it, which a steam_appid.txt beside the executable would suppress.
+ */
+function readSteamAppId(config: PlayerConfig): number | null {
+  for (const name of ["STEAM_APP_ID", "SteamAppId"]) {
+    const fromEnvironment = Number(process.env[name]);
+    if (Number.isInteger(fromEnvironment) && fromEnvironment > 0) return fromEnvironment;
+  }
+  const places = [
+    resolve("steam_appid.txt"),
+    join(dirname(process.execPath), "steam_appid.txt"),
+    join(process.resourcesPath, "steam_appid.txt"),
+  ];
+  for (const file of places) {
     try {
       const value = Number(readFileSync(file, "utf8").trim());
       if (Number.isInteger(value) && value > 0) return value;
@@ -299,7 +347,7 @@ function readSteamAppId(): number | null {
       // Steam is optional in normal desktop and browser development.
     }
   }
-  return null;
+  return config.steamAppId;
 }
 
 function loadSteamworks(): SteamworksModule | null {

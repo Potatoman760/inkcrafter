@@ -69,6 +69,11 @@ the whole story until something changes it, and survives a save.
 the script, each gated on progress, a variable or a character's state, with art
 of its own or invisible over the picture.
 
+`# map: on` and `# map: off` enable or disable travel. `# map: open` enables
+travel and opens the current map once, after presenting its tagged line. The
+map's knot assignments select the area. Closing or restoring that frame does
+not reopen the overlay; the toolbar remains available.
+
 **Accessibility and comfort.** Master, music and effect volumes; fullscreen;
 dialogue size and reveal speed; reduced motion; a high-contrast interface. All of
 it persists.
@@ -129,7 +134,26 @@ opens, and tells you which ones are.
 
 ## Desktop and Steam
 
-The same player packages as a sandboxed Electron game:
+The same player runs as a sandboxed Electron game, and the editor can export a
+game as one: **File ▸ Export… ▸ Desktop game** writes one folder per platform —
+Windows, Linux, macOS on Apple silicon and Intel — each holding Electron, this
+player's build, the Electron main in `desktop/`, and exactly one bundle. The
+folder runs with nothing installed and is what a Steam depot is made of. It is
+assembled from Electron's own prebuilt zips, so every platform can be built from
+any machine; the one thing that cannot be done away from a Mac is signing the
+Mac build, and the export's README says how. Building a Mac folder on Windows
+needs Developer Mode on, because the app inside is full of symbolic links.
+
+The shell reads `player.json` beside its `package.json` — the game's id and the
+Steam App ID — which is how one engine build serves whichever game it ships with.
+The same thing from a terminal, in the editor's folder:
+
+```bash
+npm run export -- --project data/projects/<slug> --out <folder> --desktop
+npm run export -- --project data/projects/<slug> --out <folder> --desktop --platforms win32-x64 --steam-app-id 480
+```
+
+For working on the shell itself, without an export:
 
 ```bash
 npm run desktop:dev -- --game breedhaven   # run it as a desktop app
@@ -137,8 +161,11 @@ npm run desktop:pack -- --game breedhaven  # unpacked build for local testing
 npm run desktop:dist -- --game breedhaven  # installer or disk image
 ```
 
-Steam is optional and off unless configured. With an App ID in place, the native
-API, overlay, Deck detection and Cloud saves initialise before the window opens.
+Steam is optional and off unless configured. With an App ID in place — from the
+export, from `steam_appid.txt` beside the executable, or from the environment
+Steam itself launches a game in — the native API, overlay, Deck detection and
+Cloud saves initialise before the window opens. A shipped build carries no
+`steam_appid.txt`, so one started outside Steam restarts itself through it.
 Achievements are set up in Steamworks, matched in InkCrafter to a story condition,
 and unlocked by the player the moment that condition becomes true — remembered
 offline and sent on when Steam is next available. Editor previews never earn

@@ -314,6 +314,9 @@ export class GameState {
       case "npc":
       case "autosave":
       case "minigame":
+      // The reader's answer lands in an Ink variable, which the save already
+      // carries; there is nothing about the frame for a load to rebuild.
+      case "word":
         break;
       default:
         assertNever(cmd);
@@ -342,8 +345,10 @@ export class GameState {
    * nobody claims leaves the showing map exactly as it was, which is what keeps
    * those lists short — the city gate and the road out, not the scenes between.
    */
-  followMap(): void {
-    const knot = this.engine.currentKnot();
+  followMap(lastLineKnot: string | null = null): void {
+    // END clears Ink's current pointer. The final displayed line still belongs
+    // to a knot, and can request opening that knot's map.
+    const knot = this.engine.currentKnot() ?? lastLineKnot;
     if (knot === null) return;
 
     const area = mapForKnot(this.bundle.map, knot);

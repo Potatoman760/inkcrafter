@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
   emptyMinigames,
@@ -8,6 +8,7 @@ import {
 } from '@shared/bundle/minigameDoc'
 import type { Project } from '@shared/project'
 import { stripBom } from './text'
+import { writeWatched } from './watch'
 
 export const MINIGAMES_FILE = 'minigames.json'
 
@@ -21,6 +22,6 @@ export async function readMinigames(project: Project): Promise<MinigameDocument>
 }
 
 export async function writeMinigames(project: Project, doc: MinigameDocument): Promise<void> {
-  await writeFile(join(project.path, MINIGAMES_FILE), serialiseMinigames(doc), 'utf8')
+  await writeWatched(join(project.path, MINIGAMES_FILE), serialiseMinigames(doc))
 }
 

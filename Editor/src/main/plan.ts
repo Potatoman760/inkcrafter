@@ -21,6 +21,7 @@ import type { Project } from '@shared/project'
 import { exists } from './fs'
 import { listInkFiles } from './project'
 import { stripBom } from './text'
+import { writeWatched } from './watch'
 
 /**
  * The plan lives at `plan.json` in the project directory, beside `project.md`
@@ -208,7 +209,7 @@ async function storePlan(
   )
   if (await orderSceneIncludes(project, chapterFiles)) written.push(project.main)
 
-  await writeFile(join(project.path, PLAN_FILE), serialisePlan(plan), 'utf8')
+  await writeWatched(join(project.path, PLAN_FILE), serialisePlan(plan))
   written.push(PLAN_FILE)
   return { plan, written }
 }

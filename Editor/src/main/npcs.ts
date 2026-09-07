@@ -1,9 +1,10 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { emptyNpcs, parseNpcs, serialiseNpcs, type NpcDocument } from '@shared/bundle/npcDoc'
 import type { Project } from '@shared/project'
 import { readStats, writeStats } from './stats'
 import { stripBom } from './text'
+import { writeWatched } from './watch'
 
 /**
  * The cast catalogue, at `npcs.json` beside `stats.json` and `media.json`.
@@ -34,7 +35,7 @@ export interface WriteNpcsResult {
 }
 
 export async function writeNpcs(project: Project, doc: NpcDocument): Promise<WriteNpcsResult> {
-  await writeFile(join(project.path, NPCS_FILE), serialiseNpcs(doc), 'utf8')
+  await writeWatched(join(project.path, NPCS_FILE), serialiseNpcs(doc))
 
   // Re-saving the stats regenerates `state.ink` from both catalogues at once.
   const stats = await readStats(project)

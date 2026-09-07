@@ -87,7 +87,8 @@ const KEYS: { key: string; detail: string; takesValue: boolean }[] = [
   { key: 'stat', detail: 'change something tracked', takesValue: true },
   { key: 'npc', detail: 'change something about somebody', takesValue: true },
   { key: 'minigame', detail: 'pause the story for a playable encounter', takesValue: true },
-  { key: 'map', detail: 'whether the map is reachable', takesValue: true }
+  { key: 'map', detail: 'enable, disable or open the map', takesValue: true },
+  { key: 'word', detail: 'let the reader choose a word, kept in a text variable', takesValue: true }
 ]
 
 /** The catalogue kind each key names, for the keys that name one. */
@@ -186,10 +187,11 @@ function valueSuggestions(
   at: number,
   cat: TagCatalogues
 ): Suggestions | null {
-  if (key === 'map') return plainWords(at + value.length, value, ['on', 'off'])
+  if (key === 'map') return plainWords(at + value.length, value, ['on', 'off', 'open'])
   if (key === 'stat') return statSuggestions(value, at, cat)
   if (key === 'npc') return npcSuggestions(value, at, cat)
   if (key === 'minigame') return minigameSuggestions(value, at, cat)
+  if (key === 'word') return wordSuggestions(value, at, cat)
 
   const kind = KIND_OF[key]
   if (!kind) return null
@@ -341,6 +343,30 @@ function statSuggestions(value: string, at: number, cat: TagCatalogues): Suggest
       detail: stat.display || 'a tracked number',
       more: false
     }))
+  }
+}
+
+/**
+ * The text variables a reader's word could be kept in.
+ *
+ * Only text: the reader types into this one, and a number would take the
+ * answer and show it as nonsense. Past the name comes the question to head the
+ * field with, which no catalogue knows.
+ */
+function wordSuggestions(value: string, at: number, cat: TagCatalogues): Suggestions | null {
+  if (/\s/.test(value.trim())) return null
+
+  const word = /(\S*)$/.exec(value)![1]!
+  return {
+    from: at + value.length - word.length,
+    options: [...cat.stats.stats, ...cat.stats.variables]
+      .filter((one) => one.kind === 'text')
+      .map((one) => ({
+        label: one.name,
+        insert: `${one.name} `,
+        detail: 'a word the reader can change',
+        more: true
+      }))
   }
 }
 

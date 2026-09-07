@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { isIdOf } from './ids'
 import {
   addItem,
@@ -6,8 +6,6 @@ import {
   addVariable,
   emptyStats,
   inkName,
-  moveItem,
-  moveStat,
   nameProblem,
   newItem,
   newStat,
@@ -18,6 +16,7 @@ import {
   serialiseStats,
   takenNames,
   updateStat,
+  updateVariable,
   type StatsDocument
 } from './statsDoc'
 
@@ -145,38 +144,6 @@ describe('renaming', () => {
     expect(next.stats[0]!.name).toBe('might')
   })
 
-})
-
-describe('reordering', () => {
-  it('moves a stat up and down', () => {
-    const doc = seeded()
-    const names = (next: StatsDocument): string[] => next.stats.map((stat) => stat.name)
-
-    expect(names(moveStat(doc, doc.stats[1]!.id, -1))).toEqual(['has_met_wren', 'strength'])
-    expect(names(moveStat(doc, doc.stats[0]!.id, 1))).toEqual(['has_met_wren', 'strength'])
-  })
-
-  it('refuses to move past either end', () => {
-    const doc = seeded()
-    expect(moveStat(doc, doc.stats[0]!.id, -1)).toBe(doc)
-    expect(moveStat(doc, doc.stats.at(-1)!.id, 1)).toBe(doc)
-  })
-
-  it('moves an item up and down the one list', () => {
-    const doc = seeded()
-    const rope = doc.items.find((item) => item.name === 'rope')!
-
-    expect(moveItem(doc, rope.id, 1).items.map((item) => item.name)).toEqual([
-      'shovel',
-      'brass_key',
-      'rope'
-    ])
-  })
-
-  it('refuses to move an item past the end', () => {
-    const doc = seeded()
-    expect(moveItem(doc, doc.items.at(-1)!.id, 1)).toBe(doc)
-  })
 })
 
 /**
@@ -319,5 +286,67 @@ describe('a catalogue written before the presentation fields existed', () => {
     const doc = parseStats(OLD)
     expect(doc.stats[0]!.id).toBe('stt_0000000001')
     expect(doc.items[0]!.id).toBe('stt_0000000002')
+  })
+})
+
+/**
+ * The catalogues stamp their own entries, so a list of sixty can be read
+ * newest first. The stamp is a fact about the entry, not about the file, so it
+ * is set where the entry changes rather than where the document is written.
+ */
+describe('when an entry was last touched', () => {
+  // The clock is held still and moved by hand: a create and an edit in the
+  // same millisecond really do share a stamp, which is fine for reading a list
+  // newest first and useless for asserting that one followed the other.
+  it('stamps a new entry and each real edit of it', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-09-01T00:00:00.000Z'))
+      const doc = addVariable(emptyStats(), newVariable('Courage'))
+      const first = doc.variables[0]!
+      expect(first.modified).toBe('2026-09-01T00:00:00.000Z')
+
+      vi.setSystemTime(new Date('2026-09-02T00:00:00.000Z'))
+      const edited = updateVariable(doc, first.id, { description: 'How brave.' })
+      expect(edited.variables[0]!.modified).toBe('2026-09-02T00:00:00.000Z')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('leaves the stamp where it is when an edit changes nothing', () => {
+    const doc = addVariable(emptyStats(), newVariable('Courage'))
+    const before = doc.variables[0]!
+
+    expect(updateVariable(doc, before.id, { description: '' }).variables[0]).toBe(before)
+  })
+
+  // An older project has no stamps, and that is an answer rather than a zero.
+  it('reads an entry written before stamps existed as never stamped', () => {
+    const older = JSON.stringify({
+      version: 1,
+      stats: [],
+      variables: [{ id: 'stt_1', name: 'courage', kind: 'number', initial: 0 }],
+      items: []
+    })
+
+    expect(parseStats(older).variables[0]!.modified).toBeNull()
+  })
+
+  it('round-trips a stamp through the file', () => {
+    const doc = addVariable(emptyStats(), newVariable('Courage'))
+
+    expect(parseStats(serialiseStats(doc)).variables[0]!.modified).toBe(doc.variables[0]!.modified)
+  })
+
+  it('refuses a stamp that is not a date', () => {
+    const odd = JSON.stringify({
+      version: 1,
+      stats: [],
+      variables: [{ id: 'stt_1', name: 'courage', kind: 'number', initial: 0, modified: 'soon' }],
+      items: []
+    })
+
+    expect(parseStats(odd).variables[0]!.modified).toBeNull()
   })
 })

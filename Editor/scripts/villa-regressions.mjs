@@ -58,8 +58,11 @@ for (const romance of [true, false]) {
   let run = session()
   const set = (key, value) => run.engine.setVariable(key, value)
   set('isolde_arrived', true); set('villa_day', 1)
-  run.go('villa_daytime'); run.pick(/Walk the Noble Quarter/); run.pick(/Honour the promise/)
-  set('villa_day', 3); run.go('villa_daytime'); run.pick(/Answer the guild/); run.pick(/Follow her advice/)
+  run.go('villa_daytime'); run.pick(/Walk the Noble Quarter/)
+  assert.deepEqual(run.story.currentChoices.map(choice => choice.text), ['Close the ledger'], 'The guild letter is a continuous scene')
+  assert.equal(run.engine.getVariable('isolde_trust'), 1)
+  set('villa_day', 3); run.go('villa_daytime'); run.pick(/Answer the guild/)
+  assert.deepEqual(run.story.currentChoices.map(choice => choice.text), ['Close the ledger'], 'The committee letter is a continuous scene')
   assert.equal(run.engine.getVariable('isolde_trust'), 2)
   set('villa_day', 5); set('villa_phase', 'morning'); set('villa_morning_seen', 4)
   run.go('villa_morning'); run.pick(/Ask Isolde what she would send/)
@@ -70,6 +73,64 @@ for (const romance of [true, false]) {
   assert.equal(run.engine.getVariable(romance ? 'isolde_open' : 'isolde_settled'), true)
   run.go('villa_daytime')
   assert.ok(!run.story.currentChoices.some(one => /What Isolde has not said/.test(one.text)))
+}
+
+// Day 5 advice must survive either early scene, including after a reload.
+for (const completedStages of [0, 1]) {
+  let run = session()
+  run.engine.setVariable('isolde_arrived', true)
+  run.engine.setVariable('villa_day', 1)
+  if (completedStages === 1) run.go('isolde_first')
+  run.engine.setVariable('villa_day', 5)
+  run.engine.setVariable('villa_morning_seen', 4)
+  run.go('villa_morning'); run.pick(/Ask Isolde what she would send/)
+  assert.equal(run.engine.getVariable('isolde_trust'), completedStages + 1)
+  run = session(run.story.state.ToJson())
+  if (completedStages === 0) {
+    run.go('isolde_first')
+    assert.equal(run.engine.getVariable('isolde_trust'), 2, 'First scene preserves the advice gain')
+  }
+  run.go('isolde_second')
+  assert.equal(run.engine.getVariable('isolde_trust'), 3, 'Second scene preserves the advice gain')
+}
+
+// Tamsin's tea has no cosmetic menu; the later relationship choice still matters.
+for (const romance of [true, false]) {
+  let run = session()
+  run.engine.setVariable('tamsin_arrived', true)
+  run.engine.setVariable('villa_day', 1)
+  run.go('villa_daytime'); run.pick(/Help Tamsin/)
+  assert.equal(run.engine.getVariable('tamsin_trust'), 1)
+  run.engine.setVariable('villa_day', 3)
+  run.go('villa_daytime'); run.pick(/afternoon in the courtyard/)
+  assert.deepEqual(run.story.currentChoices.map(choice => choice.text), ['Close the ledger'], 'The courtyard visit is a continuous scene')
+  assert.equal(run.engine.getVariable('tamsin_trust'), 2)
+  run = session(run.story.state.ToJson())
+  run.engine.setVariable('villa_day', 6)
+  run.go('villa_daytime'); run.pick(/What Tamsin asked for/)
+  assert.equal(run.story.currentChoices.length, 2)
+  run.pick(romance ? /Tell her you want her/ : /Tell her honestly that you cannot/)
+  assert.equal(run.engine.getVariable('tamsin_bond'), romance ? 'romance' : 'friend')
+  assert.equal(run.engine.getVariable('tamsin_open'), romance)
+  assert.equal(run.engine.getVariable('tamsin_settled'), !romance)
+  assert.equal(run.engine.getVariable('tamsin_trust'), 3)
+  run.go('villa_daytime')
+  assert.ok(!run.story.currentChoices.some(choice => /Help Tamsin|afternoon in the courtyard|What Tamsin asked for/.test(choice.text)))
+}
+// The retained letter choices produce different lasting relationship values.
+for (const [answer, isoldeTrust, seraphineTrust] of [
+  [/Give them the rooms and nothing else/, 0, 0],
+  [/Give them the whole list/, 0, 1],
+  [/Ask Isolde what she would send/, 1, 0]
+]) {
+  const run = session()
+  run.engine.setVariable('villa_day', 5)
+  run.engine.setVariable('villa_morning_seen', 4)
+  run.engine.setVariable('isolde_trust', 0)
+  run.engine.setVariable('seraphine_trust', 0)
+  run.go('villa_morning'); run.pick(answer)
+  assert.equal(run.engine.getVariable('isolde_trust'), isoldeTrust)
+  assert.equal(run.engine.getVariable('seraphine_trust'), seraphineTrust)
 }
 const early = session()
 early.engine.setVariable('isolde_arrived', true); early.engine.setVariable('villa_day', 6); early.engine.setVariable('isolde_trust', 3)
@@ -180,10 +241,27 @@ assert.equal(tutorialView.tutorialSteps().length, 12)
 
 // Post-restoration scenes must use the same personalized look as the room UI.
 const staffInk = readFileSync(resolve(root, 'chapter5/villa-staff.ink'), 'utf8')
-for (const [who, knots] of [['tamsin', ['welcome', 'night']], ['isolde', ['welcome', 'night', 'ledger']]]) {
+for (const [who, knots] of [['tamsin', ['welcome', 'ordinary']], ['isolde', ['welcome', 'night', 'ledger']]]) {
   for (const knot of knots) {
     const section = staffInk.split(`=== villa_${who}_${knot} ===`)[1].split('===')[0]
     assert.ok(section.includes(`# bg: consort_villa/${who}\n`) || section.includes(`# bg: consort_villa/${who}\r\n`))
   }
 }
+
+// The current room result and older saved result both open the renamed scene.
+for (const result of ['villa_tamsin_ordinary', 'villa_tamsin_night']) {
+  for (const open of [true, false]) {
+    const run = session()
+    run.engine.setVariable('villa_day', 1)
+    run.engine.setVariable('tamsin_open', open)
+    run.engine.setVariable('villa_result', result)
+    run.go('villa_scene_dispatch')
+    assert.equal(run.story.state.VisitCountAtPathString('villa_tamsin_ordinary'), 1)
+    assert.equal(run.story.currentChoices.some(choice => choice.text === 'Return to the villa'), open)
+  }
+}
+const oldTamsinPath = session()
+oldTamsinPath.engine.setVariable('tamsin_open', true)
+oldTamsinPath.go('villa_tamsin_night')
+assert.equal(oldTamsinPath.story.state.VisitCountAtPathString('villa_tamsin_ordinary'), 1)
 console.log('Villa regressions passed: Day 5 advice, romance/friendship after reload, no skipped/replayed stages, locked-scene UI/actions, settlement after reload, no final-day earnings/warnings, late restoration/invitation/scene, standalone clock, personalized scene art.')

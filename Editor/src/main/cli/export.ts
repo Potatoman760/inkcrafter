@@ -3,6 +3,8 @@ import { basename, resolve, sep } from 'node:path'
 import type { Project } from '@shared/project'
 import { readProject } from '../project'
 import { exportBundle } from '../bundle'
+import { desktopTools, exportDesktop } from '../desktopExport'
+import { DEFAULT_DESKTOP_RELEASE, desktopPlatform, isDesktopPlatform } from '@shared/desktop'
 import { readNpcs, writeNpcs } from '../npcs'
 
 /**
@@ -23,6 +25,12 @@ import { readNpcs, writeNpcs } from '../npcs'
  * dev server's static folder, that is the whole iteration loop: save the ink,
  * reload the browser. Without it, moving the story into an editor would have
  * cost the game the hot reload it used to have.
+ *
+ * `--desktop` writes the self-contained kind instead: the player, Electron and
+ * the bundle, one folder per platform under `--out`. `--platforms` narrows the
+ * list (comma separated: win32-x64, linux-x64, darwin-arm64, darwin-x64),
+ * `--steam-app-id` names the game on Steam, and `--player` points at the
+ * player checkout when it is not the sibling package.
  */
 export async function run(argv: string[]): Promise<number> {
   const args = parse(argv)
@@ -55,6 +63,8 @@ export async function run(argv: string[]): Promise<number> {
 
   if (argv.includes('--watch')) return watchAndExport(project, resolve(outPath), options)
 
+  if (argv.includes('--desktop')) return exportDesktopFromCli(project, resolve(outPath), args)
+
   const result = await exportBundle(project, resolve(outPath), options)
 
   for (const diagnostic of result.diagnostics) {
@@ -78,6 +88,66 @@ export async function run(argv: string[]): Promise<number> {
       // the step where a wrong destination used to surface as a blank page.
       `  the player opens this as ?game=${basename(result.outDir)}`
   )
+  return 0
+}
+
+/**
+ * The desktop export, told as it goes.
+ *
+ * The player is the sibling package unless `--player` says otherwise: this
+ * runs from the editor's folder, and `app.getAppPath()` — how the app finds
+ * it — is not available without Electron.
+ */
+async function exportDesktopFromCli(
+  project: Project,
+  outDir: string,
+  args: Record<string, string>
+): Promise<number> {
+  const platformsArg = args['platforms']
+  const platforms = platformsArg
+    ? platformsArg.split(',').map((one) => one.trim()).filter((one) => one.length > 0)
+    : [...DEFAULT_DESKTOP_RELEASE.platforms]
+  const unknown = platforms.filter((one) => !isDesktopPlatform(one))
+  if (unknown.length > 0) {
+    console.error(
+      `Unknown platform(s): ${unknown.join(', ')}. ` +
+        'Choose from win32-x64, linux-x64, darwin-arm64, darwin-x64.'
+    )
+    return 2
+  }
+
+  const appIdArg = args['steam-app-id']
+  const steamAppId = appIdArg === undefined ? (project.desktop?.steamAppId ?? null) : Number(appIdArg)
+  if (steamAppId !== null && (!Number.isInteger(steamAppId) || steamAppId <= 0)) {
+    console.error(`A Steam App ID is a whole positive number, not "${appIdArg}".`)
+    return 2
+  }
+
+  const playerDir = resolve(args['player'] ?? resolve(process.cwd(), '..', 'Player'))
+  const result = await exportDesktop(
+    project,
+    outDir,
+    { platforms: platforms.filter(isDesktopPlatform), steamAppId },
+    desktopTools(playerDir),
+    (progress) => console.log(`  ${progress.message}`)
+  )
+
+  for (const diagnostic of result.diagnostics) {
+    const where = diagnostic.line === null ? '' : ` line ${diagnostic.line}`
+    console.error(`${diagnostic.severity.toUpperCase()}:${where} ${diagnostic.message}`)
+  }
+  for (const warning of result.warnings) console.warn(`warning: ${warning}`)
+  for (const build of result.builds) {
+    const label = desktopPlatform(build.platform).label
+    if (build.outDir !== null) console.log(`  ${label}: ${build.outDir}`)
+    else console.error(`  ${label}: not written — ${build.problem}`)
+  }
+
+  if (!result.ok) {
+    console.error('Nothing was written.')
+    return 1
+  }
+  console.log(`Exported ${project.title} as a desktop game to ${result.outDir}`)
   return 0
 }
 

@@ -62,6 +62,10 @@ export const UI_TEXT = {
 
   characterTitle: "Character",
   characterClose: "Close",
+  /** The word prompt: a question the reader answers once, in their own words. */
+  wordHint: "This is what the story will call it from now on. Leave it as it is to keep the story's own word.",
+  wordKeep: "Keep as written",
+  wordUse: "Use this word",
   characterStats: "Stats",
   characterNoStats: "No stats",
   characterStatValue: "{label}: {value}",

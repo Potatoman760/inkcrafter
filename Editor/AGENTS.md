@@ -276,6 +276,20 @@ Rules that hold it together:
   is not a knot. All warnings — a story with one misspelled sprite is still worth
   playing, and half of what it finds is work in progress.
 
+**The desktop export** (`src/main/desktopExport.ts`, `Export… ▸ Desktop game`,
+`npm run export -- --desktop`) writes the other kind of release: one folder per
+platform holding Electron, the player's build, its Electron main and one
+bundle, which runs with nothing installed and is what a Steam depot is made of.
+It assembles from Electron's prebuilt zips rather than electron-builder, so
+every platform builds on any machine; what it cannot do is sign a Mac build,
+and its README says so. The player is **rebuilt every export** — an engine
+older than its source would ship a week of fixes short — and a protected
+project is refused unless the built engine holds its key, since the key is
+compiled in by that build. Everything reaching outside the process (the build,
+the download, the unzip) comes in through `DesktopTools`, which is how the
+tests run without a network. The shell reads `player.json` in the app folder
+for the game id and Steam App ID.
+
 `src/shared/bundle/` is the interchange spec, and it is **copied into the player**
 (`src/bundle/spec/`) by a sync script there. It must stay pure — no Electron, no
 node, no imports outside `src/shared` — because it is compiled by a second

@@ -11,6 +11,8 @@
  * to someone else on its own.
  */
 
+import type { DesktopRelease } from './desktop'
+
 export interface ProjectProtection {
   mode: 'protected'
   /** Fingerprint selecting the matching private key compiled into the player. */
@@ -37,6 +39,11 @@ export interface Project {
   bundleOut: string | null
   /** Absent means the existing plain export. */
   protection?: ProjectProtection
+  /**
+   * The desktop release: where it was last written, which platforms, and the
+   * Steam App ID. Absent until the project has been exported that way once.
+   */
+  desktop?: DesktopRelease
   /** Absolute path of the project directory. Derived from location, never persisted. */
   path: string
 }

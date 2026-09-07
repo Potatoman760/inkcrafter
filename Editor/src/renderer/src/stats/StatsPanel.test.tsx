@@ -216,33 +216,6 @@ describe('StatsPanel', () => {
     await waitFor(() => expect(screen.queryByText(/is used in/)).not.toBeInTheDocument())
   })
 
-  /* Reordering ------------------------------------------------------------ */
-
-  it('moves a stat down the list', async () => {
-    const { onChange } = dialog()
-
-    await userEvent.click(screen.getByLabelText('Move strength down'))
-
-    expect((onChange.mock.calls[0]![0] as StatsDocument).stats.map((s) => s.name)).toEqual([
-      'has_met_wren',
-      'strength'
-    ])
-  })
-
-  it('moves an item down the one list', async () => {
-    const { onChange } = dialog()
-    await toItems()
-
-    await userEvent.click(screen.getByLabelText('Move shovel down'))
-
-    const next = onChange.mock.calls[0]![0] as StatsDocument
-    expect(next.items.map((i) => i.name)).toEqual([
-      'rope',
-      'shovel',
-      'brass_key'
-    ])
-  })
-
   /**
    * The inventory variable is one fixed name now, not a setting. It offered a
    * rename that rewrote no ink and warned about nothing, while every other name

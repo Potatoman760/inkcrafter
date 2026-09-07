@@ -146,9 +146,14 @@ describe('MediaPanel', () => {
     container.remove()
 
     dialog()
+    // Found by its own row rather than by position: the list is sorted by name,
+    // so which asset comes first is not this test's business.
+    const row = [...document.querySelectorAll('.media-rows li')].find((one) =>
+      one.textContent?.includes('harbour')
+    )
     // Beside the row rather than inside it: the row is a button and so is the
     // thumbnail now, and one cannot be nested in the other.
-    const thumb = document.querySelector('.media-rows li .media-peek .media-thumb img')
+    const thumb = row?.querySelector('.media-peek .media-thumb img')
     expect(thumb).toHaveAttribute('src', 'app://media/p/media/bg/harbour-day.png')
   })
 

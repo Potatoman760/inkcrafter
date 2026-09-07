@@ -3,6 +3,7 @@ import { join, sep } from 'node:path'
 import { slugify } from '@shared/codex'
 import { isIdOf, newId } from '@shared/ids'
 import type { Project, ProjectFile, ProjectProtection } from '@shared/project'
+import { DEFAULT_DESKTOP_RELEASE, isDesktopPlatform, type DesktopRelease } from '@shared/desktop'
 import { exists, walkFiles } from './fs'
 import { parseDocument, serialiseDocument } from './markdown'
 import { stripBom } from './text'
@@ -59,6 +60,7 @@ export async function readProject(projectPath: string): Promise<Project | null> 
     ? data['libraries'].filter((id): id is string => typeof id === 'string' && isIdOf(id, 'lib'))
     : []
   const protection = parseProtection(data['protection'])
+  const desktop = parseDesktop(data['desktop'])
 
   const project: Project = {
     id: isIdOf(stored, 'prj') ? stored : newId('prj'),
@@ -70,6 +72,7 @@ export async function readProject(projectPath: string): Promise<Project | null> 
       ? data['bundleOut']
       : null,
     ...(protection ? { protection } : {}),
+    ...(desktop ? { desktop } : {}),
     path: projectPath
   }
 
@@ -90,12 +93,34 @@ export async function saveProject(project: Project): Promise<void> {
         libraries: project.libraries,
         main: project.main,
         ...(project.bundleOut === null ? {} : { bundleOut: project.bundleOut }),
-        ...(project.protection ? { protection: project.protection } : {})
+        ...(project.protection ? { protection: project.protection } : {}),
+        ...(project.desktop ? { desktop: project.desktop } : {})
       },
       project.description
     ),
     'utf8'
   )
+}
+
+/**
+ * The desktop release settings, or null when the project has never had any.
+ *
+ * Lenient on the way in: a platform this version does not know is dropped
+ * rather than failing the whole project, and an empty platform list falls back
+ * to all of them — an export with nothing selected is not a thing to remember.
+ */
+function parseDesktop(value: unknown): DesktopRelease | null {
+  if (typeof value !== 'object' || value === null) return null
+  const one = value as Record<string, unknown>
+  const platforms = Array.isArray(one['platforms'])
+    ? one['platforms'].filter(isDesktopPlatform)
+    : []
+  const steamAppId = Number(one['steamAppId'])
+  return {
+    outDir: typeof one['outDir'] === 'string' && one['outDir'].length > 0 ? one['outDir'] : null,
+    steamAppId: Number.isInteger(steamAppId) && steamAppId > 0 ? steamAppId : null,
+    platforms: platforms.length > 0 ? platforms : [...DEFAULT_DESKTOP_RELEASE.platforms]
+  }
 }
 
 function parseProtection(value: unknown): ProjectProtection | null {

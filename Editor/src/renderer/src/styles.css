@@ -530,6 +530,38 @@ body.is-resizing {
   margin-top: 8px;
 }
 
+/* Filter and sort on one row above a long list: both are ways of not reading
+   all of it, and separating them would put two half-empty rows over the list
+   they are meant to leave room for. The filter takes the space; the sort is a
+   fixed set of three short words. */
+.list-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 8px 10px 4px;
+  min-width: 0;
+}
+
+.panel-new + .list-tools,
+.panel-new-preview + .list-tools {
+  margin-top: 8px;
+}
+
+.list-tools .codex-filter {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+/* The field and the direction read as one control, so they sit together with
+   no gap between them and the filter takes whatever is left. */
+.list-tools .sort-control {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 /* .ic-hint is the one-line guidance in a pane. These run a little roomier
    than the component's default because they are usually a whole sentence
    explaining where something lives. */

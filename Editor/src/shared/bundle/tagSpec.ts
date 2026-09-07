@@ -154,9 +154,20 @@ export type TagCommand =
   | { kind: "speaker"; name: string }
   /** Show one live Ink variable in the player's top-left corner for this knot. */
   | { kind: "display"; variable: string; label: string }
+  /**
+   * Offer the reader a word of their own, kept in one text variable.
+   *
+   * What a character calls the reader is the reader's to choose — `daddy` is
+   * not everybody's word for it. The tag goes on the line where the word is
+   * first heard: the player offers the field there, writes the answer into the
+   * variable, and every later line that interpolates it says what the reader
+   * chose. The authored value of the variable is the default, so a reader who
+   * changes nothing gets the story exactly as written.
+   */
+  | { kind: "word"; variable: string; label: string }
   | { kind: "stat"; stat: string; op: TagOp; value: number }
   | { kind: "npc"; id: string; attr: string; op: TagOp; value: string }
-  | { kind: "map"; enabled: boolean }
+  | { kind: "map"; enabled: boolean; open?: boolean }
   /** Suspend narrative advancement and run one catalogued minigame. */
   | { kind: "minigame"; name: string }
   /** Write a rotating autosave once the next stable frame is on screen. */
@@ -201,6 +212,7 @@ export const TAG_KEYS = [
   "minigame",
   "autosave",
   "active",
+  "word",
 ] as const;
 
 /** An ink identifier: what a catalogued name and a variant must both look like. */
@@ -475,6 +487,15 @@ export function parseTag(raw: string): TagCommand | null {
       return { kind: "display", variable: match[1]!, label: match[2]!.trim() };
     }
 
+    // The same shape as `display`: a variable, then what to call it on screen.
+    // Here the words are a question rather than a caption — "What Piri calls
+    // you" heads a field the reader types into.
+    case "word": {
+      const match = DISPLAY.exec(value);
+      if (!match || match[2]!.trim().length === 0) return null;
+      return { kind: "word", variable: match[1]!, label: match[2]!.trim() };
+    }
+
     case "stat": {
       const match = STAT.exec(value);
       if (!match) return null;
@@ -500,6 +521,7 @@ export function parseTag(raw: string): TagCommand | null {
 
     case "map": {
       const on = value.toLowerCase();
+      if (on === "open") return { kind: "map", enabled: true, open: true };
       if (on === "on" || on === "off") return { kind: "map", enabled: on === "on" };
       return null;
     }
@@ -587,6 +609,8 @@ export function formatTag(command: TagCommand): string {
       return `speaker: ${command.name}`;
     case "display":
       return `display:${command.variable} ${command.label}`;
+    case "word":
+      return `word: ${command.variable} ${command.label}`;
     // `+1` reads as one thing and `= married` as two, which is how each is
     // written by hand. Both parse either way; this is only about the ink an
     // author has to read afterwards.
@@ -595,7 +619,7 @@ export function formatTag(command: TagCommand): string {
     case "npc":
       return `npc: ${command.id} ${command.attr} ${spaced(command.op)}${command.value}`;
     case "map":
-      return `map: ${command.enabled ? "on" : "off"}`;
+      return `map: ${command.open ? "open" : command.enabled ? "on" : "off"}`;
     case "minigame":
       return `minigame: ${command.name}`;
     case "autosave":
@@ -662,6 +686,7 @@ export function mediaRefOf(
     case "map":
     case "minigame":
     case "autosave":
+    case "word":
       return null;
   }
 }

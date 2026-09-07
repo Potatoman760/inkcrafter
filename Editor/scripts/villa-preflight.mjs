@@ -14,6 +14,7 @@ const compiled = await build({
       "export { parseMap } from './src/shared/bundle/mapDoc';",
       "export { parseGallery } from './src/shared/bundle/galleryDoc';",
       "export { parseGame } from './src/shared/bundle/gameDoc';",
+      "export { scanKnots } from './src/shared/inkKnots';",
       "export { parseMinigames } from './src/shared/bundle/minigameDoc';"
     ].join('\n'),
     resolveDir: process.cwd(), loader: 'ts'
@@ -33,6 +34,7 @@ const walk = (dir) => {
 walk(root)
 const problems = lib.preflight({
   sources,
+  knots: [...sources.values()].flatMap(source => lib.scanKnots(source).filter(knot => !knot.isFunction).map(knot => knot.name)),
   media: lib.parseMedia(text('media.json')),
   stats: lib.parseStats(text('stats.json')),
   npcs: lib.parseNpcs(text('npcs.json')),

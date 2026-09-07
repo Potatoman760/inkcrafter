@@ -1,4 +1,5 @@
 import { CODEX_TYPES, newEntry, slugify, type CodexEntry, type CodexType } from '@shared/codex'
+import { restamp } from '@shared/modified'
 import {
   inkName,
   newItem,
@@ -101,7 +102,9 @@ function mergeStat(doc: StatsDocument, input: StatInput): { doc: StatsDocument; 
   const existing = doc.stats.find((stat) => stat.name === input.name)
 
   if (existing) {
-    const updated: Stat = { ...existing, ...input }
+    // Stamped through the same guard the panels use: the assistant rewriting
+    // an entry with what it already said is not a change to it.
+    const updated: Stat = restamp(existing, { ...existing, ...input })
     return {
       doc: { ...doc, stats: doc.stats.map((stat) => (stat.id === existing.id ? updated : stat)) },
       added: false
@@ -120,7 +123,8 @@ function mergeVariable(doc: StatsDocument, input: StatInput): { doc: StatsDocume
     initial: input.initial,
     min: existing?.min ?? null,
     max: existing?.max ?? null,
-    description: input.description
+    description: input.description,
+    modified: existing?.modified ?? null
   }
 
   if (existing) {
@@ -128,7 +132,7 @@ function mergeVariable(doc: StatsDocument, input: StatInput): { doc: StatsDocume
       doc: {
         ...doc,
         variables: doc.variables.map((variable) =>
-          variable.id === existing.id ? { ...existing, ...fields } : variable
+          variable.id === existing.id ? restamp(existing, { ...existing, ...fields }) : variable
         )
       },
       added: false
@@ -145,7 +149,7 @@ function mergeItem(doc: StatsDocument, input: ItemInput): { doc: StatsDocument; 
   const existing = doc.items.find((item) => item.name === input.name)
 
   if (existing) {
-    const updated: Item = { ...existing, ...input }
+    const updated: Item = restamp(existing, { ...existing, ...input })
     return {
       doc: { ...doc, items: doc.items.map((item) => (item.id === existing.id ? updated : item)) },
       added: false

@@ -41,6 +41,9 @@ export class EstateScene extends Phaser.Scene {
   private leaving = false;
   private tutorialStep = -1;
   private tutorialReturn: { page: Page; room: string; resident: string | null; detail: number; note: string } | null = null;
+  private crownEditor: Phaser.GameObjects.DOMElement | null = null;
+  private crownField: HTMLInputElement | null = null;
+  private crownLabel: Phaser.GameObjects.Text | null = null;
 
   constructor() { super(SceneKey.Estate); }
 
@@ -51,6 +54,7 @@ export class EstateScene extends Phaser.Scene {
     this.closed = false; this.note = ''; this.controls = []; this.focused = -1;
     this.testGates = new Map(); this.gatePage = 0; this.calendar = null; this.leaving = false;
     this.tutorialStep = -1; this.tutorialReturn = null;
+    this.crownEditor = null; this.crownField = null; this.crownLabel = null;
     this.cameras.main.setBackgroundColor('#152820');
     try {
       const game = this.state.bundle.minigames.minigames.find(one => one.name === data.name);
@@ -99,7 +103,7 @@ export class EstateScene extends Phaser.Scene {
     setControllerActions(this, { back: () => this.back(), accept: () => { if (this.tutorialStep >= 0) this.moveTutorial(1); },
       previousPage: () => this.tutorialStep >= 0 ? this.moveTutorial(-1) : this.stepRoom(-1),
       nextPage: () => this.tutorialStep >= 0 ? this.moveTutorial(1) : this.stepRoom(1) });
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => keyboard?.off('keydown', keydown));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.closeCrownEditor(false); keyboard?.off('keydown', keydown); });
   }
 
   private number(variable: string): number | null {
@@ -226,6 +230,7 @@ export class EstateScene extends Phaser.Scene {
     return image;
   }
   private render(): void {
+    this.closeCrownEditor(false);
     this.children.removeAll(true); this.controls = []; this.focused = -1;
     const room = this.currentRoom();
     this.roomKey = room?.key ?? '';
@@ -240,12 +245,15 @@ export class EstateScene extends Phaser.Scene {
       const g = this.add.graphics().lineStyle(1, 0xa89260, 0.055);
       for (let x = -720; x < 1400; x += 50) g.lineBetween(x, 0, x + 720, 720);
     }
-    this.header();
+    // Bath portraits are intentionally drawn before the header so a native-size
+    // crop can extend behind the chrome without covering its controls.
+    if (this.page !== 'bath') this.header();
     if (this.page === 'villa') this.villa();
     else if (this.page === 'room') this.roomInterior();
     else if (this.page === 'bath' && room) this.bathInterior(room);
     else if (this.page === 'commissions') this.commissions();
     else this.roomGates();
+    if (this.page === 'bath') this.header();
     this.add.rectangle(0, 674, 1280, 46, 0x101d17, 0.96).setOrigin(0);
     const boardNote = !this.calendar ? 'Choose your commissions, then collect the day’s earnings.'
       : this.workFinished() ? 'Commissions are finished. Your crowns remain available for rooms and visits.'
@@ -263,7 +271,14 @@ export class EstateScene extends Phaser.Scene {
     this.text(86, 35, this.definition.display || 'The villa', 30, C.cream, 490, true);
     const remaining = this.calendar?.lastDay ? this.calendar.lastDay - this.ledger.day : null;
     this.text(634, 23, 'DAY ' + String(this.ledger.day).padStart(2, '0') + (remaining === null ? '' : remaining > 0 ? ' / ' + remaining + ' LEFT' : ' / LAST DAY'), 13, '#c6b58f');
-    this.text(634, 47, this.ledger.crowns + ' crowns', 24, '#f2d598', 230, true);
+    const crowns = this.text(634, 47, this.ledger.crowns + ' crowns', 24, '#f2d598', 230, true);
+    this.crownLabel = crowns;
+    if (this.launchData.mode === 'test' && this.tutorialStep < 0) {
+      crowns.setInteractive({ useHandCursor: true })
+        .on('pointerover', () => crowns.setColor('#ffe9b4'))
+        .on('pointerout', () => crowns.setColor('#f2d598'))
+        .on('pointerdown', () => this.editCrowns(crowns));
+    }
     this.text(888, 24, 'AT HOME', 11, '#c6b58f');
     const visibleResidents = this.ledger.residents.filter(key => this.visibleRooms().some(room => room.key === this.ledger.assignments[key]));
     this.text(888, 47, visibleResidents.length + ' / ' + estateCapacity(this.ledger, this.definition.rooms, this.roomVariable), 24, C.cream, 100, true);
@@ -277,6 +292,41 @@ export class EstateScene extends Phaser.Scene {
       if (this.definition.rooms.some(room => room.availabilityVariable)) this.button(1037, 98, 'Room gates', () => this.navigate('gates'), true, 132, this.page === 'gates', true, 30);
       this.button(1180, 98, 'Reset test', () => this.scene.restart(this.launchData), true, 145, false, true, 30);
     }
+  }
+  /** A test-only native field; story funds remain exclusively game-driven. */
+  private editCrowns(label: Phaser.GameObjects.Text): void {
+    if (this.launchData.mode !== 'test' || this.tutorialStep >= 0 || this.crownEditor) return;
+    const input = document.createElement('input');
+    input.type = 'text'; input.inputMode = 'numeric'; input.value = String(this.ledger.crowns);
+    input.maxLength = 16; input.autocomplete = 'off'; input.spellcheck = false;
+    input.setAttribute('aria-label', 'Test crowns');
+    input.style.cssText = 'width:230px;height:34px;box-sizing:border-box;padding:1px 8px;pointer-events:auto;' +
+      'background:rgba(18,37,29,.98);border:1px solid #c9a86c;border-radius:3px;color:#f2d598;' +
+      'font:700 24px Georgia,serif;line-height:30px;outline:none;caret-color:#ffe9b4;' +
+      'box-shadow:0 2px 8px rgba(0,0,0,.45);';
+    label.setVisible(false); this.crownLabel = label; this.crownField = input;
+    const editor = this.add.dom(634, 44, input).setOrigin(0, 0); this.crownEditor = editor;
+    input.addEventListener('keydown', event => {
+      event.stopPropagation();
+      if (event.key === 'Escape') { event.preventDefault(); this.closeCrownEditor(true); return; }
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      const raw = input.value.trim(), value = /^\d+$/.test(raw) ? Number(raw) : Number.NaN;
+      if (!Number.isSafeInteger(value) || value < 0) {
+        input.setAttribute('aria-invalid', 'true'); input.style.borderColor = '#db7d68'; input.select(); return;
+      }
+      this.ledger = { ...this.ledger, crowns: value };
+      this.note = `Test crowns set to ${value}.`;
+      this.closeCrownEditor(false); this.render();
+    });
+    input.addEventListener('blur', () => { if (this.crownEditor === editor) this.closeCrownEditor(true); });
+    queueMicrotask(() => { if (this.crownField === input) { input.focus(); input.select(); } });
+  }
+  private closeCrownEditor(restoreLabel: boolean): void {
+    const editor = this.crownEditor, label = this.crownLabel;
+    this.crownEditor = null; this.crownField = null; this.crownLabel = null;
+    if (editor) editor.destroy();
+    if (restoreLabel && label?.active) { label.setVisible(true); this.crownLabel = label; }
   }
   private villa(): void {
     const key = this.art(this.definition.background);
@@ -454,22 +504,28 @@ export class EstateScene extends Phaser.Scene {
   private bathInterior(room: EstateRoom): void {
     const guests = estateBathGuests(this.ledger, this.definition, room.key, this.roomVariable)
       .map(guest => ({ guest, texture: this.bathPortrait(guest) })).filter(one => one.texture !== null);
-    const pages = Math.max(1, Math.ceil(guests.length / 4));
+    // Bath variants are authored at their intended display size. Keeping them
+    // at scale 1 avoids browser downsampling while still fitting a social pool.
+    const guestsPerPage = 4;
+    const pages = Math.max(1, Math.ceil(guests.length / guestsPerPage));
     this.detailPage = Math.max(0, Math.min(this.detailPage, pages - 1));
     estatePanel(this, 28, 142, 530, 83);
     this.text(49, 155, room.name, 28, C.cream, 484, true);
     this.text(49, 193, guests.length ? `${guests.length} household guests · A place to unwind` : 'A quiet pool, waiting for the household', 15, '#e6c78e', 484);
     estatePanel(this, 880, 142, 372, 58);
     this.button(1066, 171, 'Leave water', () => this.openRoom(room.key), true, 340, false, true, 36);
-    const visible = guests.slice(this.detailPage * 4, this.detailPage * 4 + 4);
+    const visible = guests.slice(this.detailPage * guestsPerPage, this.detailPage * guestsPerPage + guestsPerPage);
     visible.forEach(({ guest, texture }, index) => {
-      const x = 640 + (index - (visible.length - 1) / 2) * 300;
-      const waterline = visible.length > 2 && index % 2 ? 574 : 514;
-      const sprite = this.add.image(x, waterline, texture!).setOrigin(0.5, 1);
-      sprite.setScale(Math.min(260 / sprite.width, (waterline > 520 ? 204 : 176) / sprite.height));
+      const x = 190 + index * 300;
+      const preferredWaterline = visible.length > 2 && index % 2 ? 574 : 514;
+      const sprite = this.add.image(x, 0, texture!).setOrigin(0.5, 1);
+      // Taller author-selected crops sink a little deeper so their heads never
+      // cover the room title, while short crops keep the staggered composition.
+      const waterline = Math.min(610, Math.max(preferredWaterline, 236 + sprite.height));
+      sprite.setPosition(x, waterline);
       const ripples = this.add.graphics();
-      ripples.lineStyle(2, 0xbce0d3, 0.52).strokeEllipse(x, waterline - 9, Math.min(235, sprite.displayWidth + 38), 17);
-      ripples.lineStyle(1, 0xd9ebd8, 0.28).strokeEllipse(x, waterline - 6, Math.min(272, sprite.displayWidth + 76), 29);
+      ripples.lineStyle(2, 0xbce0d3, 0.52).strokeEllipse(x, waterline - 9, Math.min(235, sprite.displayWidth + 28), 17);
+      ripples.lineStyle(1, 0xd9ebd8, 0.28).strokeEllipse(x, waterline - 6, Math.min(272, sprite.displayWidth + 62), 29);
       this.text(x, waterline + 16, guest.name, 18, C.cream, 236, true).setOrigin(0.5, 0).setShadow(1, 2, '#153c3d', 3);
     });
     if (!guests.length) {
@@ -478,9 +534,9 @@ export class EstateScene extends Phaser.Scene {
       this.text(640, 587, 'Company joins you as the household grows.', 16, '#d7d6c2', 532).setOrigin(0.5, 0);
     }
     if (pages > 1) {
-      this.button(451, 655, 'Previous guests', () => { this.detailPage--; this.render(); }, this.detailPage > 0, 214, false, true, 28);
-      this.text(640, 647, `${this.detailPage + 1} / ${pages}`, 14, C.cream, 65, true).setOrigin(0.5, 0);
-      this.button(829, 655, 'More guests', () => { this.detailPage++; this.render(); }, this.detailPage < pages - 1, 214, false, true, 28);
+      this.button(139, 655, 'Previous guests', () => { this.detailPage--; this.render(); }, this.detailPage > 0, 214, false, true, 32);
+      this.text(640, 651, `${this.detailPage + 1} / ${pages}`, 14, C.cream, 65, true).setOrigin(0.5, 0);
+      this.button(1141, 655, 'More guests', () => { this.detailPage++; this.render(); }, this.detailPage < pages - 1, 214, false, true, 32);
     }
   }
   private residentActions(resident: EstateResident, occupants: string[]): void {

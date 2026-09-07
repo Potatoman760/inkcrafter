@@ -1,4 +1,5 @@
 import { newId } from './ids'
+import { restamp, stampNow } from './modified'
 export { COMBATANT_STATES } from './bundle/minigameDoc'
 
 /**
@@ -195,6 +196,12 @@ export interface MediaAsset {
   /** Free-form, for finding things once there are two hundred. */
   tags: string[]
   variants: MediaVariant[]
+  /**
+   * When this asset or one of its looks last changed, or null for one
+   * catalogued before this was recorded. Never exported: the player has no use
+   * for it, and it is here so a folder of two hundred can be read newest first.
+   */
+  modified: string | null
 }
 
 export interface MediaDocument {
@@ -229,6 +236,7 @@ export function newVariant(name: string, file: string): MediaVariant {
 
 export function newAsset(name: string, kind: MediaKind): MediaAsset {
   return {
+    modified: stampNow(),
     id: newId('med'),
     kind,
     name: mediaName(name),
@@ -250,10 +258,7 @@ export function updateAsset(
   id: string,
   changes: Partial<MediaAsset>
 ): MediaDocument {
-  return {
-    ...doc,
-    assets: doc.assets.map((asset) => (asset.id === id ? { ...asset, ...changes } : asset))
-  }
+  return updateAssetBy(doc, id, (asset) => ({ ...asset, ...changes }))
 }
 
 export function removeAsset(doc: MediaDocument, id: string): MediaDocument {
@@ -375,9 +380,12 @@ function updateAssetBy(
   id: string,
   change: (asset: MediaAsset) => MediaAsset
 ): MediaDocument {
+  // Every change to an asset's looks comes through here — added, repointed,
+  // reordered, removed — so this is the one place a stamp has to be set for
+  // all of them, and the guard keeps a no-op from moving it.
   return {
     ...doc,
-    assets: doc.assets.map((asset) => (asset.id === id ? change(asset) : asset))
+    assets: doc.assets.map((asset) => (asset.id === id ? restamp(asset, change(asset)) : asset))
   }
 }
 
@@ -487,6 +495,10 @@ function asAsset(value: unknown): MediaAsset | null {
           .map((tag) => tag.trim())
           .filter((tag) => tag.length > 0)
       : [],
+    modified:
+      typeof record['modified'] === 'string' && !Number.isNaN(Date.parse(record['modified']))
+        ? record['modified']
+        : null,
     // `file` is the authored audio shape. `variants` remains readable for
     // existing projects and for the bundle catalogue consumed by the player.
     variants:
@@ -542,7 +554,16 @@ export function serialiseMedia(doc: MediaDocument): string {
 /**
  * Bundle compatibility shape. The player resolves every kind through runtime
  * variants, including each audio asset's synthetic default entry.
+ *
+ * `modified` is left out. It is authoring bookkeeping — when the author last
+ * touched an asset — and a shipped game has no use for it; leaving it in would
+ * put a private editing history in a file readers can open.
  */
 export function serialiseBundleMedia(doc: MediaDocument): string {
-  return `${JSON.stringify(doc, null, 2)}\n`
+  const shipped = {
+    ...doc,
+    assets: doc.assets.map(({ modified: _modified, ...asset }) => asset)
+  }
+
+  return `${JSON.stringify(shipped, null, 2)}\n`
 }

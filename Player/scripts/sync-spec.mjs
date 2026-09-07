@@ -36,6 +36,9 @@ const TO = join(PLAYER, 'src', 'bundle', 'spec')
 const FILES = [
   'ids.ts',
   'mediaDoc.ts',
+  // mediaDoc stamps its assets through this; the player never sorts by it,
+  // but the module has to be here for the vendored copy to compile.
+  'modified.ts',
   'mediaTag.ts',
   'bundle/manifest.ts',
   'bundle/protection.ts',

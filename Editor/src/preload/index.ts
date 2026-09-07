@@ -1,7 +1,8 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { ChatProgress } from '@shared/chat'
+import type { DesktopExportProgress } from '@shared/desktop'
 import type { MenuAction } from '@shared/settings'
-import type { CompileRequest, InkCrafterApi } from '@shared/types'
+import type { CompileRequest, InkCrafterApi, WorkspaceChange } from '@shared/types'
 
 const api: InkCrafterApi = {
   compile: (request: CompileRequest) => ipcRenderer.invoke('ink:compile', request),
@@ -121,10 +122,30 @@ const api: InkCrafterApi = {
   search: {
     ink: (project, request) => ipcRenderer.invoke('search:ink', project, request)
   },
+
+  watch: {
+    project: (project) => ipcRenderer.invoke('watch:project', project),
+    onChange: (handler) => {
+      // The IpcRendererEvent carries a reference to the sender, so it is
+      // unwrapped here rather than handed across the context bridge.
+      const listener = (_event: IpcRendererEvent, change: WorkspaceChange): void =>
+        handler(change)
+      ipcRenderer.on('watch:changed', listener)
+      return () => ipcRenderer.removeListener('watch:changed', listener)
+    }
+  },
   bundle: {
     export: (project, outDir) => ipcRenderer.invoke('bundle:export', project, outDir),
     generateProtection: () => ipcRenderer.invoke('bundle:generateProtection'),
     installProtection: (profile) => ipcRenderer.invoke('bundle:installProtection', profile),
+    exportDesktop: (project, outDir, options) =>
+      ipcRenderer.invoke('bundle:exportDesktop', project, outDir, options),
+    onDesktopProgress: (handler) => {
+      const listener = (_event: IpcRendererEvent, progress: DesktopExportProgress): void =>
+        handler(progress)
+      ipcRenderer.on('bundle:desktopProgress', listener)
+      return () => ipcRenderer.removeListener('bundle:desktopProgress', listener)
+    },
     chooseDir: (current) => ipcRenderer.invoke('bundle:chooseDir', current),
     reveal: (outDir) => ipcRenderer.invoke('bundle:reveal', outDir)
   },

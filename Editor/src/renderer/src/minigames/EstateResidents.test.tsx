@@ -52,7 +52,7 @@ describe('EstateResidents', () => {
     expect(last(changed).residents?.[0]).toMatchObject({ sprite: 'lira', bathSprite: { assetId: 'lira', variantId: 'bath' } })
     expect(screen.getByAltText('Bath sprite preview')).toHaveAttribute('src', 'bath.png')
     fireEvent.change(screen.getByLabelText('Bath visible percent'), { target: { value: '26' } })
-    expect(last(changed).residents?.[0].bathVisiblePercent).toBe(26)
+    expect(last(changed).residents?.[0]?.bathVisiblePercent).toBe(26)
     fireEvent.change(screen.getByLabelText('Bath sprite'), { target: { value: '' } })
     expect(last(changed).residents?.[0]).toMatchObject({ sprite: 'lira', bathSprite: null })
   })

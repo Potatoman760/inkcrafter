@@ -163,6 +163,21 @@ describe('parseTag', () => {
     expect(isKnownTag('display:anything')).toBe(true)
   })
 
+  // What a character calls the reader is the reader's to choose, so the tag
+  // names the variable to keep it in and the question to head the field with.
+  it('reads a reader-chosen word, and refuses one with nothing to ask', () => {
+    const command = { kind: 'word', variable: 'piri_word', label: 'What Piri calls you' } as const
+
+    expect(parseTag('word: piri_word What Piri calls you')).toEqual(command)
+    expect(formatTag(command)).toBe('word: piri_word What Piri calls you')
+    // Round-trips through the tag it prints, which is how an author will read it.
+    expect(parseTag(formatTag(command))).toEqual(command)
+
+    expect(parseTag('word: piri_word')).toBeNull()
+    expect(parseTag('word: 9lives What they call you')).toBeNull()
+    expect(isKnownTag('word: anything at all')).toBe(true)
+  })
+
   it('reads a stat change with or without spaces', () => {
     expect(parseTag('stat: courage +1')).toEqual({
       kind: 'stat',
@@ -204,9 +219,11 @@ describe('parseTag', () => {
     expect(parseTag('npc: abeline')).toBeNull()
   })
 
-  it('reads the map toggle and nothing else', () => {
+  it('reads map toggles and an explicit open event', () => {
     expect(parseTag('map: on')).toEqual({ kind: 'map', enabled: true })
     expect(parseTag('map: OFF')).toEqual({ kind: 'map', enabled: false })
+    expect(parseTag('map: OPEN')).toEqual({ kind: 'map', enabled: true, open: true })
+    expect(formatTag({ kind: 'map', enabled: true, open: true })).toBe('map: open')
     expect(parseTag('map: maybe')).toBeNull()
   })
 

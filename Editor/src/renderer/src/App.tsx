@@ -20,9 +20,11 @@ import {
 import type { Project, ProjectFile } from "@shared/project";
 import type { MenuAction } from "@shared/settings";
 import { editorContextAt } from "@shared/inkContext";
+import { findKnot } from "@shared/inkKnots";
 import type { GuardedTextEdit } from "./editor/guardedEdit";
 import type { CompileResult } from "@shared/types";
 import { CodexEntryDialog } from "./codex/CodexEntryDialog";
+import { ConflictDialog } from "./editor/ConflictDialog";
 import { CodexPanel } from "./codex/CodexPanel";
 import { LibraryDialog } from "./codex/LibraryDialog";
 import { useCodex } from "./codex/useCodex";
@@ -152,6 +154,19 @@ export function App(): React.JSX.Element {
   projectRef.current = project;
   const [source, setSource] = useState("");
   const [dirty, setDirty] = useState(false);
+  /**
+   * What the open file held on disk the last time this app read or wrote it.
+   *
+   * The baseline a watcher event is measured against: disk matching this is
+   * our own save echoing back, and disk differing from it is somebody else's
+   * work. Without it there is no way to tell a change from a save, because a
+   * dirty buffer differs from disk either way.
+   */
+  const diskSource = useRef("");
+  /** The open file, changed underneath a buffer with unsaved edits. */
+  const [conflict, setConflict] = useState<{ path: string; theirs: string } | null>(null);
+  const conflictRef = useRef(conflict);
+  conflictRef.current = conflict;
   /** Current rather than captured, because an assistant turn outlives a render. */
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
@@ -273,6 +288,7 @@ export function App(): React.JSX.Element {
     void window.inkcrafter.readFile(main.absolutePath).then((contents) => {
       setOpenFile(main);
       setSource(contents);
+      diskSource.current = contents;
       setDirty(false);
     });
   }, [project, files, openFile]);
@@ -376,9 +392,30 @@ export function App(): React.JSX.Element {
   }, [project, codex.entries, openFile, deferredSource, files]);
 
 
+  /**
+   * Writes the buffer, unless somebody else got there first.
+   *
+   * Disk is read rather than trusted to the watcher: `fs.watch` makes no
+   * promise that every change produces an event, and this is the moment where
+   * missing one costs the author their collaborator's work rather than a stale
+   * view. A conflict already on screen blocks the save outright — the whole
+   * point of asking is not to write until it is answered.
+   */
   const save = useCallback(async () => {
-    if (!openFile) return;
+    if (!openFile || conflictRef.current) return;
+
+    const onDisk = await window.inkcrafter
+      .readFile(openFile.absolutePath)
+      // A file that has gone is not a conflict; the save puts it back.
+      .catch(() => diskSource.current);
+
+    if (onDisk !== diskSource.current) {
+      setConflict({ path: openFile.path, theirs: onDisk });
+      return;
+    }
+
     await window.inkcrafter.saveFile(openFile.absolutePath, source);
+    diskSource.current = source;
     setDirty(false);
   }, [openFile, source]);
 
@@ -513,7 +550,13 @@ export function App(): React.JSX.Element {
       const contents = await window.inkcrafter.readFile(file.absolutePath);
       setOpenFile(file);
       setSource(contents);
+      diskSource.current = contents;
       setDirty(false);
+      setConflict(null);
+      // Returned rather than only stored: a caller that has to look inside the
+      // file it just opened would otherwise read it a second time, and would
+      // race the state it is waiting for.
+      return contents;
     },
     [dirty, save],
   );
@@ -528,7 +571,9 @@ export function App(): React.JSX.Element {
   const reopenFromDisk = useCallback(async (file: ProjectFile) => {
     const contents = await window.inkcrafter.readFile(file.absolutePath);
     setSource(contents);
+    diskSource.current = contents;
     setDirty(false);
+    setConflict(null);
   }, []);
 
   /**
@@ -648,6 +693,97 @@ export function App(): React.JSX.Element {
   );
 
   const toasts = useToasts();
+
+  /**
+   * Watch the open project, and act on what anything other than this app writes.
+   *
+   * The three answers are different because the stakes are. A catalogue is
+   * saved continuously and holds no draft worth protecting, so it is reloaded
+   * outright — `workspaceNonce` is the same lever the assistant's writes
+   * already pull. An ink file with no unsaved edits is likewise just reloaded.
+   * An ink file being edited is the only case with two versions of real work
+   * in it, and that one is asked about rather than decided.
+   */
+  useEffect(() => {
+    void window.inkcrafter.watch.project(project);
+    return () => {
+      void window.inkcrafter.watch.project(null);
+    };
+  }, [project?.id, project]);
+
+  useEffect(() => {
+    return window.inkcrafter.watch.onChange((change) => {
+      const open = openFileRef.current;
+      const touchesOpen = open ? change.ink.includes(open.path) : false;
+
+      // Everything but the open buffer: the catalogues, the file list, the
+      // plan, the manuscript. All of them read from disk on this nonce.
+      if (change.catalogues.length > 0 || change.other.length > 0 || change.ink.length > 0) {
+        setWorkspaceNonce((current) => current + 1);
+      }
+      if (!open || !touchesOpen) return;
+
+      void window.inkcrafter
+        .readFile(open.absolutePath)
+        .then((theirs) => {
+          // Ours, echoing back through the filesystem, or a change that turned
+          // out to leave the bytes alone.
+          if (theirs === diskSource.current) return;
+          if (openFileRef.current?.path !== open.path) return;
+
+          if (!dirtyRef.current) {
+            setSource(theirs);
+            diskSource.current = theirs;
+            toasts.show({ tone: "info", title: `Reloaded ${open.path}` });
+            return;
+          }
+          setConflict({ path: open.path, theirs });
+        })
+        // A file that has been deleted or renamed out from under the buffer
+        // leaves the buffer alone: it is the only copy left.
+        .catch(() => undefined);
+    });
+  }, [toasts]);
+
+  /**
+   * Ctrl-clicking a divert: open the knot it leads to.
+   *
+   * The open file first, because that is where most diverts land and it needs
+   * no reload — and because an unsaved buffer holds knots that are not on disk
+   * yet, which the project scan could not find. Only then the rest of the
+   * project, scanned rather than compiled so this still works while the story
+   * around it is half-written.
+   */
+  const goToKnot = useCallback(
+    async (knot: string) => {
+      const here = findKnot(source, knot);
+      if (here) {
+        showView("editor");
+        setGotoLine({ line: here.line, nonce: Date.now(), align: "start" });
+        return;
+      }
+      if (!project) return;
+
+      const found = (await window.inkcrafter.map.destinations(project)).find(
+        (one) => one.knot === knot,
+      );
+      const file = found && files.find((one) => one.path === found.file);
+      if (!file) {
+        toasts.show({
+          tone: "error",
+          title: `Nothing declares ${knot}`,
+          detail: "No ink file in this project has a knot by that name.",
+        });
+        return;
+      }
+
+      showView("editor");
+      const contents = await selectFile(file);
+      const at = findKnot(contents, knot);
+      if (at) setGotoLine({ line: at.line, nonce: Date.now(), align: "start" });
+    },
+    [source, project, files, selectFile, showView, toasts],
+  );
 
   /**
    * What the manuscript refused, said once and dismissible.
@@ -1039,6 +1175,9 @@ export function App(): React.JSX.Element {
         project={project}
         onRemember={(destination) => {
           void window.inkcrafter.projects.save({ ...project, bundleOut: destination });
+        }}
+        onRememberDesktop={(desktop) => {
+          void window.inkcrafter.projects.save({ ...project, desktop });
         }}
         onClose={() => setExportOpen(false)}
       />
@@ -1434,6 +1573,7 @@ export function App(): React.JSX.Element {
               catalogues={tagCatalogues}
               onOpenEntry={openEntry}
               onFollowKnot={(knot) => void followKnot(knot)}
+              onGoToKnot={(knot) => void goToKnot(knot)}
               gotoLine={gotoLine}
               edit={inkEdit}
               onEditHandled={(nonce) =>
@@ -1581,6 +1721,25 @@ export function App(): React.JSX.Element {
           onOpenFile={openProjectFile}
           onOpenEntry={editEntry}
           onClose={() => setExpandedNodeId(null)}
+        />
+      )}
+
+      {conflict && (
+        <ConflictDialog
+          path={conflict.path}
+          onKeepMine={() => {
+            // Their version becomes the baseline without being loaded: the
+            // author has seen it and chosen against it, and asking again on
+            // every save would be nagging rather than warning.
+            diskSource.current = conflict.theirs;
+            setConflict(null);
+          }}
+          onUseTheirs={() => {
+            setSource(conflict.theirs);
+            diskSource.current = conflict.theirs;
+            setDirty(false);
+            setConflict(null);
+          }}
         />
       )}
 

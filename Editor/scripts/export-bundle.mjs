@@ -35,7 +35,9 @@ try {
     format: 'esm',
     target: 'node20',
     // Left for node to resolve: bundling them buys nothing, and inkjs is large.
-    external: ['inkjs', 'yaml', 'electron'],
+    // The two behind the desktop export as well: one carries a native
+    // binding, and neither gains anything from being inlined.
+    external: ['inkjs', 'yaml', 'electron', '@electron/get', '@electron-internal/extract-zip'],
     alias: { '@shared': join(ROOT, 'src', 'shared') },
     logLevel: 'warning'
   })

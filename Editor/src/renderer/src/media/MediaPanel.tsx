@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { DEFAULT_SORT, sortBy, type Sort } from '@shared/modified'
+import { SortControl } from '../layout/SortControl'
 import {
   addAsset,
   allTags,
@@ -109,6 +111,7 @@ export function MediaPanel({
 }: MediaPanelProps): React.JSX.Element {
   const [kind, setKind] = useState<MediaKind>('background')
   const [filter, setFilter] = useState('')
+  const [sort, setSort] = useState<Sort>(DEFAULT_SORT)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   /** What the lightbox is showing, or null. */
   const [preview, setPreview] = useState<{ items: PreviewItem[]; at: number } | null>(null)
@@ -189,8 +192,14 @@ export function MediaPanel({
   const matches = (haystack: string): boolean =>
     terms.every((term) => haystack.toLowerCase().includes(term))
 
-  const shown = assetsOfKind(doc, kind).filter((asset) =>
-    matches(`${asset.name} ${asset.display} ${asset.tags.join(' ')}`)
+  // A view of the catalogue, never a change to it: the file's order is the
+  // order the assets were catalogued in, and sorting must not rewrite it.
+  const shown = sortBy(
+    assetsOfKind(doc, kind).filter((asset) =>
+      matches(`${asset.name} ${asset.display} ${asset.tags.join(' ')}`)
+    ),
+    sort,
+    { label: (asset) => asset.name, modified: (asset) => asset.modified }
   )
 
   const selected = doc.assets.find((asset) => asset.id === selectedId) ?? null
@@ -271,12 +280,15 @@ export function MediaPanel({
             </Hint>
           )}
 
-          <Input className="codex-filter"
-            value={filter}
-            aria-label="Filter"
-            placeholder="Filter by name or tag…"
-            onChange={(event) => setFilter(event.target.value)}
-          />
+          <div className="list-tools">
+            <Input className="codex-filter"
+              value={filter}
+              aria-label="Filter"
+              placeholder="Filter by name or tag…"
+              onChange={(event) => setFilter(event.target.value)}
+            />
+            <SortControl value={sort} onChange={setSort} />
+          </div>
 
           {shown.length === 0 ? (
             <Hint>

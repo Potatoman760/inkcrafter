@@ -1,4 +1,4 @@
-import { readFile, stat, unlink, writeFile } from 'node:fs/promises'
+import { readFile, stat, unlink } from 'node:fs/promises'
 import { dirname, join, relative, sep } from 'node:path'
 import {
   claimedFiles,
@@ -14,6 +14,7 @@ import { pruneEmptyFolders, walkFiles } from './fs'
 import { isServableMedia, mediaUrl } from './mediaProtocol'
 import { stripBom } from './text'
 import { dataDir } from './workspace'
+import { writeWatched } from './watch'
 
 /**
  * The media catalogue lives at `media.json` in the project, beside `plan.json`
@@ -35,7 +36,7 @@ export async function readMedia(project: Project): Promise<MediaDocument> {
 }
 
 export async function writeMedia(project: Project, doc: MediaDocument): Promise<void> {
-  await writeFile(join(project.path, MEDIA_FILE), serialiseMedia(doc), 'utf8')
+  await writeWatched(join(project.path, MEDIA_FILE), serialiseMedia(doc))
 }
 
 /**

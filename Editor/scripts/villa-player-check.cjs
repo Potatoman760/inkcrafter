@@ -103,6 +103,17 @@ app.whenReady().then(async () => {
       if (JSON.parse(v.state.engine.getVariable(v.definition.stateVariable)).tutorialSeen !== v.definition.tutorial.version) throw new Error('Story tutorial completion not saved');
       v.launchData.mode = 'test'; v.render();
     })()`)
+    await click(700, 60)
+    await win.webContents.executeJavaScript(`(() => {
+      const v=window.villaProbe, input=document.querySelector('input[aria-label="Test crowns"]');
+      if(!input||document.activeElement!==input) throw new Error('Click did not open and focus the test crown editor');
+      input.value='2468';
+      input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',bubbles:true,cancelable:true}));
+      if(v.ledger.crowns!==2468) throw new Error('Enter did not apply edited crowns');
+      if(document.querySelector('input[aria-label="Test crowns"]')) throw new Error('Crown editor stayed open after Enter');
+      const flatten=list=>list.flatMap(one=>[one,...(Array.isArray(one.list)?flatten(one.list):[])]);
+      if(!flatten(v.children.list).some(one=>one.text==='2468 crowns')) throw new Error('Edited crown total did not rerender');
+    })()`)
     const result = await win.webContents.executeJavaScript(`(() => {
       const view = window.villaProbe;
       if (!view?.definition) throw new Error('Villa did not load');
@@ -116,6 +127,8 @@ app.whenReady().then(async () => {
       assert(view.ledger.day === testDay + 1, 'Test day did not advance');
       view.launchData.mode = 'story'; view.calendar = null; view.render();
       assert(!text().includes('End day'), 'Day control leaked into story without a calendar');
+      const storyCrowns = flatten(view.children.list).find(one => one.text === view.ledger.crowns + ' crowns');
+      assert(storyCrowns && !storyCrowns.input, 'Crown editor leaked into story mode');
       const storyDay = view.ledger.day; view.act({kind:'settle'});
       assert(view.ledger.day === storyDay, 'Story action advanced the day');
       for (const room of view.definition.rooms.filter(one => ['guest','guest_2'].includes(one.key))) {
@@ -179,14 +192,17 @@ app.whenReady().then(async () => {
       const labels=()=>flatten(v.children.list).map(one=>one.text);
       if(v.page!=='room'||!labels().includes('Take a bath')) throw new Error('Bath entry button missing');
       window.bathLedger=JSON.stringify(v.ledger); v.takeBath();
-      if(!labels().includes('Roman bathhouse')||!labels().includes('Piri')||!labels().includes('Lira')) throw new Error('Bathhouse household missing');
+      if(!labels().includes('Roman bathhouse')||!labels().includes('Lira')||!labels().includes('Piri')||!labels().includes('Isolde')) throw new Error('Bathhouse household missing');
       if(labels().includes('Invite Piri')||labels().includes('See them off')) throw new Error('Baths changed housing controls');
       if(JSON.stringify(v.ledger.assignments)!==window.bathHomes) throw new Error('Visiting baths moved residents');
       if(flatten(v.children.list).some(one=>one.texture?.key==='char_piri_neutral')) throw new Error('Missing bath sprite fell back to ordinary outfit');
-      const crop=flatten(v.children.list).find(one=>one.texture?.key?.startsWith('estate-bath:char_piri_neutral:'));
-      if(!crop||crop.height>=1000) throw new Error('Visible percentage crop missing');
+      const firstCrop=flatten(v.children.list).find(one=>one.texture?.key?.startsWith('estate-bath:'));
+      if(!firstCrop||firstCrop.scaleX!==1||firstCrop.scaleY!==1||firstCrop.width>360||firstCrop.height>320) throw new Error('Optimized bath crop missing: '+JSON.stringify(firstCrop&&{key:firstCrop.texture?.key,width:firstCrop.width,height:firstCrop.height,scaleX:firstCrop.scaleX,scaleY:firstCrop.scaleY}));
+      const crop=flatten(v.children.list).find(one=>one.texture?.key?.startsWith('estate-bath:char_piri_bath:'));
+      if(!crop||crop.scaleX!==1||crop.scaleY!==1) throw new Error('Piri was not rendered natively');
       if(JSON.stringify(v.ledger)!==window.bathLedger) throw new Error('Bath changed ledger');
-      if(labels().includes('Isolde')) throw new Error('Unassigned bath sprite shown');
+      const isolde=flatten(v.children.list).find(one=>one.texture?.key?.startsWith('estate-bath:char_isolde_bath:'));
+      if(!isolde||isolde.scaleX!==1||isolde.scaleY!==1) throw new Error('Isolde bath sprite missing');
     })()`)
     await capture('villa-bathhouse-restored.png')
     await win.webContents.executeJavaScript(`(() => {const v=window.villaProbe; v.back(); if(v.page!=='room') throw new Error('Bath Back failed'); v.takeBath(); })()`)
@@ -197,11 +213,17 @@ app.whenReady().then(async () => {
       for(const person of v.definition.residents) v.act({kind:'invite',key:person.key});
       v.openRoom('baths'); v.takeBath();
       const flatten=list=>list.flatMap(one=>[one,...(Array.isArray(one.list)?flatten(one.list):[])]);
-      const next=v.controls.find(one=>flatten([one.object]).some(child=>child.text==='More guests'));
-      if(!next) throw new Error('Bath guest pagination missing');
-      next.activate();
-      const texts=flatten(v.children.list).map(one=>one.text);
-      if(!texts.includes('Faye')||!texts.includes('Dinah')||!texts.includes('Yelena')) throw new Error('Second bath guest page missing');
+      const expected=['Maren','Anwen','Elowen','Lira','Piri','Tink','Faye','Dinah','Yelena','Daphne','Tamsin','Isolde'];
+      const seen=[];
+      for(let i=0;i<3;i++) {
+        const objects=flatten(v.children.list);
+        seen.push(...objects.map(one=>one.text).filter(text=>expected.includes(text)));
+        const crops=objects.filter(one=>one.texture?.key?.startsWith('estate-bath:'));
+        if(crops.length!==4||crops.some(one=>one.scaleX!==1||one.scaleY!==1||one.width>360||one.height>320)) throw new Error('Bath page did not use four optimized native-size crops');
+        const next=v.controls.find(one=>flatten([one.object]).some(child=>child.text==='More guests'));
+        if(next) next.activate();
+      }
+      if(!expected.every(name=>seen.includes(name))) throw new Error('Bath guest pages missing: '+expected.filter(name=>!seen.includes(name)).join(', '));
     })()`)
     await capture('villa-bathhouse-company.png')
     await win.webContents.executeJavaScript(`(() => { const v=window.villaProbe; v.ledger=JSON.parse(window.beforeBathCrowd); v.launchData.mode='story'; v.testGates.clear(); v.persist(); v.openRoom('baths'); })()`)

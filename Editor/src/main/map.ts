@@ -1,10 +1,11 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { emptyMap, parseMap, serialiseMap, type MapDocument } from '@shared/bundle/mapDoc'
 import { scanKnots, type KnotSource } from '@shared/inkKnots'
 import { listInkFiles } from './project'
 import type { Project } from '@shared/project'
 import { stripBom } from './text'
+import { writeWatched } from './watch'
 
 /**
  * The maps, at `map.json` beside the other catalogues.
@@ -30,7 +31,7 @@ export async function readMap(project: Project): Promise<MapDocument> {
 }
 
 export async function writeMap(project: Project, doc: MapDocument): Promise<void> {
-  await writeFile(join(project.path, MAP_FILE), serialiseMap(doc), 'utf8')
+  await writeWatched(join(project.path, MAP_FILE), serialiseMap(doc))
 }
 
 /**

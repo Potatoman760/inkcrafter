@@ -16,6 +16,7 @@ import { VNScene } from "@/scenes/VNScene";
 import { SaveLoadScene } from "@/scenes/SaveLoadScene";
 import { MapScene } from "@/scenes/MapScene";
 import { CharacterScene } from "@/scenes/CharacterScene";
+import { WordScene } from "@/scenes/WordScene";
 import { GalleryScene } from "@/scenes/GalleryScene";
 import { CombatScene } from "@/scenes/CombatScene";
 import { QuickhandsScene } from "@/scenes/QuickhandsScene";
@@ -80,6 +81,11 @@ async function start(): Promise<void> {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
+    // The villa's test-only inline crown editor is a native input so number
+    // entry, selection, and keyboard editing behave like the rest of the OS.
+    dom: {
+      createContainer: true,
+    },
     callbacks: {
       preBoot: (game) => {
         game.registry.set(BUNDLE_KEY, bundle);
@@ -95,6 +101,7 @@ async function start(): Promise<void> {
       SaveLoadScene,
       MapScene,
       CharacterScene,
+      WordScene,
       GalleryScene,
       CombatScene,
       QuickhandsScene,

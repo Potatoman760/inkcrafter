@@ -24,6 +24,7 @@ import type { PromptDefaults, PromptKind } from './prompts'
 import type { PlanDocument } from './planDoc'
 import type { MediaDocument, MediaKind } from './mediaDoc'
 import type { BundleExportResult } from './bundle/result'
+import type { DesktopExportOptions, DesktopExportProgress, DesktopExportResult } from './desktop'
 import type { StatsDocument } from './statsDoc'
 import type { NpcDocument } from './bundle/npcDoc'
 import type { MapDocument } from './bundle/mapDoc'
@@ -420,6 +421,36 @@ export interface NpcsApi {
   write(project: Project, doc: NpcDocument): Promise<{ written: string[] }>
 }
 
+/**
+ * What changed under the open project, since the app last looked.
+ *
+ * Split by what the renderer has to do about it rather than by what happened:
+ * a catalogue is reloaded outright, an ink file may be open and being edited,
+ * and everything else only matters because the file list may have moved.
+ */
+export interface WorkspaceChange {
+  /** Project-relative paths of `.ink` files added, changed or removed. */
+  ink: string[]
+  /** Project-relative names of the catalogue documents, `media.json` and its siblings. */
+  catalogues: string[]
+  /** Everything else under the project: pictures, notes, anything an author keeps there. */
+  other: string[]
+}
+
+export interface WatchApi {
+  /**
+   * Watches one project, or stops watching when given null. One at a time:
+   * the app has one project open, and watching a closed one would report
+   * changes nothing on screen is showing.
+   */
+  project(project: Project | null): Promise<void>
+  /**
+   * Subscribes to changes under the watched project. Returns an unsubscribe
+   * function so React effect cleanup can detach the listener.
+   */
+  onChange(handler: (change: WorkspaceChange) => void): () => void
+}
+
 export interface MapApi {
   read(project: Project): Promise<MapDocument>
   /** Generates no ink: a map is read by the game, never by the compiler. */
@@ -465,6 +496,18 @@ export interface BundleApi {
    * player can load it without checking.
    */
   export(project: Project, outDir: string): Promise<BundleExportResult>
+  /**
+   * The same story as a folder that runs on its own: the player, Electron and
+   * the bundle, once per platform asked for. Progress arrives through
+   * `onDesktopProgress`, because building and fetching take long enough that
+   * a dialog saying only "Exporting…" would look hung.
+   */
+  exportDesktop(
+    project: Project,
+    outDir: string,
+    options: DesktopExportOptions
+  ): Promise<DesktopExportResult>
+  onDesktopProgress(handler: (progress: DesktopExportProgress) => void): () => void
   /** Creates a release keypair; only its public export profile crosses into the renderer. */
   generateProtection(): Promise<ProjectProtection>
   /** Copies the private half from secure local storage into the connected player's keyring. */
@@ -648,6 +691,8 @@ export interface InkCrafterApi {
     mediaUsage(project: Project): Promise<MediaUsage>
   }
   search: SearchApi
+  /** Changes to the project's files made by anything other than this app. */
+  watch: WatchApi
   ai: AiApi
   settings: SettingsApi
   player: PlayerApi

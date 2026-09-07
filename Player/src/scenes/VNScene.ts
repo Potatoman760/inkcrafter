@@ -299,7 +299,7 @@ export class VNScene extends Phaser.Scene {
       // Not driven by a tag either: the maps claim the knots they belong to, so
       // the ink says nothing about maps, and a knot nobody claims leaves the
       // showing map alone.
-      this.state.followMap();
+      this.state.followMap(line.knot);
       await this.presentLine(line);
     } else if (this.state.engine.choices.length > 0) {
       this.presentChoices();
@@ -311,6 +311,8 @@ export class VNScene extends Phaser.Scene {
   private async presentLine(line: StoryLine): Promise<void> {
     this.state.enterKnot(line.knot);
     let minigame: string | null = null;
+    let mapRequested = false;
+    let word: { variable: string; label: string } | null = null;
     for (const cmd of line.tags) {
       this.state.trackTag(cmd, line.knot);
       switch (cmd.kind) {
@@ -364,9 +366,16 @@ export class VNScene extends Phaser.Scene {
           // line has finished drawing, so its words introduce the encounter.
           minigame ??= cmd.name;
           break;
+        case "map":
+          mapRequested = cmd.open === true;
+          break;
+        case "word":
+          // Asked after the line has drawn, like a minigame: the reader should
+          // see the word used before being offered the chance to change it.
+          word ??= { variable: cmd.variable, label: cmd.label };
+          break;
         case "speaker":
         case "display":
-        case "map":
         case "active":
           break; // tracked into sceneMeta above
         default:
@@ -384,7 +393,7 @@ export class VNScene extends Phaser.Scene {
     this.media.setEmphasis(this.state.emphasis(line.text));
 
     // A tag-only line (no text) just advances to the next beat.
-    if (line.text.length === 0 && minigame === null) {
+    if (line.text.length === 0 && minigame === null && !mapRequested && word === null) {
       await this.advance();
       return;
     }
@@ -394,7 +403,19 @@ export class VNScene extends Phaser.Scene {
       this.launchMinigame(minigame, line.text.length === 0);
       return;
     }
+    if (word !== null) {
+      // Not a suspended tag the way a minigame is: the story has already said
+      // the line, and there is nothing waiting on the answer. The reader
+      // closes the field and carries on from where they were.
+      this.stopSkipping();
+      this.scene.launch(SceneKey.Word, { ...word, origin: SceneKey.VN });
+      this.scene.pause();
+      return;
+    }
     this.commitPendingAutosave(this.state.sceneMeta.speaker || line.text.slice(0, 24));
+    // Opening is a one-shot event, not saved presentation state. Returning or
+    // loading this frame must not trap the player in a reopening map overlay.
+    if (mapRequested) this.openMap();
   }
 
   private launchMinigame(name: string, blankLine: boolean): void {

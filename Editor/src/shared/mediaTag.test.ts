@@ -310,7 +310,7 @@ describe('applyTags', () => {
     expect(scene.speaker).toBe('Wren')
     expect(scene.mapEnabled).toBe(false)
 
-    scene = applyTags(doc, scene, ['speaker:', 'map: on'])
+    scene = applyTags(doc, scene, ['speaker:', 'map: open'])
     expect(scene.speaker).toBe('')
     expect(scene.mapEnabled).toBe(true)
   })

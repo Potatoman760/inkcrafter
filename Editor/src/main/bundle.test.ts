@@ -74,6 +74,7 @@ const MEDIA: MediaDocument = {
       display: 'Courtyard',
       description: '',
       tags: [],
+    modified: null,
       variants: [
         { id: 'med_0000000002', name: 'day', file: 'bg/courtyard-day.png' },
         // The same background as a looping clip. What an asset is *for* and
@@ -89,6 +90,7 @@ const MEDIA: MediaDocument = {
       display: 'Abeline',
       description: '',
       tags: [],
+    modified: null,
       variants: [
         { id: 'med_0000000004', name: 'happy', file: 'sprites/abeline-happy.png' },
         { id: 'med_0000000005', name: 'gone', file: 'sprites/abeline-gone.png' }
@@ -101,6 +103,7 @@ const MEDIA: MediaDocument = {
       display: 'The grove',
       description: '',
       tags: [],
+    modified: null,
       variants: [{ id: 'med_0000000007', name: 'loop', file: 'music/the_grove/loop.mp3' }]
     },
     {
@@ -110,6 +113,7 @@ const MEDIA: MediaDocument = {
       display: 'Door slam',
       description: '',
       tags: [],
+    modified: null,
       variants: [{ id: 'med_0000000010', name: 'heavy', file: 'music/door_slam/heavy.ogg' }]
     }
   ]

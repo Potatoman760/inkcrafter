@@ -1,4 +1,5 @@
 import { newId } from './ids'
+import { restamp, stampNow, type Stamped } from './modified'
 
 /**
  * The catalogue: what stats and items this story *has*.
@@ -63,12 +64,18 @@ export interface Variable {
   max: number | null
   /** For the author, and for the model when it writes ink. Emitted as a comment. */
   description: string
+  /**
+   * When this entry was last changed, or null for one written before the
+   * catalogue recorded it. Never reaches the ink or the export: it is here so
+   * a list of sixty can be read newest first.
+   */
+  modified: string | null
 }
 
 /** A variable deliberately exposed on the player's character/status screen. */
 export interface Stat extends Variable, Presentation {}
 
-export interface Item extends Presentation {
+export interface Item extends Presentation, Stamped {
   id: string
   /** The ink identifier: `shovel`. Unique across every item — they share one
    * ink `LIST`, and one namespace with it. */
@@ -151,6 +158,7 @@ export function newStat(name: string, kind: StatKind = 'number'): Stat {
     min: null,
     max: null,
     description: '',
+    modified: stampNow(),
     // What was typed becomes the display name; the ink identifier is derived
     // from it. "Brass Key" is what a player should see, and brass_key is not.
     ...blankPresentation(name)
@@ -165,7 +173,8 @@ export function newVariable(name: string, kind: StatKind = 'number'): Variable {
     initial: kind === 'number' ? 0 : kind === 'boolean' ? false : '',
     min: null,
     max: null,
-    description: ''
+    description: '',
+    modified: stampNow()
   }
 }
 
@@ -174,6 +183,7 @@ export function newItem(name: string): Item {
     id: newId('stt'),
     name: inkName(name),
     description: '',
+    modified: stampNow(),
     ...blankPresentation(name)
   }
 }
@@ -187,7 +197,9 @@ export function addStat(doc: StatsDocument, stat: Stat): StatsDocument {
 export function updateStat(doc: StatsDocument, id: string, changes: Partial<Stat>): StatsDocument {
   return {
     ...doc,
-    stats: doc.stats.map((stat) => (stat.id === id ? coerceStat({ ...stat, ...changes }) : stat))
+    stats: doc.stats.map((stat) =>
+      stat.id === id ? restamp(stat, coerceStat({ ...stat, ...changes })) : stat
+    )
   }
 }
 
@@ -207,7 +219,7 @@ export function updateVariable(
   return {
     ...doc,
     variables: doc.variables.map((variable) =>
-      variable.id === id ? coerceVariable({ ...variable, ...changes }) : variable
+      variable.id === id ? restamp(variable, coerceVariable({ ...variable, ...changes })) : variable
     )
   }
 }
@@ -223,44 +235,12 @@ export function addItem(doc: StatsDocument, item: Item): StatsDocument {
 export function updateItem(doc: StatsDocument, id: string, changes: Partial<Item>): StatsDocument {
   return {
     ...doc,
-    items: doc.items.map((item) => (item.id === id ? { ...item, ...changes } : item))
+    items: doc.items.map((item) => (item.id === id ? restamp(item, { ...item, ...changes }) : item))
   }
 }
 
 export function removeItem(doc: StatsDocument, id: string): StatsDocument {
   return { ...doc, items: doc.items.filter((item) => item.id !== id) }
-}
-
-/**
- * Moves an entry within its list. Array order is what both the generated ink and
- * the export follow, so this is the only control over how either reads.
- */
-export function moveStat(doc: StatsDocument, id: string, by: number): StatsDocument {
-  const stats = shift(doc.stats, (stat) => stat.id === id, by)
-  // The same document back when nothing moved: a new object would look like an
-  // edit, and an edit rewrites state.ink and the export for no reason.
-  return stats === doc.stats ? doc : { ...doc, stats }
-}
-
-export function moveVariable(doc: StatsDocument, id: string, by: number): StatsDocument {
-  const variables = shift(doc.variables, (variable) => variable.id === id, by)
-  return variables === doc.variables ? doc : { ...doc, variables }
-}
-
-export function moveItem(doc: StatsDocument, id: string, by: number): StatsDocument {
-  const items = shift(doc.items, (item) => item.id === id, by)
-  return items === doc.items ? doc : { ...doc, items }
-}
-
-function shift<T>(list: T[], match: (item: T) => boolean, by: number): T[] {
-  const from = list.findIndex(match)
-  const to = from + by
-  if (from === -1 || to < 0 || to >= list.length) return list
-
-  const next = [...list]
-  const [moving] = next.splice(from, 1)
-  next.splice(to, 0, moving!)
-  return next
 }
 
 /** Keeps `initial` consistent with `kind` after the kind is changed. */
@@ -379,7 +359,8 @@ function asVariable(value: unknown): Variable | null {
         : 0,
     description: asText(record['description']),
     min: asBound(record['min']),
-    max: asBound(record['max'])
+    max: asBound(record['max']),
+    modified: asStamp(record['modified'])
   })
 }
 
@@ -401,8 +382,14 @@ function asItem(value: unknown): Item | null {
     id: typeof record['id'] === 'string' && record['id'].length > 0 ? record['id'] : newId('stt'),
     name,
     description: asText(record['description']),
+    modified: asStamp(record['modified']),
     ...asPresentation(record)
   }
+}
+
+/** An ISO instant written by this app, or null for anything else. */
+function asStamp(value: unknown): string | null {
+  return typeof value === 'string' && !Number.isNaN(Date.parse(value)) ? value : null
 }
 
 /**

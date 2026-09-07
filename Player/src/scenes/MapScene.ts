@@ -160,10 +160,12 @@ export class MapScene extends Phaser.Scene {
     const width = loc.width * scale;
     const height = loc.height * scale;
 
-    const look = (state: HotspotState): string | null =>
-      loc.art.length > 0
+    const look = (state: HotspotState): string | null => {
+      const key = loc.art.length > 0
         ? (getAssetIndex(this).resolve("hotspot", loc.art, state)?.key ?? null)
         : null;
+      return key ? this.hotspotTexture(key, width, height) : null;
+    };
 
     if (!available) {
       const shut = look("disabled");
@@ -209,6 +211,23 @@ export class MapScene extends Phaser.Scene {
         controllerMarker.setVisible(focused);
       },
     });
+  }
+
+  /** Pre-filter large illustrations before shrinking them to tiny map markers. */
+  private hotspotTexture(key: string, width: number, height: number): string {
+    const source = this.textures.get(key).getSourceImage() as HTMLImageElement | HTMLCanvasElement;
+    const w = Math.max(1, Math.ceil(width * 2));
+    const h = Math.max(1, Math.ceil(height * 2));
+    if (!source || source.width <= w || source.height <= h) return key;
+    const cached = `${key}:map:${w}x${h}`;
+    if (this.textures.exists(cached)) return cached;
+    const texture = this.textures.createCanvas(cached, w, h);
+    if (!texture) return key;
+    texture.context.imageSmoothingEnabled = true;
+    texture.context.imageSmoothingQuality = "high";
+    texture.context.drawImage(source, 0, 0, w, h);
+    texture.refresh();
+    return cached;
   }
 
   /**

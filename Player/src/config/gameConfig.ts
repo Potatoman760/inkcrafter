@@ -31,6 +31,7 @@ export const SceneKey = {
   SaveLoad: "SaveLoad",
   Map: "Map",
   Character: "Character",
+  Word: "Word",
   Gallery: "Gallery",
   Combat: "Combat",
   Quickhands: "Quickhands",

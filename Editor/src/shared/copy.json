@@ -22,8 +22,13 @@
   "comfy.timeout": "One picture, in seconds.",
   "comfy.workflowDir": "The .json files you saved with Workflow → Export (API).",
 
+  "export.desktopDestination": "An empty folder. One folder per platform is written inside it.",
+  "export.desktopWhatIsWritten": "The player, Electron and the bundle, once per platform.",
   "export.destination": "A folder the game serves — usually its public/bundle.",
+  "export.mode": "A web bundle is the story alone, for a player that serves it. A desktop game is the story and the player together, ready to run.",
   "export.nothingWritten": "Nothing was written.",
+  "export.platforms": "Each is a whole build. A platform this machine has never built fetches its Electron once.",
+  "export.steamAppId": "The number Steam gave this game. Leave it blank for a build with Steam features off.",
   "export.whatIsWritten": "The project, flattened into something a browser can fetch.",
 
   "inkWrite.context": "What the model will be given.",

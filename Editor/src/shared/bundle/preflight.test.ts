@@ -589,3 +589,46 @@ describe('villa calendar checks', () => {
     expect(run()).toEqual([])
   })
 })
+
+/**
+ * A word the reader types has to land somewhere a word fits. The catalogue is
+ * the only thing that knows whether it does, and getting it wrong shows up as
+ * a number in the middle of a sentence rather than as an error.
+ */
+describe('reader-chosen word checks', () => {
+  const stats: StatsDocument = {
+    ...STATS,
+    variables: [...STATS.variables, newVariable('Piri word', 'text')]
+  }
+  const run = (ink: string): string[] =>
+    check(ink, { stats }).filter((message) => message.includes('word:'))
+
+  it('accepts a declared text variable', () => {
+    expect(run('=== a ===\n# word: piri_word What Piri calls you\nShe smiles.\n')).toEqual([])
+  })
+
+  it('refuses a variable the catalogue never declared', () => {
+    expect(run('=== a ===\n# word: nowhere What they call you\nShe smiles.\n')).toEqual([
+      expect.stringContaining('nowhere is not a variable in the catalogue')
+    ])
+  })
+
+  it('refuses a number or a yes/no, which a typed word would make nonsense of', () => {
+    expect(run('=== a ===\n# word: courage What they call you\nShe smiles.\n')).toEqual([
+      expect.stringContaining('courage holds a number')
+    ])
+    expect(run('=== a ===\n# word: has_met_wren What they call you\nShe smiles.\n')).toEqual([
+      expect.stringContaining('has_met_wren holds a yes/no')
+    ])
+  })
+
+  // An empty catalogue is a project that has not written one yet, which is the
+  // same rule the stat and display checks already follow.
+  it('says nothing when there is no catalogue to check against', () => {
+    expect(
+      check('=== a ===\n# word: piri_word What Piri calls you\nShe smiles.\n', {
+        stats: emptyStats()
+      }).filter((message) => message.includes('word:'))
+    ).toEqual([])
+  })
+})

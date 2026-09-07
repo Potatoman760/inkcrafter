@@ -145,14 +145,11 @@ function walk({ ally, love, answer }) {
     return go()
   }
   const taken = []
-  run.ChoosePathString('shared_court')
+  run.ChoosePathString('sire_consort_after')
   let text = go()
-  if (love) {
-    text += pick(answer === 'separate' ? /Keep the relationships separate/ : answer === 'defer' ? /Ask for time/ : /Propose a shared bond/)
-    if (answer === 'share') text += pick(/./)   // the first accepting answer in the companion's negotiation
-    // A proposal that lands in bonding right away would be the old, unspread flow.
-    assert.ok(!/next afternoon.*\n[\s\S]*Three Queens|First lesson/.test(text), `${ally}: the bond's afternoon must wait for a calendar day`)
-  }
+  assert.equal(run.variablesState.villa_day, 0)
+  assert.equal(run.state.VisitCountAtPathString('shared_court'), 0)
+  run.ChoosePathString('villa_arrival'); text = go()
   assert.equal(run.variablesState.villa_day, 1, `${ally}/${answer}: the handover sets day 1`)
   assert.ok(run.variablesState.tamsin_arrived && run.variablesState.isolde_arrived)
   assert.ok(run.currentChoices.some(choice => /Set out for the day/.test(choice.text)), `${ally}/${answer}: day 1 morning`)
@@ -160,6 +157,12 @@ function walk({ ally, love, answer }) {
   for (let day = 1; day <= 8; day += 1) {
     assert.equal(run.variablesState.villa_day, day)
     assert.equal(run.variablesState.villa_phase, 'morning')
+    if (day === 2 && love) {
+      pick(answer === 'separate' ? /Keep the relationships separate/ : answer === 'defer' ? /Ask for time/ : /Propose a shared bond/)
+      if (answer === 'share') pick(/./)
+      assert.equal(run.variablesState.villa_shared_connection_day, 0)
+      assert.equal(run.variablesState.villa_shared_kiss_day, 0)
+    }
     // The fifth morning's letter asks a question before the day can start.
     if (!run.currentChoices.some(choice => /Set out for the day/.test(choice.text))) pick(/Ask Isolde what she would send/)
     pick(/Set out for the day/)
@@ -184,6 +187,14 @@ function walk({ ally, love, answer }) {
     if (run.variablesState.villa_settled < day) paid += 1
     set('villa_result', 'return')
     pick(/Close the ledger/)
+    if (day === 3 && answer === 'defer' && love) {
+      pick(/Give Seraphine an answer/); pick(/Propose a shared bond/); pick(/./)
+    }
+    if (run.currentChoices.some(choice => /Spend the evening together at the palace/.test(choice.text))) {
+      pick(/Spend the evening together at the palace/)
+      pick(/Fill Tink|Finish with Seraphine|^Cum$/)
+      set('villa_result', 'return'); pick(/Close the ledger/)
+    }
     assert.ok(run.currentChoices.some(choice => /Sleep/.test(choice.text)), `${ally}/${answer} day ${day}: evening hub`)
     pick(/Sleep/)
   }

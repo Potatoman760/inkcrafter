@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
   emptyAchievements,
@@ -8,6 +8,7 @@ import {
 } from '@shared/bundle/achievementDoc'
 import type { Project } from '@shared/project'
 import { stripBom } from './text'
+import { writeWatched } from './watch'
 
 const ACHIEVEMENTS_FILE = 'achievements.json'
 
@@ -24,5 +25,5 @@ export async function writeAchievements(
   project: Project,
   doc: AchievementDocument
 ): Promise<void> {
-  await writeFile(join(project.path, ACHIEVEMENTS_FILE), serialiseAchievements(doc), 'utf8')
+  await writeWatched(join(project.path, ACHIEVEMENTS_FILE), serialiseAchievements(doc))
 }

@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
   emptyGallery,
@@ -8,6 +8,7 @@ import {
 } from '@shared/bundle/galleryDoc'
 import type { Project } from '@shared/project'
 import { stripBom } from './text'
+import { writeWatched } from './watch'
 
 const GALLERY_FILE = 'gallery.json'
 
@@ -21,5 +22,5 @@ export async function readGallery(project: Project): Promise<GalleryDocument> {
 }
 
 export async function writeGallery(project: Project, doc: GalleryDocument): Promise<void> {
-  await writeFile(join(project.path, GALLERY_FILE), serialiseGallery(doc), 'utf8')
+  await writeWatched(join(project.path, GALLERY_FILE), serialiseGallery(doc))
 }

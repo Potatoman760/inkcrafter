@@ -11,7 +11,7 @@ import type { InkDiagnostic } from '@shared/types'
 import { ink } from './inkLanguage'
 import { InkOutline } from './InkOutline'
 import { knotLinks } from './knotLinks'
-import { scanKnots } from '@shared/inkKnots'
+import { knotAt } from '@shared/inkKnots'
 import { codexMentions, setMentions } from './mentionHighlight'
 import { setTagCatalogues, tagComplete } from './tagComplete'
 import { canApplyGuardedEdit, type GuardedTextEdit } from './guardedEdit'
@@ -34,6 +34,8 @@ interface InkEditorProps {
   onOpenEntry: (entryId: string) => void
   /** Ctrl-clicking a knot header traces a path to it in the manuscript. */
   onFollowKnot: (knot: string) => void
+  /** Ctrl-clicking a divert opens the knot it leads to, wherever it is declared. */
+  onGoToKnot: (knot: string) => void
   /**
    * Scrolls to a line and selects it. The nonce lets the same line be requested
    * twice — jumping back to where you already were should still move the view.
@@ -187,12 +189,6 @@ function reveal(view: EditorView, at: number, align: 'center' | 'start' = 'cente
   view.focus()
 }
 
-/** The innermost section a line sits in — a stitch before the knot holding it. */
-function knotAt(source: string, line: number): string | null {
-  const found = scanKnots(source).filter((knot) => !knot.isFunction && knot.line <= line)
-  return found.length > 0 ? found[found.length - 1]!.name : null
-}
-
 export function InkEditor({
   value,
   onChange,
@@ -202,6 +198,7 @@ export function InkEditor({
   catalogues,
   onOpenEntry,
   onFollowKnot,
+  onGoToKnot,
   gotoLine = null,
   insert = null,
   edit = null,
@@ -239,6 +236,8 @@ export function InkEditor({
   onEditHandledRef.current = onEditHandled
   const onFollowKnotRef = useRef(onFollowKnot)
   onFollowKnotRef.current = onFollowKnot
+  const onGoToKnotRef = useRef(onGoToKnot)
+  onGoToKnotRef.current = onGoToKnot
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -254,7 +253,10 @@ export function InkEditor({
           ink(),
           tagComplete(),
           codexMentions((entryId) => onOpenEntryRef.current(entryId)),
-          knotLinks((knot) => onFollowKnotRef.current(knot)),
+          knotLinks(
+            (knot) => onFollowKnotRef.current(knot),
+            (knot) => onGoToKnotRef.current(knot)
+          ),
           editorTheme,
           EditorView.lineWrapping,
           EditorView.domEventHandlers({

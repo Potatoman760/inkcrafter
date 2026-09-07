@@ -42,6 +42,7 @@ import type {
   NameUse
 } from '@shared/types'
 import type { BundleExportResult } from '@shared/bundle/result'
+import type { DesktopExportOptions, DesktopExportResult } from '@shared/desktop'
 import type {
   MentionCountRequest,
   MediaUsage,
@@ -96,6 +97,7 @@ import { createPlanScene, readPlan, writePlan } from './plan'
 import { deleteMediaFile, readMedia, scanMedia, writeMedia } from './media'
 import { readMinigames, writeMinigames } from './minigames'
 import { importLook, IMPORTABLE } from './mediaImport'
+import { watchProject, writeWatched, type ProjectWatcher } from './watch'
 import { chooseUploadFile } from './uploadPicker'
 import { cutoutLook } from './mediaCutout'
 import { countMentionsAcross } from './mentions'
@@ -105,6 +107,7 @@ import { mediaUsage } from './mediaUsage'
 import { readGame, writeGame } from './game'
 import type { GameDocument } from '@shared/bundle/gameDoc'
 import { exportBundle } from './bundle'
+import { desktopTools, exportDesktop } from './desktopExport'
 import { generateProjectProtection, installProjectProtection } from './releaseProtection'
 import {
   checkPlayer,
@@ -168,6 +171,9 @@ async function entriesOfLibraries(libraryIds: string[]): Promise<CodexEntry[]> {
   return entries.flat().sort((a, b) => a.name.localeCompare(b.name))
 }
 
+/** The one project watcher, held here because only main can close it. */
+let watching: ProjectWatcher | null = null
+
 export function registerIpcHandlers(): void {
   ipcMain.handle('ink:compile', (_event, request: CompileRequest): CompileResult => compileInk(request))
 
@@ -176,7 +182,26 @@ export function registerIpcHandlers(): void {
   )
 
   ipcMain.handle('file:save', async (_event, filePath: string, contents: string): Promise<void> => {
-    await writeFile(filePath, contents, 'utf8')
+    await writeWatched(filePath, contents)
+  })
+
+  /**
+   * Watches the open project, or stops when handed null.
+   *
+   * One at a time, and owned here rather than by the renderer: a watcher is an
+   * open handle on the filesystem, and the renderer can be reloaded out from
+   * under it. Reported back to whoever asked, which is the window showing that
+   * project.
+   */
+  ipcMain.handle('watch:project', (event, project: Project | null): void => {
+    watching?.close()
+    watching = null
+    if (!project) return
+
+    const sender = event.sender
+    watching = watchProject(project, (change) => {
+      if (!sender.isDestroyed()) sender.send('watch:changed', change)
+    })
   })
 
   ipcMain.handle('workspace:dataDir', async (): Promise<string> => {
@@ -555,6 +580,19 @@ export function registerIpcHandlers(): void {
     'bundle:export',
     (_event, project: Project, outDir: string): Promise<BundleExportResult> =>
       exportBundle(project, outDir)
+  )
+
+  ipcMain.handle(
+    'bundle:exportDesktop',
+    (
+      event,
+      project: Project,
+      outDir: string,
+      options: DesktopExportOptions
+    ): Promise<DesktopExportResult> =>
+      exportDesktop(project, outDir, options, desktopTools(playerDir()), (progress) => {
+        if (!event.sender.isDestroyed()) event.sender.send('bundle:desktopProgress', progress)
+      })
   )
 
   ipcMain.handle('bundle:generateProtection', (): ReturnType<typeof generateProjectProtection> =>

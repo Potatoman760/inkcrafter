@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { dirname, join, sep } from 'node:path'
 import { emptyStats, parseStats, serialiseStats, type StatsDocument } from '@shared/statsDoc'
 import { emptyNpcs, parseNpcs, type NpcDocument } from '@shared/bundle/npcDoc'
@@ -6,6 +6,7 @@ import { buildExport, EXPORT_FILE, serialiseExport } from '@shared/statsExport'
 import { includePathFrom, renderStateInk, STATE_FILE, withStateInclude } from '@shared/statsInk'
 import type { Project } from '@shared/project'
 import { stripBom } from './text'
+import { writeWatched } from './watch'
 
 /**
  * The catalogue lives at `stats.json` in the project directory, beside
@@ -40,7 +41,7 @@ export async function writeStats(
   const written: string[] = []
   const absolute = (path: string): string => join(project.path, path.split('/').join(sep))
 
-  await writeFile(absolute(STATS_FILE), serialiseStats(doc), 'utf8')
+  await writeWatched(absolute(STATS_FILE), serialiseStats(doc))
   written.push(STATS_FILE)
 
   // `state.ink` holds the declarations from *both* catalogues, so saving one
@@ -50,14 +51,14 @@ export async function writeStats(
 
   const statePath = absolute(STATE_FILE)
   await mkdir(dirname(statePath), { recursive: true })
-  await writeFile(statePath, renderStateInk(doc, cast), 'utf8')
+  await writeWatched(statePath, renderStateInk(doc, cast))
   written.push(STATE_FILE)
 
   // Regenerated with the ink rather than on demand, so the two can never
   // disagree about what the story contains.
   const exportPath = absolute(EXPORT_FILE)
   await mkdir(dirname(exportPath), { recursive: true })
-  await writeFile(exportPath, serialiseExport(buildExport(doc)), 'utf8')
+  await writeWatched(exportPath, serialiseExport(buildExport(doc)))
   written.push(EXPORT_FILE)
 
   if (await addIncludeToEntry(project)) written.push(project.main)
@@ -87,7 +88,7 @@ async function addIncludeToEntry(project: Project): Promise<boolean> {
   const next = withStateInclude(source, project.main)
   if (next === source) return false
 
-  await writeFile(path, next, 'utf8')
+  await writeWatched(path, next)
   return true
 }
 

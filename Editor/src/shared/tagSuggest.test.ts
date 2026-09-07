@@ -211,7 +211,7 @@ describe('suggestTag', () => {
     })
 
     it('offers on and off to a map tag', () => {
-      expect(labels('# map: ')).toEqual(['on', 'off'])
+      expect(labels('# map: ')).toEqual(['on', 'off', 'open'])
     })
   })
 

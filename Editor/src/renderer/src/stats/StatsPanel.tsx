@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
+import { agoLabel, DEFAULT_SORT, sortBy, type Sort } from '@shared/modified'
+import { SortControl } from '../layout/SortControl'
 import {
   addItem,
   addStat,
   addVariable,
   inkName,
-  moveItem,
-  moveStat,
-  moveVariable,
   nameProblem,
   newItem,
   newStat,
@@ -31,7 +30,6 @@ import {
   Button,
   Field,
   Hint,
-  IconButton,
   Input,
   ListRow,
   MasterDetail,
@@ -83,6 +81,7 @@ export function StatsPanel({
 }: StatsPanelProps): React.JSX.Element {
   const [tab, setTab] = useState<'stats' | 'variables' | 'items'>('stats')
   const [filter, setFilter] = useState('')
+  const [sort, setSort] = useState<Sort>(DEFAULT_SORT)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draftName, setDraftName] = useState('')
   const [uses, setUses] = useState<NameUse[]>([])
@@ -114,22 +113,39 @@ export function StatsPanel({
   const matches = (haystack: string): boolean =>
     terms.every((term) => haystack.toLowerCase().includes(term))
 
+  // Sorted after filtering, and never written back: the file's order is what
+  // generates the ink, so these three are a way of reading it rather than a
+  // change to it.
+  const read = { label: (one: { name: string }) => one.name, modified: (one: { modified: string | null }) => one.modified }
+
   const stats = useMemo(
-    () => doc.stats.filter((stat) => matches(`${stat.name} ${stat.display} ${stat.description}`)),
-    [doc.stats, filter]
+    () =>
+      sortBy(
+        doc.stats.filter((stat) => matches(`${stat.name} ${stat.display} ${stat.description}`)),
+        sort,
+        read
+      ),
+    [doc.stats, filter, sort]
   )
 
   const variables = useMemo(
-    () => doc.variables.filter((variable) => matches(`${variable.name} ${variable.description}`)),
-    [doc.variables, filter]
+    () =>
+      sortBy(
+        doc.variables.filter((variable) => matches(`${variable.name} ${variable.description}`)),
+        sort,
+        read
+      ),
+    [doc.variables, filter, sort]
   )
 
   const items = useMemo(
     () =>
-      doc.items.filter((item) =>
-        matches(`${item.name} ${item.display} ${item.description}`)
+      sortBy(
+        doc.items.filter((item) => matches(`${item.name} ${item.display} ${item.description}`)),
+        sort,
+        read
       ),
-    [doc.items, filter]
+    [doc.items, filter, sort]
   )
 
   const newProblem = draftName.trim().length > 0 ? nameProblem(doc, draftName) : null
@@ -212,30 +228,31 @@ export function StatsPanel({
           )}
 
 
-          <Input className="codex-filter"
-            value={filter}
-            aria-label="Filter"
-            placeholder="Filter…"
-            onChange={(event) => setFilter(event.target.value)}
-          />
+          <div className="list-tools">
+            <Input className="codex-filter"
+              value={filter}
+              aria-label="Filter"
+              placeholder="Filter…"
+              onChange={(event) => setFilter(event.target.value)}
+            />
+            <SortControl value={sort} onChange={setSort} />
+          </div>
 
           {tab === 'items' ? (
             <ItemMaster
               doc={doc}
               items={items}
+              showModified={sort.by === 'modified'}
               selectedId={selectedId}
               onSelect={setSelectedId}
-              onChange={onChange}
             />
           ) : (
             <StateMaster
               entries={tab === 'stats' ? stats : variables}
+              showModified={sort.by === 'modified'}
               empty={tab === 'stats' ? doc.stats.length === 0 : doc.variables.length === 0}
               selectedId={selectedId}
               onSelect={setSelectedId}
-              onMove={(id, by) =>
-                onChange(tab === 'stats' ? moveStat(doc, id, by) : moveVariable(doc, id, by))
-              }
             />
           )}
 
@@ -295,33 +312,19 @@ export function StatsPanel({
 
 /* Master lists ------------------------------------------------------------- */
 
-function MoveButtons({
-  label,
-  onMove
-}: {
-  label: string
-  onMove: (by: number) => void
-}): React.JSX.Element {
-  return (
-    <span className="stats-move">
-      <IconButton icon="chevron-up" label={`Move ${label} up`} onClick={() => onMove(-1)} />
-      <IconButton icon="chevron-down" label={`Move ${label} down`} onClick={() => onMove(1)} />
-    </span>
-  )
-}
-
 function StateMaster({
   entries,
+  showModified,
   empty,
   selectedId,
-  onSelect,
-  onMove
+  onSelect
 }: {
-  entries: (Stat | Variable)[]
+  entries: readonly (Stat | Variable)[]
+  /** Shows when each entry changed, so the order it is in can be checked. */
+  showModified: boolean
   empty: boolean
   selectedId: string | null
   onSelect: (id: string) => void
-  onMove: (id: string, by: number) => void
 }): React.JSX.Element {
   if (empty) return <Hint>Nothing here yet.</Hint>
   if (entries.length === 0) return <Hint>Nothing matches that filter.</Hint>
@@ -335,10 +338,10 @@ function StateMaster({
             mono
             name={variable.name}
             meta={'display' in variable && variable.display.length > 0 ? variable.display : undefined}
+            trail={showModified ? agoLabel(variable.modified) : undefined}
             selected={variable.id === selectedId}
             onClick={() => onSelect(variable.id)}
           />
-          <MoveButtons label={variable.name} onMove={(by) => onMove(variable.id, by)} />
         </li>
       ))}
     </ul>
@@ -348,15 +351,15 @@ function StateMaster({
 function ItemMaster({
   doc,
   items,
+  showModified,
   selectedId,
-  onSelect,
-  onChange
+  onSelect
 }: {
   doc: StatsDocument
-  items: Item[]
+  items: readonly Item[]
+  showModified: boolean
   selectedId: string | null
   onSelect: (id: string) => void
-  onChange: (next: StatsDocument) => void
 }): React.JSX.Element {
   if (doc.items.length === 0) {
     return <Hint>No items yet.</Hint>
@@ -377,10 +380,10 @@ function ItemMaster({
             className="stats-pick"
             name={<code>{item.name}</code>}
             meta={item.display.length > 0 ? item.display : undefined}
+            trail={showModified ? agoLabel(item.modified) : undefined}
             selected={item.id === selectedId}
             onClick={() => onSelect(item.id)}
           />
-          <MoveButtons label={item.name} onMove={(by) => onChange(moveItem(doc, item.id, by))} />
         </li>
       ))}
     </ul>
