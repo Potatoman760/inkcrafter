@@ -53,7 +53,7 @@ export class CombatScene extends Phaser.Scene {
   private opponentHealthLabel!: Phaser.GameObjects.Text;
 
   constructor() {
-    super(SceneKey.Combat);
+    super('Combat');
   }
 
   create(data: CombatSceneData): void {

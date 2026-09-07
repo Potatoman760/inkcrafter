@@ -77,7 +77,7 @@ export class CarryScene extends Phaser.Scene {
   private previousAxis = 0;
 
   constructor() {
-    super(SceneKey.Carry);
+    super('Carry');
   }
 
   create(data: CarrySceneData): void {

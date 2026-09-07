@@ -17,7 +17,7 @@ import { StatsPanel } from "../stats/StatsPanel";
 import { GalleryPanel } from "../gallery/GalleryPanel";
 import { AchievementPanel } from "../achievements/AchievementPanel";
 import type { GameDocument } from "@shared/bundle/gameDoc";
-import { MinigamePanel } from "../minigames/MinigamePanel";
+import { MinigamePanel } from "../minigame/MinigamePanel";
 import { type IconName } from "../design/Icon";
 import { Tabs } from "../design/components";
 import { GameSettingsPanel } from "./GameSettingsPanel";

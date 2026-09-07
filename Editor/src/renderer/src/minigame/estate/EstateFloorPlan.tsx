@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom'
 import { newId } from '@shared/ids'
 import type { EstateBounds, EstateMinigame, EstateRoom } from '@shared/bundle/estate'
 import { boxOf, clampRect, MAP_HANDLES, rectBetween, rectOf, resizeRect, type MapHandle } from '@shared/bundle/mapDoc'
-import { Button, Checkbox, Field, Hint, Input, Select } from '../design/components'
-import { ArtField, type ArtHome, type ArtOption } from './ArtField'
+import { Button, Checkbox, Field, Hint, Input, Select } from '../../design/components'
+import { ArtField, type ArtHome, type ArtOption } from '../ArtField'
 
 type Gesture = { kind: 'draw'; from: { x: number; y: number }; room: string | null } |
   { kind: 'move' | 'resize'; key: string; from: { x: number; y: number }; original: EstateBounds; handle?: MapHandle }

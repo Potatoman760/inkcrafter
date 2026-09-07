@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import type { EstateMinigame } from '@shared/bundle/estate'
-import { Checkbox, Field, Input, Select, Tabs } from '../design/components'
-import { ArtField, refKey, type ArtHome, type ArtOption } from './ArtField'
+import { Checkbox, Field, Input, Select, Tabs } from '../../design/components'
+import { ArtField, refKey, type ArtHome, type ArtOption } from '../ArtField'
 import { EstateCommissions } from './EstateCommissions'
 import { EstateFloorPlan } from './EstateFloorPlan'
 import { EstateResidents } from './EstateResidents'
 import { EstateTutorialFields } from './EstateTutorialFields'
-import { TuningField } from './TuningField'
+import { TuningField } from '../TuningField'
 
 type EstateTab = 'plan' | 'residents' | 'commissions' | 'ledger' | 'tutorial'
 

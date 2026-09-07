@@ -93,7 +93,7 @@ export class QuickhandsScene extends Phaser.Scene {
   private pointerClaimedX: number | null = null;
 
   constructor() {
-    super(SceneKey.Quickhands);
+    super('Quickhands');
   }
 
   create(data: QuickhandsSceneData): void {

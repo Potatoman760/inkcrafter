@@ -1,5 +1,6 @@
+import { minigameScene } from '@/minigame/registry';
 import Phaser from "phaser";
-import { GAME_WIDTH, GAME_HEIGHT, MINIGAME_SCENES, SceneKey } from "@/config/gameConfig";
+import { GAME_WIDTH, GAME_HEIGHT, SceneKey } from "@/config/gameConfig";
 import { getGameState } from "@/state/registry";
 import { getAssetIndex } from "@/bundle/registry";
 import type { GameState } from "@/state/GameState";
@@ -423,9 +424,7 @@ export class VNScene extends Phaser.Scene {
     this.minigameActive = true;
     this.minigameBlankLine = blankLine;
     const kind = this.state.bundle.minigames.minigames.find((game) => game.name === name)?.kind;
-    // A tag naming nothing in the catalogue still has to land somewhere, and
-    // Combat is the one that explains itself when handed a game it cannot run.
-    this.scene.launch(kind ? MINIGAME_SCENES[kind] : SceneKey.Combat, { name, mode: "story" });
+    this.scene.launch(minigameScene(kind), { name, mode: "story" });
     this.scene.pause();
   }
 

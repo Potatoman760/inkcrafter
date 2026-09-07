@@ -11,7 +11,7 @@ import {
   type EstateAction, type EstateCalendar, type EstateMinigame, type EstateResident, type EstateRoom, type EstateState, type EstateTutorialStep,
 } from '@/bundle/spec/bundle/estate';
 import { registerFocusable, setControllerActions } from '@/input/FocusNavigation';
-import { estateButton, estatePanel, ESTATE_COLORS as C, type EstateControl } from '@/ui/EstateUI';
+import { estateButton, estatePanel, ESTATE_COLORS as C, type EstateControl } from '@/minigame/estate/EstateUI';
 
 type Page = 'villa' | 'room' | 'bath' | 'commissions' | 'gates';
 
@@ -45,7 +45,7 @@ export class EstateScene extends Phaser.Scene {
   private crownField: HTMLInputElement | null = null;
   private crownLabel: Phaser.GameObjects.Text | null = null;
 
-  constructor() { super(SceneKey.Estate); }
+  constructor() { super('Estate'); }
 
   create(data: { name: string; mode: 'story' | 'test' }): void {
     this.launchData = data; this.state = getGameState(this);

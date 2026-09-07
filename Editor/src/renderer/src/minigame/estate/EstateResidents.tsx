@@ -2,8 +2,8 @@ import { useState } from 'react'
 import type { EstateMinigame, EstateResident } from '@shared/bundle/estate'
 import { estateBathPercent } from '@shared/bundle/estate'
 import { mediaName } from '@shared/mediaDoc'
-import { Button, Field, Hint, IconButton, Input, Select } from '../design/components'
-import { ArtField, type ArtOption } from './ArtField'
+import { Button, Field, Hint, IconButton, Input, Select } from '../../design/components'
+import { ArtField, type ArtOption } from '../ArtField'
 
 /**
  * The household: who can move in, on what condition, and the moments each

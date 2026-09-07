@@ -12,7 +12,13 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "dist": "npm run build && electron-builder",
-    "export": "node scripts/export-bundle.mjs"
+    "export": "node scripts/export-bundle.mjs",
+    "minigames:sync": "node scripts/sync-minigames.mjs",
+    "predev": "npm run minigames:sync",
+    "prebuild": "npm run minigames:sync",
+    "pretest": "npm run minigames:sync",
+    "pretypecheck": "npm run minigames:sync",
+    "preexport": "npm run minigames:sync"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",

@@ -17,7 +17,7 @@
  * to hand is the normal state of building the game.
  */
 
-import { readFile, writeFile, mkdir, access } from 'node:fs/promises'
+import { readFile, writeFile, mkdir, access, readdir } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -55,6 +55,17 @@ const FILES = [
   'bundle/estate.ts'
 ]
 
+// Discover every data module and helper; adding a minigame requires no sync-list edit.
+async function moduleFiles(directory, prefix = 'bundle/minigame') {
+  const files = []
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const relative = `${prefix}/${entry.name}`
+    if (entry.isDirectory()) files.push(...await moduleFiles(join(directory, entry.name), relative))
+    else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts') && !entry.name.endsWith('.editor.ts')) files.push(relative)
+  }
+  return files.sort()
+}
+
 const BANNER = `// Vendored from InkCrafter/src/shared — do not edit.
 // Change it there, then run \`npm run spec:sync\`. See scripts/sync-spec.mjs.
 
@@ -80,6 +91,8 @@ if (!(await exists(FROM))) {
   console.error(`${message}\nSet INKCRAFTER_DIR to point at it.`)
   process.exit(1)
 }
+
+FILES.push(...await moduleFiles(join(FROM, 'bundle/minigame')))
 
 const drifted = []
 

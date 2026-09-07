@@ -69,7 +69,7 @@ export class PowerStrikeScene extends Phaser.Scene {
   private previousButtons = new Array<boolean>(16).fill(false);
 
   constructor() {
-    super(SceneKey.PowerStrike);
+    super('PowerStrike');
   }
 
   create(data: PowerStrikeSceneData): void {

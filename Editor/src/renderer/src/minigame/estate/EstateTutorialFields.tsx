@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { parseEstateTutorial, type EstateMinigame } from '@shared/bundle/estate'
-import { Button, Field, Textarea } from '../design/components'
+import { Button, Field, Textarea } from '../../design/components'
 
 /** Intentionally raw JSON: the script is one authored document, not a form builder. */
 export function EstateTutorialFields({ game, portraits, onChange }: {

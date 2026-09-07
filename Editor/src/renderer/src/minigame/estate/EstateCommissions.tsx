@@ -7,7 +7,7 @@ import {
   type EstateContract,
   type EstateMinigame
 } from '@shared/bundle/estate'
-import { Button, Field, IconButton, Input } from '../design/components'
+import { Button, Field, IconButton, Input } from '../../design/components'
 
 /**
  * The notices on the commission board: what each pays, and which crews it

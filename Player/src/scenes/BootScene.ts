@@ -1,5 +1,6 @@
+import { minigameScene } from '@/minigame/registry';
 import Phaser from "phaser";
-import { MINIGAME_SCENES, SceneKey } from "@/config/gameConfig";
+import { SceneKey } from "@/config/gameConfig";
 import { AssetIndex } from "@/bundle/AssetIndex";
 import { ASSET_INDEX_KEY, getBundle, getPreviewCheckpoint, getTestMinigame } from "@/bundle/registry";
 import { GameState } from "@/state/GameState";
@@ -69,7 +70,7 @@ export class BootScene extends Phaser.Scene {
     const testKind = testMinigame
       ? state.bundle.minigames.minigames.find((game) => game.name === testMinigame)?.kind
       : undefined;
-    const testScene = testKind ? MINIGAME_SCENES[testKind] : null;
+    const testScene = testMinigame ? minigameScene(testKind) : null;
 
     if (preview) {
       state.loadPreview(preview.inkState);
@@ -79,7 +80,7 @@ export class BootScene extends Phaser.Scene {
       );
     } else if (testMinigame) {
       state.newGame();
-      this.scene.start(testScene ?? SceneKey.Combat, { name: testMinigame, mode: "test" });
+      this.scene.start(testScene ?? minigameScene(undefined), { name: testMinigame, mode: "test" });
     } else {
       this.scene.start(SceneKey.MainMenu);
     }

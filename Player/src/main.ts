@@ -1,3 +1,5 @@
+import { minigameScenes } from '@/minigame/registry';
+import { MissingMinigameScene } from '@/minigame/MissingMinigameScene';
 import Phaser from "phaser";
 import { GAME_WIDTH, GAME_HEIGHT } from "@/config/gameConfig";
 import {
@@ -18,11 +20,6 @@ import { MapScene } from "@/scenes/MapScene";
 import { CharacterScene } from "@/scenes/CharacterScene";
 import { WordScene } from "@/scenes/WordScene";
 import { GalleryScene } from "@/scenes/GalleryScene";
-import { CombatScene } from "@/scenes/CombatScene";
-import { QuickhandsScene } from "@/scenes/QuickhandsScene";
-import { CarryScene } from "@/scenes/CarryScene";
-import { PowerStrikeScene } from "@/scenes/PowerStrikeScene";
-import { EstateScene } from "@/scenes/EstateScene";
 import { GalleryUnlocks } from "@/gallery/GalleryUnlocks";
 import { formatUiText, UI_TEXT } from "@/config/uiText";
 import { PlayerStorage } from "@/platform/Storage";
@@ -103,11 +100,8 @@ async function start(): Promise<void> {
       CharacterScene,
       WordScene,
       GalleryScene,
-      CombatScene,
-      QuickhandsScene,
-      CarryScene,
-      PowerStrikeScene,
-      EstateScene,
+      ...minigameScenes,
+      MissingMinigameScene,
     ],
   });
   installLifecycleHandling(game);

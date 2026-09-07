@@ -21,7 +21,6 @@ export const GAME = {
 } as const;
 
 /** Phaser scene keys. */
-import type { MinigameDefinition } from "@/bundle/spec/bundle/minigameDoc";
 
 export const SceneKey = {
   Boot: "Boot",
@@ -33,30 +32,8 @@ export const SceneKey = {
   Character: "Character",
   Word: "Word",
   Gallery: "Gallery",
-  Combat: "Combat",
-  Quickhands: "Quickhands",
-  Carry: "Carry",
-  PowerStrike: "PowerStrike",
-  Estate: "Estate",
 } as const;
 export type SceneKey = (typeof SceneKey)[keyof typeof SceneKey];
-
-/**
- * Which scene runs each kind of minigame.
- *
- * A record rather than the ternary this used to be in two places. That ternary
- * read `kind === "quickhands" ? Quickhands : Combat`, so a kind it had never
- * heard of compiled cleanly and then ran as combat, which reported that the
- * game "is not a combat minigame". Keyed by the kind, a kind added later fails
- * to compile here until it is given a scene.
- */
-export const MINIGAME_SCENES: Record<MinigameDefinition["kind"], SceneKey> = {
-  combat: SceneKey.Combat,
-  quickhands: SceneKey.Quickhands,
-  carry: SceneKey.Carry,
-  powerstrike: SceneKey.PowerStrike,
-  estate: SceneKey.Estate,
-};
 
 /**
  * There is deliberately no asset registry here any more.

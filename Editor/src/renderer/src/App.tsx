@@ -60,7 +60,7 @@ import { useMedia } from "./media/useMedia";
 import { useStats } from "./stats/useStats";
 import { useGallery } from "./gallery/useGallery";
 import { useAchievements } from "./achievements/useAchievements";
-import { useMinigames } from "./minigames/useMinigames";
+import { useMinigames } from "./minigame/useMinigames";
 import { ManuscriptOutline } from "./manuscript/ManuscriptOutline";
 import { PlanGrid } from "./plan/PlanGrid";
 import { PlanImportDialog } from "./plan/PlanImportDialog";
