@@ -5,6 +5,7 @@ import { isIdOf, newId } from '@shared/ids'
 import type { Project, ProjectFile, ProjectProtection } from '@shared/project'
 import { DEFAULT_DESKTOP_RELEASE, isDesktopPlatform, type DesktopRelease } from '@shared/desktop'
 import { exists, walkFiles } from './fs'
+import { writeWatched } from './watch'
 import { parseDocument, serialiseDocument } from './markdown'
 import { stripBom } from './text'
 
@@ -84,7 +85,11 @@ export async function readProject(projectPath: string): Promise<Project | null> 
 
 export async function saveProject(project: Project): Promise<void> {
   await mkdir(project.path, { recursive: true })
-  await writeFile(
+  // Through the watcher, like every other catalogue write. Without it the
+  // app's own manifest saves — remembering an export folder, linking a
+  // library, the debounced flush behind every settings edit — are reported
+  // back as somebody else's change, reloading every screen that reads disk.
+  await writeWatched(
     join(project.path, MANIFEST),
     serialiseDocument(
       {
@@ -97,8 +102,7 @@ export async function saveProject(project: Project): Promise<void> {
         ...(project.desktop ? { desktop: project.desktop } : {})
       },
       project.description
-    ),
-    'utf8'
+    )
   )
 }
 

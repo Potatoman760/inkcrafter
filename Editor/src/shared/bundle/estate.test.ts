@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actOnEstate, availableEstateRoom, commissionBoard, commissionQuote, ESTATE_CONTRACT_LIMIT, ESTATE_CONTRACTS, estateCalendar, estateCapacity, estateConfiguration, settleWorkday, estatePlanSize, estateRoomBackground, estateRoomEnabled, estateRoomResidents, estateSceneEnabled, estateWorkdayOpen, newEstateState, readEstateState, type EstateRoom } from './estate'
+import { actOnEstate, availableEstateRoom, commissionBoard, commissionQuote, ESTATE_CONTRACT_LIMIT, ESTATE_CONTRACTS, estateCalendar, estateCapacity, estateConfiguration, estateFinaleReady, estateGoalProgress, settleWorkday, estatePlanSize, estateRoomBackground, estateRoomEnabled, estateRoomResidents, estateSceneEnabled, estateWorkdayOpen, newEstateState, readEstateState, type EstateRoom } from './estate'
 import { newEstateMinigame, parseMinigames, serialiseMinigames } from './minigameDoc'
 
 const game = newEstateMinigame('Villa')
@@ -9,8 +9,64 @@ const act = (state: ReturnType<typeof newEstateState>, action: Parameters<typeof
   actOnEstate(state, action, game, () => eligible, 18, 0)
 
 describe('villa economy and household progression', () => {
+  it('round-trips room encounters and requires all participants to remain eligible residents with available restored homes', () => {
+    const villa = newEstateMinigame('Ambient villa')
+    villa.rooms = [
+      { key: 'pool', name: 'Pool', cost: 0, beds: 0, residentKey: null, requires: null, description: '' },
+      { key: 'a', name: 'A', cost: 0, beds: 1, residentKey: 'a', requires: null, description: '' },
+      { key: 'b', name: 'B', cost: 0, beds: 1, residentKey: 'b', availabilityVariable: 'b_room', requires: null, description: '' }
+    ]
+    villa.residents = ['a', 'b'].map(key => ({ key, name: key, eligibilityVariable: `${key}_ok`, requirement: '', sprite: '', scenes: [] }))
+    villa.encounters = [{ room: 'pool', result: 'pool_chat', title: 'Poolside questions', cue: 'Voices carry over the water.', residents: ['a', 'b'], gate: 'ready' }]
+    expect(parseMinigames(serialiseMinigames({ version: 1, minigames: [villa] })).minigames).toEqual([villa])
+    const state = { ...newEstateState(80, villa.rooms), rooms: ['pool', 'a', 'b'], residents: ['a', 'b'], assignments: { a: 'a', b: 'b' } }
+    const action = { kind: 'encounter' as const, result: 'pool_chat' }
+    const run = (ledger = state, read = (_key: string): boolean => true) => actOnEstate(ledger, action, villa, read, 18, 0, read)
+    expect(run()).not.toBe(state)
+    expect(run()).toEqual(state)
+    const absent = { ...state, residents: ['a'] }
+    expect(run(absent)).toBe(absent)
+    const noHome = { ...state, assignments: { a: 'a', b: '' } }
+    expect(run(noHome)).toBe(noHome)
+    for (const missing of ['pool', 'b']) {
+      const locked = { ...state, rooms: state.rooms.filter(key => key !== missing) }
+      expect(run(locked)).toBe(locked)
+    }
+    for (const missing of ['b_ok', 'b_room', 'ready']) expect(run(state, key => key !== missing)).toBe(state)
+    expect(actOnEstate(state, { kind: 'encounter', result: 'unknown' }, villa, () => true, 18, 0)).toBe(state)
+  })
   it('round-trips the new kind, including author-defined rooms and invitation gates', () => {
     expect(parseMinigames(serialiseMinigames({ version: 1, minigames: [game] })).minigames).toEqual([game])
+  })
+
+  it('derives authored goals and latches finale readiness only after the minimum day', () => {
+    const villa = newEstateMinigame('Goal villa')
+    villa.rooms = [
+      { key: 'hall', name: 'Hall', cost: 0, beds: 0, startsActive: true, residentKey: null, requires: null, description: '' },
+      { key: 'staff', name: 'Staff room', cost: 10, beds: 1, residentKey: 'staff', requires: null, description: '' },
+      { key: 'guest', name: 'Guest room', cost: 10, beds: 1, residentKey: 'guest', requires: null, description: '' }
+    ]
+    villa.residents = [
+      { key: 'staff', name: 'Staff', eligibilityVariable: 'staff_ok', requirement: '', sprite: '', scenes: [] },
+      { key: 'guest', name: 'Guest', eligibilityVariable: 'guest_ok', requirement: '', sprite: '', scenes: [] }
+    ]
+    villa.goals = [
+      { id: 'room', title: 'Restore', text: 'Done.', required: true, condition: { kind: 'room', room: 'staff' } },
+      { id: 'arc', title: 'Arc', text: 'Done.', required: true, condition: { kind: 'variable', variable: 'arc_done' } },
+      { id: 'guests', title: 'Guests', text: 'Done.', required: true, condition: { kind: 'residents', count: 2, exclude: ['staff'] } }
+    ]
+    villa.finale = { minimumDay: 9, readyVariable: 'ready', requiredGoalIds: ['room', 'arc', 'guests'] }
+    const flags = new Set(['staff_ok', 'guest_ok', 'arc_done'])
+    const read = (name: string): boolean => flags.has(name)
+    let state = newEstateState(30, villa.rooms)
+    state = actOnEstate(state, { kind: 'restore', key: 'staff' }, villa, read, 18, 0, read)
+    state = actOnEstate(state, { kind: 'restore', key: 'guest' }, villa, read, 18, 0, read)
+    state = actOnEstate(state, { kind: 'invite', key: 'guest' }, villa, read, 18, 0, read)
+    expect(estateGoalProgress(villa.goals[2]!, state, villa, read)).toMatchObject({ complete: true, current: 1, target: 1 })
+    expect(estateFinaleReady(state, villa, 8, read)).toBe(false)
+    expect(estateFinaleReady(state, villa, 9, read)).toBe(true)
+    flags.delete('guest_ok')
+    expect(estateGoalProgress(villa.goals[2]!, state, villa, read)).toMatchObject({ complete: true, target: 0 })
   })
 
   it('restores in any order while checking funds and duplicate purchases', () => {
@@ -31,22 +87,21 @@ describe('villa economy and household progression', () => {
     expect(act(state, { kind: 'invite', key: 'guest0' })).toBe(state)
     state = act(state, { kind: 'invite', key: 'guest1' })
     expect(act(state, { kind: 'invite', key: 'guest2' })).toBe(state)
-    state = act(state, { kind: 'farewell', key: 'guest0' })
-    expect(act(state, { kind: 'invite', key: 'guest2' }).residents).toEqual(['guest1', 'guest2'])
+    state = act(state, { kind: 'restore', key: 'east' })
+    expect(state.residents).toEqual(['guest0', 'guest1', 'guest2'])
   })
 
-  it('requires a resident and restored room for scenes, then preserves history across reloads and departures', () => {
+  it('requires a resident and restored room for scenes, then preserves history across reloads', () => {
     let state = newEstateState(80)
     expect(act(state, { kind: 'scene', result: 'evening0' })).toBe(state)
     state = act(state, { kind: 'invite', key: 'guest0' })
     expect(act(state, { kind: 'scene', result: 'evening0' })).toBe(state)
     state = act(state, { kind: 'restore', key: 'garden' })
     state = act(state, { kind: 'scene', result: 'evening0' })
-    state = act(state, { kind: 'farewell', key: 'guest0' })
     expect(readEstateState(JSON.stringify(state), 80)).toEqual(state)
-    expect(state.seen).toEqual(['evening0'])
+    expect(state.seen).toEqual([])
     expect(() => readEstateState('{broken}', 80)).toThrow()
-    expect(() => readEstateState(JSON.stringify({ ...state, version: 3 }), 80)).toThrow()
+    expect(() => readEstateState(JSON.stringify({ ...state, version: 4 }), 80)).toThrow()
   })
 
   it('rejects impossible staffing and duplicate contracts, preserving a saved draft', () => {
@@ -93,7 +148,7 @@ describe('villa economy and household progression', () => {
     expect(state.crowns).toBeGreaterThanOrEqual(0)
   })
 
-  it('invites into the chosen restored suite and frees that exact room on departure', () => {
+  it('invites into the chosen restored suite and refuses one already taken', () => {
     let state = newEstateState(80)
     expect(state.rooms).toEqual(['hall', 'suite_1', 'suite_2'])
     expect(act(state, { kind: 'invite', key: 'guest0', room: 'east' })).toBe(state)
@@ -104,15 +159,13 @@ describe('villa economy and household progression', () => {
     expect(act(state, { kind: 'invite', key: 'guest1', room: 'suite_2' })).toBe(state)
     state = act(state, { kind: 'invite', key: 'guest1', room: 'suite_1' })
     expect(readEstateState(JSON.stringify(state), 80).assignments).toEqual({ guest0: 'suite_2', guest1: 'suite_1' })
-    state = act(state, { kind: 'farewell', key: 'guest0' })
-    expect(state.assignments).toEqual({ guest1: 'suite_1' })
-    expect(availableEstateRoom(state, game.rooms)?.key).toBe('suite_2')
+    expect(availableEstateRoom(state, game.rooms)).toBeUndefined()
   })
 
   it('migrates purchased wings and places old residents without losing any progress', () => {
     const old = { version: 1, day: 7, crowns: 132, rooms: ['hall', 'east', 'west', 'garden'], residents: ['guest0', 'guest1', 'guest2', 'guest3', 'guest4', 'guest5'], seen: ['evening0'], selected: [1], lastIncome: 33 }
     const migrated = readEstateState(JSON.stringify(old), 80)
-    expect(migrated.version).toBe(2)
+    expect(migrated.version).toBe(3)
     expect(migrated.rooms).toEqual(expect.arrayContaining(['hall', 'suite_1', 'suite_2', 'east', 'east_2', 'west', 'west_2', 'garden']))
     expect(estateCapacity(migrated, game.rooms)).toBe(6)
     expect(new Set(Object.values(migrated.assignments)).size).toBe(6)
@@ -161,7 +214,7 @@ describe('character-specific homes', () => {
     const saved = readEstateState(JSON.stringify(invited), 80, villa.rooms)
     expect(saved).toEqual(invited)
     expect(estateCapacity(saved, villa.rooms, () => true)).toBe(1)
-    expect(actOnEstate(saved, { kind: 'scene', result: 'visit' }, villa, () => true, 18, 0).seen).toContain('visit')
+    expect(actOnEstate(saved, { kind: 'scene', result: 'visit' }, villa, () => true, 18, 0).seen).not.toContain('visit')
     villa.rooms[0]!.availabilityVariable = 'hall_enabled'
     expect(actOnEstate(saved, { kind: 'scene', result: 'visit' }, villa, () => true, 18, 0, name => name !== 'hall_enabled')).toBe(saved)
   })
@@ -219,11 +272,12 @@ describe('character-specific homes', () => {
     expect(invite(invited, 'lira')).toBe(invited)
   })
 
-  it('keeps a departed companion’s home reserved and does not reuse it for someone else', () => {
-    let state = invite(newEstateState(80, rooms), 'maren')
-    state = actOnEstate(state, { kind: 'farewell', key: 'maren' }, config, () => true, 18, 0)
-    expect(invite(state, 'lira', 'bedroom')).toBe(state)
-    expect(invite(state, 'maren').assignments).toEqual({ maren: 'bedroom' })
+  it('never lends a dedicated home to someone else, empty or occupied', () => {
+    const empty = newEstateState(80, rooms)
+    expect(invite(empty, 'lira', 'bedroom')).toBe(empty)
+    const housed = invite(empty, 'maren')
+    expect(housed.assignments).toEqual({ maren: 'bedroom' })
+    expect(invite(housed, 'lira', 'bedroom')).toBe(housed)
   })
 
   it('rehomes old residents without charging, evicting them or losing history', () => {
@@ -304,7 +358,8 @@ describe('a chapter-managed villa', () => {
     expect(actOnEstate(invited, { kind: 'scene', result: scene.result }, villa, closed, 18, 0)).toBe(invited)
     expect(invited.seen).toEqual([])
     const visited = actOnEstate(invited, { kind: 'scene', result: scene.result }, villa, () => true, 18, 0)
-    expect(visited.seen).toEqual([scene.result])
+    expect(visited).not.toBe(invited)
+    expect(visited.seen).toEqual([])
   })
 
   it('ends earnings after the last workday without closing restorations or standalone play', () => {

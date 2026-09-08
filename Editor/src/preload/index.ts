@@ -163,6 +163,7 @@ const api: InkCrafterApi = {
     writeSection: (request) => ipcRenderer.invoke('ai:writeSection', request),
     writeInk: (request, project) => ipcRenderer.invoke('ai:writeInk', request, project),
     chat: (request) => ipcRenderer.invoke('ai:chat', request),
+    cancelChat: () => ipcRenderer.invoke('ai:cancelChat'),
     onChatProgress: (handler) => {
       const listener = (_event: IpcRendererEvent, progress: ChatProgress): void => handler(progress)
       ipcRenderer.on('ai:chatProgress', listener)

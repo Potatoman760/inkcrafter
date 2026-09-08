@@ -38,6 +38,22 @@ const check: MinigameCheck = ({ game, input, variables, problems, at }) => {
   const declaredBoolean = (name: string): boolean =>
     variables.some(one => one.name === name && one.kind === 'boolean') ||
     input.npcs.npcs.some(npc => npc.variables.some(one => npcVar(npc.inkId, one.key) === name && one.kind === 'boolean'))
+  if (game.goals) {
+    const goalIds = new Set(game.goals.map(goal => goal.id))
+    if (goalIds.size !== game.goals.length) problems.push(at(`${game.display || game.name} needs unique household goal ids.`))
+    for (const goal of game.goals) {
+      if (!goal.id || !goal.title.trim() || !goal.text.trim()) problems.push(at(`${game.display || game.name} has an incomplete household goal.`))
+      if (goal.condition.kind === 'room' && !keys.has(goal.condition.room)) problems.push(at(`${goal.title} names an unknown room.`))
+      if (goal.condition.kind === 'variable' && !declaredBoolean(goal.condition.variable)) problems.push(at(`${goal.title} needs a declared boolean story flag.`))
+      if (goal.condition.kind === 'residents') for (const resident of goal.condition.exclude ?? []) {
+        if (!game.residents.some(one => one.key === resident)) problems.push(at(`${goal.title} excludes an unknown resident.`))
+      }
+    }
+    if (game.finale) {
+      if (!declaredBoolean(game.finale.readyVariable)) problems.push(at(`${game.display || game.name}'s finale ready flag must be a declared boolean.`))
+      for (const id of game.finale.requiredGoalIds) if (!goalIds.has(id)) problems.push(at(`${game.display || game.name}'s finale names an unknown goal ${id}.`))
+    }
+  }
   if (!keys.has('hall') || keys.size !== game.rooms.length) {
     problems.push(at(`${game.display || game.name} needs unique room keys including hall.`))
   }
@@ -86,6 +102,12 @@ const check: MinigameCheck = ({ game, input, variables, problems, at }) => {
         problems.push(at(`${resident.name}'s bath sprite must reference a still character look in the media catalogue.`))
       }
     }
+    if (resident.talk) {
+      if (!resident.talk.title.trim() || !resident.talk.result || resident.talk.result === 'return' || resultTokens.has(resident.talk.result)) {
+        problems.push(at(`${resident.name}'s household conversation needs a title and unique result.`))
+      }
+      resultTokens.add(resident.talk.result)
+    }
     for (const scene of resident.scenes) {
       if (!keys.has(scene.room)) problems.push(at(`${resident.name}'s ${scene.title} names an unknown room.`))
       if (!scene.result || scene.result === 'return' || resultTokens.has(scene.result)) {
@@ -96,6 +118,18 @@ const check: MinigameCheck = ({ game, input, variables, problems, at }) => {
         problems.push(at(`${resident.name}'s ${scene.title} waits on ${scene.gate}, which is not a declared boolean.`))
       }
     }
+  }
+  for (const encounter of game.encounters ?? []) {
+    if (!keys.has(encounter.room)) problems.push(at(`${encounter.title} names an unknown encounter room.`))
+    if (!encounter.title.trim() || !encounter.cue.trim() || !encounter.result || encounter.result === 'return' || resultTokens.has(encounter.result)) {
+      problems.push(at('Each household encounter needs a title, cue and unique result.'))
+    }
+    resultTokens.add(encounter.result)
+    if (encounter.residents.length < 2 || new Set(encounter.residents).size !== encounter.residents.length ||
+        encounter.residents.some(key => !game.residents.some(person => person.key === key))) {
+      problems.push(at(`${encounter.title} needs at least two distinct, known residents.`))
+    }
+    if (encounter.gate && !declaredBoolean(encounter.gate)) problems.push(at(`${encounter.title} needs a declared boolean gate.`))
   }
   // A calendar names variables the story owns; each has to exist with the kind the villa reads.
   if (game.calendar) {

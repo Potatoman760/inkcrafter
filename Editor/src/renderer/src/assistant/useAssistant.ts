@@ -4,6 +4,14 @@ import type { ChatContext, ChatMessage, ChatProgress } from '@shared/chat'
 export interface AssistantSession {
   messages: ChatMessage[]
   busy: boolean
+  /**
+   * Stop has been pressed and the turn has not settled yet.
+   *
+   * Its own flag rather than a derived one, because `busy` stays true through
+   * this: a tool already running is allowed to finish, so there is a stretch of
+   * seconds where the honest thing to show is neither "working" nor "done".
+   */
+  stopping: boolean
   /** What the current turn has done so far, oldest first. Cleared when it ends. */
   progress: ChatProgress[]
   error: string | null
@@ -17,6 +25,13 @@ export interface AssistantSession {
       context?: ChatContext
     }
   ) => Promise<string[]>
+  /**
+   * Asks main to stop the turn in flight. Safe to call when nothing is running.
+   *
+   * There is nothing to await: the turn ends through `send`, which returns the
+   * work it had already done, exactly as it would at any other ending.
+   */
+  stop: () => void
   clear: () => void
 }
 
@@ -41,6 +56,7 @@ export function useAssistant(): AssistantSession {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<ChatProgress[]>([])
+  const [stopping, setStopping] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Subscribed once for the session. A turn runs for minutes and the renderer
@@ -82,6 +98,7 @@ export function useAssistant(): AssistantSession {
       setMessages(conversation)
       setBusy(true)
       setProgress([])
+      setStopping(false)
       setError(null)
 
       try {
@@ -106,16 +123,25 @@ export function useAssistant(): AssistantSession {
         return []
       } finally {
         setBusy(false)
+        setStopping(false)
         setProgress([])
       }
     },
     [messages, busy]
   )
 
+  const stop = useCallback(() => {
+    // Marked here rather than on main's answer, so the button changes the
+    // moment it is pressed. A turn stops between tool calls, and a press that
+    // looked ignored for ten seconds would just be pressed again.
+    setStopping(true)
+    void window.inkcrafter.ai.cancelChat()
+  }, [])
+
   const clear = useCallback(() => {
     setMessages([])
     setError(null)
   }, [])
 
-  return { messages, busy, progress, error, send, clear }
+  return { messages, busy, stopping, progress, error, send, stop, clear }
 }

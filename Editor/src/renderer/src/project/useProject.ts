@@ -53,7 +53,17 @@ export interface ProjectSession {
   deletePath(path: string): Promise<boolean>
 }
 
-export function useProject(): ProjectSession {
+/**
+ * The open project, its ink files, and the folders they sit in.
+ *
+ * `reloadKey` is how anything outside this hook asks for the list to be read
+ * again. The project's files are not only written by this app — an author
+ * keeps a chapter open in another editor, a script generates one, `git
+ * checkout` replaces the lot — and a file tree that only changes when this app
+ * changes it is a file tree that is quietly wrong. The watcher in main reports
+ * those writes, App turns them into a new key, and the list re-reads.
+ */
+export function useProject(reloadKey = 0): ProjectSession {
   const [project, setProject] = useState<Project | null>(null)
   const [files, setFiles] = useState<ProjectFile[]>([])
   const [folders, setFolders] = useState<string[]>([])
@@ -103,7 +113,9 @@ export function useProject(): ProjectSession {
 
   useEffect(() => {
     void refreshFiles()
-  }, [refreshFiles])
+    // `reloadKey` is a dependency with no other purpose: reading it here is
+    // what makes somebody else's write re-read the tree.
+  }, [refreshFiles, reloadKey])
 
   // Never leave manifest edits unwritten because the view changed.
   useEffect(

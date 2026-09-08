@@ -15,7 +15,7 @@ app.whenReady().then(async () => {
       vite.middlewares.use('/__villa_probe', (_req, res) => {
         res.setHeader('Content-Type', 'text/html')
         res.end(`<html><body style="margin:0"><div id="game"></div><script type="module">
-          import { EstateScene } from '/src/scenes/EstateScene.ts';
+          import { EstateScene } from '/src/minigame/estate/EstateScene.ts';
           const original = EstateScene.prototype.create;
           EstateScene.prototype.create = function(data) { original.call(this, data); window.villaProbe = this; };
           await import('/src/main.ts');
@@ -157,8 +157,8 @@ app.whenReady().then(async () => {
     await capture('villa-isolde-unrestored.png')
     await win.webContents.executeJavaScript(`(() => {
       const v = window.villaProbe;
-      v.act({kind:'restore',key:'guest'}); v.state.engine.setVariable('isolde_arrived',true);
-      v.act({kind:'invite',key:'isolde',room:'guest'}); v.openRoom('guest');
+      v.state.engine.setVariable('isolde_arrived',true); v.act({kind:'restore',key:'guest'}); v.openRoom('guest');
+      if(!v.ledger.residents.includes('isolde')) throw new Error('Restoration did not house Isolde');
       const label = 'After the ledgers close';
       const flatten = list => list.flatMap(one => [one, ...(Array.isArray(one.list) ? flatten(one.list) : [])]);
       const button = flatten(v.children.list).find(one => one.text === label);
@@ -171,13 +171,11 @@ app.whenReady().then(async () => {
       const v=window.villaProbe;
       v.state.engine.setVariable('lira_is_bred',true); v.state.engine.setVariable('piri_is_bred',false);
       v.act({kind:'restore',key:'garden'}); v.openRoom('garden');
-      if(v.invitations('garden').length) throw new Error('Joint invitation opened before Piri');
-      v.act({kind:'invite',key:'lira',room:'garden'});
-      if(v.ledger.residents.includes('lira')) throw new Error('Partial pair invited');
-      v.state.engine.setVariable('piri_is_bred',true); v.render();
+      if(v.ledger.residents.includes('lira')) throw new Error('Partial pair moved in without Piri');
       const flatten=list=>list.flatMap(one=>[one,...(Array.isArray(one.list)?flatten(one.list):[])]);
-      if(!flatten(v.children.list).some(one=>one.text==='Invite Lira + Piri')) throw new Error('Missing joint invitation label');
-      v.act({kind:'invite',key:'lira',room:'garden'});
+      if(flatten(v.children.list).some(one=>String(one.text).startsWith('Invite'))) throw new Error('Invite control still shown');
+      v.state.engine.setVariable('piri_is_bred',true);
+      v.ledger=v.autoInvite(v.ledger); v.openRoom('garden');
       if(v.ledger.assignments.lira!=='garden'||v.ledger.assignments.piri!=='garden') throw new Error('Pair not housed together');
       if(!flatten(v.children.list).some(one=>one.texture?.key==='char_piri_neutral')) throw new Error('Piri neutral sprite missing');
     })()`)
@@ -193,7 +191,7 @@ app.whenReady().then(async () => {
       if(v.page!=='room'||!labels().includes('Take a bath')) throw new Error('Bath entry button missing');
       window.bathLedger=JSON.stringify(v.ledger); v.takeBath();
       if(!labels().includes('Roman bathhouse')||!labels().includes('Lira')||!labels().includes('Piri')||!labels().includes('Isolde')) throw new Error('Bathhouse household missing');
-      if(labels().includes('Invite Piri')||labels().includes('See them off')) throw new Error('Baths changed housing controls');
+      if(labels().some(one=>/^(Invite|See )/.test(String(one)))) throw new Error('Baths changed housing controls');
       if(JSON.stringify(v.ledger.assignments)!==window.bathHomes) throw new Error('Visiting baths moved residents');
       if(flatten(v.children.list).some(one=>one.texture?.key==='char_piri_neutral')) throw new Error('Missing bath sprite fell back to ordinary outfit');
       const firstCrop=flatten(v.children.list).find(one=>one.texture?.key?.startsWith('estate-bath:'));
@@ -210,7 +208,8 @@ app.whenReady().then(async () => {
       const v=window.villaProbe;
       window.beforeBathCrowd=JSON.stringify(v.ledger); v.launchData.mode='test'; v.ledger.crowns=5000;
       for(const room of v.definition.rooms) { if(room.availabilityVariable) v.testGates.set(room.availabilityVariable,true); v.act({kind:'restore',key:room.key}); }
-      for(const person of v.definition.residents) v.act({kind:'invite',key:person.key});
+      v.ledger=v.autoInvite(v.ledger);
+      if(v.ledger.residents.length!==v.definition.residents.length) throw new Error('Restoration left the household short');
       v.openRoom('baths'); v.takeBath();
       const flatten=list=>list.flatMap(one=>[one,...(Array.isArray(one.list)?flatten(one.list):[])]);
       const expected=['Maren','Anwen','Elowen','Lira','Piri','Tink','Faye','Dinah','Yelena','Daphne','Tamsin','Isolde'];

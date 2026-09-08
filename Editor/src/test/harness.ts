@@ -256,8 +256,10 @@ export function installApi(overrides: DeepPartial<InkCrafterApi> = {}): InkCraft
         messages: [{ id: 'a1', role: 'assistant' as const, content: 'Done.' }],
         message: null,
         truncated: false,
+        stopped: false,
         filesWritten: []
       })),
+      cancelChat: vi.fn(async () => true),
       onChatProgress: vi.fn(() => () => {})
     },
     settings: {

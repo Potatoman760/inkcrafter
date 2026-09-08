@@ -17,6 +17,8 @@ import type { StoryLine } from "@/narrative/StoryEngine";
 import { assertNever } from "@/util/exhaustive";
 import { UI_TEXT } from "@/config/uiText";
 import { setControllerActions } from "@/input/FocusNavigation";
+import { EstateMemories } from '@/minigame/estate/EstateMemories';
+import { GalleryUnlocks } from '@/gallery/GalleryUnlocks';
 
 /**
  * How fast skipping walks the story.
@@ -50,7 +52,10 @@ function toolbarX(fromRight: number): number {
 
 export interface VNSceneData {
   /** Preview starts from a restored pre-paragraph checkpoint and advances normally. */
-  mode: "new" | "preview" | "resume";
+  mode: "new" | "preview" | "resume" | "replay";
+  /** Replay owns a disposable state rather than the live registry state. */
+  state?: GameState;
+  onReplayExit?: (error?: string) => void;
 }
 
 /**
@@ -83,16 +88,22 @@ export class VNScene extends Phaser.Scene {
   /** True only while a minigame overlay, rather than an ordinary menu, owns the pause. */
   private minigameActive = false;
   private minigameBlankLine = false;
+  private replay = false;
+  private replayExit?: (error?: string) => void;
+  private replayCleanup: Array<() => void> = [];
 
-  constructor() {
-    super(SceneKey.VN);
+  constructor(key: string = SceneKey.VN) {
+    super(key);
   }
 
   create(data: VNSceneData): void {
-    this.state = getGameState(this);
+    this.state = data.state ?? getGameState(this);
+    this.replay = data.mode === 'replay';
+    this.replayExit = data.onReplayExit;
+    this.replayCleanup = this.replay ? [GalleryUnlocks.suppress(), SaveManager.suppressWrites()] : [];
     setControllerActions(this, {
       accept: () => this.onAdvanceInput(),
-      back: () => this.goBack(),
+      back: () => this.replay ? this.finishReplay() : this.goBack(),
       menu: () => this.openMenu(),
       secondary: () => this.quickSave(),
       tertiary: () => this.toggleChrome(),
@@ -112,6 +123,8 @@ export class VNScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.music.destroy();
       this.media.destroy();
+      for (const cleanup of this.replayCleanup.splice(0)) cleanup();
+      if (this.replay) this.state.destroy();
     });
     this.events.on(Phaser.Scenes.Events.RESUME, this.onSceneResume, this);
     this.dialogue = new DialogueBox(this);
@@ -183,6 +196,7 @@ export class VNScene extends Phaser.Scene {
 
   /** Public hook used by SaveLoadScene after applying a load over this scene. */
   applyLoadedState(): void {
+    EstateMemories.cancel();
     this.stopSkipping();
     this.autosavePending = false;
     this.history.clear();
@@ -198,6 +212,7 @@ export class VNScene extends Phaser.Scene {
    * the current frame, and render from the new scene. Called by MapScene.
    */
   jumpTo(path: string): void {
+    EstateMemories.cancel();
     this.stopSkipping();
     this.autosavePending = false;
     // Travelling is a jump; the frames behind it are somewhere else entirely.
@@ -281,6 +296,7 @@ export class VNScene extends Phaser.Scene {
     this.advancing = true;
     void this.advance().catch((error: unknown) => {
       console.error("Could not prepare the next story frame.", error);
+      if (this.replay) this.finishReplay('The memory could not be played. Your live game was left unchanged.');
     }).finally(() => {
       this.advancing = false;
     });
@@ -401,6 +417,7 @@ export class VNScene extends Phaser.Scene {
     this.state.sceneMeta.lastText = line.text;
     if (line.text.length > 0) this.dialogue.setLine(this.state.sceneMeta.speaker, line.text);
     if (minigame !== null) {
+      if (this.replay) { this.finishReplay('This memory reaches an unsupported minigame boundary. Your live game was left unchanged.'); return; }
       this.launchMinigame(minigame, line.text.length === 0);
       return;
     }
@@ -455,11 +472,20 @@ export class VNScene extends Phaser.Scene {
    * deserve a second write every time somebody steps back onto it.
    */
   private showChoices(): void {
-    this.choices.present(this.state.engine.choices, (index) => {
+    const offered = this.state.engine.choices;
+    const boundary = this.replay ? offered.find(choice => choice.text.trim() === 'Return to the villa') : undefined;
+    if (boundary) {
+      this.choices.present([{ ...boundary, text: 'Return to memories' }], () => this.finishReplay());
+      this.applyChrome();
+      return;
+    }
+    this.choices.present(offered, (index) => {
       // Remembered before the choice is taken, so Back returns to the choice
       // itself rather than to the line before it — undoing a decision is most
       // of what anyone wants this for.
       this.remember();
+      const selected = offered.find(choice => choice.index === index);
+      if (!this.replay && selected) EstateMemories.completeAtReturn(this.state, selected.text);
       this.state.engine.choose(index);
       this.proceed();
     });
@@ -468,6 +494,10 @@ export class VNScene extends Phaser.Scene {
   }
 
   private endStory(): void {
+    if (this.replay) {
+      this.finishReplay('This memory has no supported return boundary. Your live game was left unchanged.');
+      return;
+    }
     // Dead end: keep the last line and current scene on screen, just stop
     // advancing. Don't navigate away. (The previous line is already shown.)
     this.ended = true;
@@ -547,6 +577,7 @@ export class VNScene extends Phaser.Scene {
   }
 
   private quickSave(): void {
+    if (this.replay) return;
     this.stopSkipping();
     SaveManager.quickSave(
       this.state,
@@ -557,9 +588,11 @@ export class VNScene extends Phaser.Scene {
   }
 
   private quickLoad(): void {
+    if (this.replay) return;
     this.stopSkipping();
     const data = SaveManager.loadLatestQuick(this.state);
     if (!data || !SaveManager.apply(this.state, data)) return;
+    EstateMemories.cancel();
 
     // The frames behind a load belong to a different reading of the story;
     // stepping back into them would be a jump, not an undo.
@@ -625,7 +658,7 @@ export class VNScene extends Phaser.Scene {
   private commitPendingAutosave(label: string): void {
     if (!this.autosavePending) return;
     this.autosavePending = false;
-    SaveManager.autosave(this.state, label);
+    if (!this.replay) SaveManager.autosave(this.state, label);
   }
 
   // --- toolbar ---
@@ -694,6 +727,7 @@ export class VNScene extends Phaser.Scene {
   }
 
   private openMap(): void {
+    if (this.replay) return;
     if (!this.state.sceneMeta.mapEnabled) return;
     this.stopSkipping();
     this.scene.launch(SceneKey.Map, { origin: SceneKey.VN });
@@ -701,14 +735,24 @@ export class VNScene extends Phaser.Scene {
   }
 
   private openCharacter(): void {
+    if (this.replay) return;
     this.stopSkipping();
     this.scene.launch(SceneKey.Character, { origin: SceneKey.VN });
     this.scene.pause();
   }
 
   private openMenu(): void {
+    if (this.replay) { this.finishReplay(); return; }
     this.stopSkipping();
     this.scene.launch(SceneKey.SaveLoad, { origin: SceneKey.VN });
     this.scene.pause();
+  }
+
+  private finishReplay(error?: string): void {
+    if (!this.replay) return;
+    const exit = this.replayExit;
+    this.replayExit = undefined;
+    exit?.(error);
+    this.scene.stop();
   }
 }

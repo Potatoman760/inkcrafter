@@ -563,6 +563,14 @@ export interface AiApi {
    * than looking hung. Returns an unsubscribe function.
    */
   onChatProgress(handler: (progress: ChatProgress) => void): () => void
+  /**
+   * Stops the turn this window has in flight.
+   *
+   * Resolves as soon as the turn has been told to stop, not when it has: a tool
+   * already running is allowed to finish, so `chat` may take a few more seconds
+   * to settle. It resolves false when there was nothing running.
+   */
+  cancelChat(): Promise<boolean>
 }
 
 export interface SettingsApi {

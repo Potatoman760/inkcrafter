@@ -7,8 +7,8 @@ import assert from 'node:assert/strict'
 import { Compiler } from 'inkjs/full'
 
 const root = resolve('data/projects/breedhaven')
-const compiled = await build({ stdin: { contents: "export {renderStateInk} from './src/shared/statsInk'; export {actOnEstate,newEstateState,estateCapacity,settleWorkday,commissionQuote} from './src/shared/bundle/estate';", resolveDir: process.cwd(), loader: 'ts' }, bundle: true, platform: 'node', format: 'esm', write: false })
-const { renderStateInk, actOnEstate, newEstateState, estateCapacity, settleWorkday, commissionQuote } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString('base64')}`)
+const compiled = await build({ stdin: { contents: "export {renderStateInk} from './src/shared/statsInk'; export {actOnEstate,autoInviteEstateResidents,newEstateState,estateCapacity,settleWorkday,commissionQuote} from './src/shared/bundle/estate';", resolveDir: process.cwd(), loader: 'ts' }, bundle: true, platform: 'node', format: 'esm', write: false })
+const { renderStateInk, actOnEstate, autoInviteEstateResidents, newEstateState, estateCapacity, settleWorkday, commissionQuote } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString('base64')}`)
 const stats = JSON.parse(readFileSync(resolve(root, 'stats.json'), 'utf8'))
 const npcs = JSON.parse(readFileSync(resolve(root, 'npcs.json'), 'utf8'))
 // Generated declarations, rebuilt from their authored catalogues.
@@ -65,24 +65,32 @@ for (const route of [...exclusive, 'none']) {
   for (const room of game.rooms) assert.equal(branch.rooms.includes(room.key), !room.availabilityVariable || read(room.availabilityVariable), route + ': ' + room.name)
   assert.equal(estateCapacity(branch, game.rooms, read), game.residents.length - (route === 'none' ? 3 : 2))
   for (const resident of game.residents.filter(one => exclusive.includes(one.key))) {
-    const next = actOnEstate(branch, { kind: 'invite', key: resident.key }, game, () => true, 18, 0, read)
-    assert.equal(next !== branch, resident.key === route)
+    assert.equal(branch.residents.includes(resident.key), resident.key === route, route + ': ' + resident.name)
   }
 }
+// Restoring a room moves its eligible resident in at once. Rooms that begin
+// restored have nothing to buy, so those women settle when the villa opens.
+const alreadyHome = game.rooms.filter(room => room.startsActive && room.residentKey).map(room => room.residentKey)
+assert.deepEqual(game.residents.filter(one => !household.residents.includes(one.key)).map(one => one.key), alreadyHome)
+household = autoInviteEstateResidents(household, game, () => true, () => true)
+assert.equal(household.residents.length, game.residents.length)
+// Nobody is eligible here, so the same rooms stay empty and reject wrong-room invitations.
+let vacant = newEstateState(all, game.rooms)
+for (const room of game.rooms) vacant = actOnEstate(vacant, { kind: 'restore', key: room.key }, game, () => false, 18, 0, () => true)
+assert.equal(vacant.residents.length, 0)
 for (const resident of game.residents) {
   const homes = game.rooms.filter(room => room.residentKey === resident.key || room.companionKey === resident.key)
   assert.equal(homes.length, 1, resident.name)
   for (const other of game.rooms.filter(room => room.key !== homes[0].key)) {
-    assert.equal(actOnEstate(household, { kind: 'invite', key: resident.key, room: other.key }, game, () => true, 18, 0), household, `${resident.name} must not enter ${other.name}`)
+    assert.equal(actOnEstate(vacant, { kind: 'invite', key: resident.key, room: other.key }, game, () => true, 18, 0), vacant, `${resident.name} must not enter ${other.name}`)
   }
-  household = actOnEstate(household, { kind: 'invite', key: resident.key }, game, () => true, 18, 0)
   assert.equal(household.assignments[resident.key], homes[0].key)
 }
 // The two exclusive-room prices are equal, and the staff rooms are the old guest rooms.
 assert.equal(new Set(exclusive.map(key => game.rooms.find(room => room.residentKey === key).cost)).size, 1)
 assert.equal(game.rooms.find(room => room.key === 'guest').residentKey, 'isolde')
 assert.equal(game.rooms.find(room => room.key === 'guest_2').residentKey, 'tamsin')
-assert.deepEqual(game.calendar, { day: 'villa_day', settled: 'villa_settled', when: { variable: 'villa_phase', value: 'evening' }, lastDay: 9, lastWorkday: 8 })
+assert.deepEqual(game.calendar, { day: 'villa_day', settled: 'villa_settled', when: { variable: 'villa_phase', value: 'evening' } })
 
 // --- every scene the villa can open, reached through the dispatch ------------
 function drainStory(run) {
@@ -122,6 +130,13 @@ for (const resident of game.residents) {
     drain()
     assert.ok(story.currentChoices.some(choice => /Sleep/.test(choice.text)), `${scene.result} should return to the evening`)
   }
+  assert.ok(resident.talk?.result, `${resident.name} needs a household conversation`)
+  story.variablesState.villa_result = resident.talk.result
+  story.ChoosePathString('villa_dispatch')
+  const talk = drain()
+  assert.ok(talk.includes(resident.name), resident.talk.result)
+  assert.equal(story.currentChoices[0]?.text, 'Return to the villa', resident.talk.result)
+  choose(/Return to the villa/); drain()
 }
 story.variablesState.villa_result = 'return'
 story.ChoosePathString('villa_dispatch')
@@ -167,7 +182,7 @@ function walk({ ally, love, answer }) {
     if (!run.currentChoices.some(choice => /Set out for the day/.test(choice.text))) pick(/Ask Isolde what she would send/)
     pick(/Set out for the day/)
     // The most story-bearing activity first, so every arc is exercised within the eight days.
-    const order = [/What Tamsin asked for/, /What Isolde has not said/, /afternoon in the courtyard/, /Answer the guild/, /Help Tamsin/, /Walk the Noble Quarter/, /afternoon Seraphine asked/, /Give Seraphine an answer/, /A day with Seraphine/]
+    const order = [/An afternoon with Tamsin/, /An afternoon with Isolde/, /afternoon in the courtyard/, /Answer the guild/, /Help Tamsin/, /Walk the Noble Quarter/, /afternoon Seraphine asked/, /Give Seraphine an answer/, /A day with Seraphine/]
     const chosen = order.find(pattern => run.currentChoices.some(choice => pattern.test(choice.text)))
     taken.push(run.currentChoices.find(choice => chosen.test(choice.text)).text)
     text = pick(chosen)
@@ -175,7 +190,7 @@ function walk({ ally, love, answer }) {
     // An activity with choices of its own is played through: the shared scenes
     // have sticky position choices and one that ends them, so that one first.
     for (let step = 0; step < 12 && run.currentChoices.length && !run.currentChoices.some(choice => /Close the ledger/.test(choice.text)); step += 1) {
-      const prefer = [/Fill Tink|Finish with Seraphine|^Cum$/, /Tell her you want her|Tell her it is not unwelcome/, /Keep Tink untitled|Offer Faye|Give Dinah|Accept Yelena|^(?!Ask|Offer .* standing|Not yet)/, /./]
+      const prefer = [/Fill Tink|Finish with Seraphine|^Cum$/, /Ask to spend an evening alone|Accept her private invitation|Tell her you want to keep seeing her|Make time for an ongoing romance/, /Keep Tink untitled|Offer Faye|Give Dinah|Accept Yelena|^(?!Ask|Offer .* standing|Not yet)/, /./]
       text += pick(prefer.find(pattern => run.currentChoices.some(choice => pattern.test(choice.text))))
     }
     // Every daytime path ends at the villa, at dusk, on the ledger.
@@ -199,14 +214,36 @@ function walk({ ally, love, answer }) {
     pick(/Sleep/)
   }
   assert.equal(run.variablesState.villa_day, 9)
-  assert.equal(paid, 8, `${ally}/${answer}: eight payouts, not ${paid}`)
+  assert.equal(paid, 8, `${ally}/${answer}: eight introductory payouts, not ${paid}`)
   assert.equal(evenings, 8)
+  assert.equal(run.variablesState.villa_free_roam_seen, true)
+  for (let day = 9; day <= 30; day += 1) {
+    assert.ok(run.currentChoices.some(choice => /Set out for the day/.test(choice.text)), `${ally}/${answer}: free-roam morning ${day}`)
+    pick(/Set out for the day/); pick(/A day in the city/)
+    assert.equal(run.variablesState.villa_phase, 'evening')
+    if (run.variablesState.villa_settled < day) { paid += 1; set('villa_settled', day) }
+    set('villa_result', 'return'); pick(/Close the ledger/)
+    assert.ok(run.currentChoices.some(choice => /Sleep/.test(choice.text)), `${ally}/${answer}: free-roam evening ${day}`)
+    pick(/Sleep/)
+  }
+  assert.equal(run.variablesState.villa_day, 31)
+  assert.equal(paid, 30, `${ally}/${answer}: every elapsed day pays once`)
+  assert.equal(run.variablesState.villa_settled, 30)
+  assert.ok(run.currentChoices.some(choice => /Review reception requirements/.test(choice.text)))
+  assert.ok(!run.currentChoices.some(choice => /Receive the court/.test(choice.text)))
+  set('villa_finale_ready', true)
+  run.ChoosePathString('villa_hub'); text = go()
+  assert.equal(run.variablesState.villa_finale_announced, true)
+  pick(/Receive the court/)
+  assert.ok(run.currentChoices.some(choice => /Begin finale/.test(choice.text)))
+  pick(/Stay at the villa/)
+  assert.equal(run.variablesState.villa_finale_started, false)
   assert.ok(run.currentChoices.some(choice => /Receive the court/.test(choice.text)))
-  pick(/Manage the villa/); set('villa_result', 'return'); pick(/Close the ledger/)
-  assert.ok(run.currentChoices.some(choice => /Receive the court/.test(choice.text)), 'day 9 keeps the villa open without a ninth payout')
-  assert.equal(run.variablesState.villa_settled, 8)
-  text = pick(/Receive the court/)
-  assert.ok(/council/.test(text) && run.variablesState.chapter5_complete, `${ally}/${answer}: the epilogue`)
+  pick(/Receive the court/)
+  text = pick(/Begin finale/)
+  assert.ok(/council/.test(text) && run.variablesState.chapter5_complete, `${ally}/${answer}: the player-selected epilogue`)
+  assert.equal(run.variablesState.villa_finale_started, true)
+  assert.equal(run.variablesState.villa_finale_completed, true)
   // NPC tags are applied during the walk, including the Day 5 trust bonus.
   assert.ok(run.variablesState.tamsin_trust >= 2 && run.variablesState.isolde_trust >= 2, `${ally}/${answer}: both staff arcs complete in eight days (${taken.join(' | ')})`)
   assert.ok(run.variablesState.tamsin_open && run.variablesState.isolde_open)
@@ -220,6 +257,27 @@ for (const ally of ['tink', 'faye', 'dinah', 'yelena']) {
   for (const answer of ['separate', 'defer', 'share']) routes.push(walk({ ally, love: true, answer }))
 }
 
+// The optional celebration is a reusable-asset evening and never begins the finale.
+const celebration = compile()
+celebration.variablesState.villa_day = 12
+celebration.variablesState.villa_phase = 'evening'
+celebration.variablesState.villa_finale_ready = true
+celebration.ChoosePathString('villa_evening_hub'); drainStory(celebration)
+let at = celebration.currentChoices.findIndex(choice => /Hold a household supper/.test(choice.text))
+assert.ok(at >= 0)
+celebration.ChooseChoiceIndex(at); drainStory(celebration)
+at = celebration.currentChoices.findIndex(choice => /Return to the villa/.test(choice.text)); assert.ok(at >= 0)
+celebration.ChooseChoiceIndex(at); drainStory(celebration)
+assert.equal(celebration.variablesState.villa_celebration_seen, true)
+assert.equal(celebration.variablesState.villa_finale_started, false)
+assert.ok(!celebration.currentChoices.some(choice => /Hold a household supper/.test(choice.text)))
+
+for (const pending of ['villa_author_threesome_pending', 'villa_author_orgy_pending']) {
+  const stub = compile(); stub.variablesState.villa_day = 12; stub.variablesState.villa_phase = 'evening'
+  stub.ChoosePathString(pending); const body = drainStory(stub)
+  assert.ok(/not been authored/.test(body)); assert.equal(stub.variablesState.villa_celebration_seen, false)
+}
+
 // --- the once-only guard the player uses ---------------------------------------
 let ledger = newEstateState(80, game.rooms)
 ledger = actOnEstate(ledger, { kind: 'contract', index: 0 }, game, () => true, 18, 0)
@@ -228,4 +286,4 @@ assert.equal(first.state.crowns, 80 + 18 + commissionQuote(1, [0], 0, game.contr
 assert.equal(first.state.day, 1, 'settlement never moves the day')
 
 assert.ok(routes.some(route => route.accepted), 'at least one walk exercises the accepted bond and its afternoon')
-console.log(`Villa probe passed: ${game.residents.length} exclusive homes, every wrong-room invitation rejected, ${game.residents.reduce((n, r) => n + r.scenes.length, 0)} scenes, ${routes.length + 4} calendar walks to the epilogue with eight payouts each, both staff arcs complete with NPC tags applied. No project files changed.`)
+console.log(`Villa probe passed: ${game.residents.length} exclusive homes, every wrong-room invitation rejected, ${game.residents.reduce((n, r) => n + r.scenes.length, 0)} scenes, ${routes.length + 4} calendar walks through Day 30 with one payout per day and a player-confirmed finale, both staff arcs complete with NPC tags applied. No project files changed.`)

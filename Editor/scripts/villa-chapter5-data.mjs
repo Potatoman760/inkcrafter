@@ -36,13 +36,22 @@ const wantVariable = (name, kind, initial, description) => {
   stats = lib.addVariable(stats, { ...lib.newVariable(name, kind), name, initial, description })
   changes.push(`variable ${name}`)
 }
-wantVariable('villa_day', 'number', 0, 'The Chapter 5 calendar: 0 before the villa is handed over, then 1 to 9. Owned by the story; the villa reads it.')
+wantVariable('villa_day', 'number', 0, 'The Chapter 5 villa calendar: 0 before handover, then one or more. Owned by the story; the villa reads it.')
 wantVariable('villa_phase', 'text', 'morning', 'Where the villa day stands: morning or evening. The villa pays the day’s work on a visit made in the evening.')
 wantVariable('villa_settled', 'number', 0, 'The last villa day whose crew work was paid. Written by the villa, so a reload never pays twice.')
 wantVariable('villa_morning_seen', 'number', 0, 'The last day whose morning news was shown, so returning to the morning does not repeat it.')
 wantVariable('villa_shared_since', 'number', 0, 'The day a shared bond was accepted; the promised afternoon comes after it.')
 wantVariable('villa_complication_seen', 'boolean', false, 'Whether the mid-week court complication has arrived.')
 wantVariable('villa_shared_bonded', 'boolean', false, 'Whether the afternoon Seraphine asked for has happened, after which the shared bond is whole.')
+wantVariable('villa_free_roam_seen', 'boolean', false, 'Whether Isolde has explained the open-ended villa schedule beginning on Day 9.')
+wantVariable('villa_intro_complete', 'boolean', false, 'Whether the first eight villa days have elapsed and free roam is available.')
+wantVariable('villa_finale_ready', 'boolean', false, 'Whether the authored required villa goals have made the formal reception available.')
+wantVariable('villa_finale_announced', 'boolean', false, 'Whether Isolde has announced that the household is ready for the reception.')
+wantVariable('villa_finale_started', 'boolean', false, 'Whether the player explicitly chose to begin the Episode 1 finale.')
+wantVariable('villa_finale_completed', 'boolean', false, 'Whether the villa reception and Episode 1 epilogue have completed.')
+wantVariable('villa_celebration_seen', 'boolean', false, 'Whether the optional household celebration has been completed.')
+wantVariable('tamsin_villa_arc_complete', 'boolean', false, 'Whether Tamsin’s third villa story beat reached its aftermath, on either relationship path.')
+wantVariable('isolde_villa_arc_complete', 'boolean', false, 'Whether Isolde’s third villa story beat reached its aftermath, on either relationship path.')
 write('stats.json', stats)
 
 // --- npcs.json: the two who come with the house ------------------------------
@@ -152,11 +161,26 @@ resident('isolde', 'Isolde', 'She arrives with the house on the first day.', 'gu
   ['villa_isolde_night', 'After the ledgers close', 'isolde_open'],
   ['villa_isolde_ledger', 'A last entry', 'isolde_settled']
 ])
+for (const person of villa.residents) person.talk = { title: 'Talk', result: `villa_${person.key}_talk` }
 if (!villa.calendar) {
-  villa.calendar = { day: 'villa_day', settled: 'villa_settled', when: { variable: 'villa_phase', value: 'evening' }, lastDay: 9 }
+  villa.calendar = { day: 'villa_day', settled: 'villa_settled', when: { variable: 'villa_phase', value: 'evening' } }
   changes.push('calendar')
 }
-villa.calendar.lastWorkday = 8
+if (villa.calendar.lastDay != null || villa.calendar.lastWorkday != null) {
+  delete villa.calendar.lastDay
+  delete villa.calendar.lastWorkday
+  changes.push('open-ended villa calendar')
+}
+villa.goals = [
+  { id: 'tamsin_room', title: 'A chamber for Tamsin', text: 'Tamsin’s sunny chamber is fitted out.', required: true, condition: { kind: 'room', room: 'guest_2' } },
+  { id: 'isolde_room', title: 'An office for Isolde', text: 'Isolde’s office and quarters are fitted out.', required: true, condition: { kind: 'room', room: 'guest' } },
+  { id: 'tamsin_arc', title: 'An afternoon with Tamsin', text: 'Tamsin’s place in the household has been settled on her chosen terms.', required: true, condition: { kind: 'variable', variable: 'tamsin_villa_arc_complete' } },
+  { id: 'isolde_arc', title: 'Follow up with Isolde', text: 'Isolde’s personal and professional understanding with Kael has been resolved.', required: true, condition: { kind: 'variable', variable: 'isolde_villa_arc_complete' } },
+  { id: 'additional_residents', title: 'Welcome the household', text: 'Two additional route-eligible residents have homes at the villa.', required: true, condition: { kind: 'residents', count: 2, exclude: ['tamsin', 'isolde'] } },
+  { id: 'all_rooms', title: 'Restore every available room', text: 'Every room available on this route has been restored.', required: false, condition: { kind: 'all-rooms' } },
+  { id: 'household_celebration', title: 'Celebrate the household', text: 'Kael has shared a private supper with the household he built.', required: false, condition: { kind: 'variable', variable: 'villa_celebration_seen' } }
+]
+villa.finale = { minimumDay: 9, readyVariable: 'villa_finale_ready', requiredGoalIds: ['tamsin_room', 'isolde_room', 'tamsin_arc', 'isolde_arc', 'additional_residents'] }
 // Room restoration is independent; the pair shares one gated invitation.
 for (const one of villa.rooms) one.requires = null
 Object.assign(room('garden'), { beds: 2, companionKey: 'piri', inviteTogether: true })
@@ -166,6 +190,16 @@ if (lira) {
   lira.requirement = 'Finish Piri’s scene in the Whispering Woods. Lira and Piri move in together.'
   if (!villa.residents.some(one => one.key === 'piri')) villa.residents.push({ key: 'piri', name: 'Piri', eligibilityVariable: 'piri_is_bred', requirement: lira.requirement, sprite: '', scenes: [] })
 }
+villa.encounters = [
+  { room: 'garden', result: 'villa_company_slimes', title: 'Poolside questions', cue: 'Faye has brought a notebook to the fountain.', residents: ['faye', 'lira', 'piri'] },
+  { room: 'baths', result: 'villa_company_rivals', title: 'Friendly rivals', cue: 'Maren and Daphne have cleared a bench. Neither will back down.', residents: ['maren', 'daphne'] },
+  { room: 'hall', result: 'villa_company_ribbons', title: 'Missing ribbons', cue: 'Anwen is holding a cup. Elowen and Tink are blaming each other.', residents: ['anwen', 'elowen', 'tink'] },
+  { room: 'conservatory', result: 'villa_company_manners', title: 'Bad manners', cue: 'Dinah, Yelena and Faye have abandoned the formal chairs.', residents: ['dinah', 'yelena', 'faye'] },
+  { room: 'garden', result: 'villa_company_balance', title: 'Dry ground', cue: 'Lira is questioning Maren and Daphne about their morning exercises.', residents: ['lira', 'maren', 'daphne'] },
+  { room: 'east_2', result: 'villa_company_cards', title: 'House rules', cue: 'Tink, Faye and Yelena are arguing over a pack of cards.', residents: ['tink', 'faye', 'yelena'] },
+  { room: 'suite_1', result: 'villa_company_mending', title: 'Borrowed coat', cue: 'Tamsin, Anwen and Maren have found three different faults with a coat.', residents: ['tamsin', 'anwen', 'maren'] },
+  { room: 'west', result: 'villa_company_quiet', title: 'Quiet hour', cue: 'Isolde, Faye and Dinah have stopped answering the door.', residents: ['isolde', 'faye', 'dinah'] }
+]
 write('minigames.json', minigames)
 
 // --- plan.json: the two new scenes of chapter 5 --------------------------------

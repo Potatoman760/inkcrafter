@@ -71,6 +71,7 @@ export function savePages(): SavePageId[] {
 let currentGame = "";
 /** Preview tabs keep their slots for the tab's lifetime without touching a reader's saves. */
 let volatileStorage: Map<string, string> | null = null;
+let writeSuppressions = 0;
 
 function stored(key: string): string | null {
   return volatileStorage?.get(key) ?? (volatileStorage ? null : PlayerStorage.getItem(key));
@@ -94,6 +95,12 @@ function discard(key: string): void {
  * rebuilt on load.
  */
 export const SaveManager = {
+  /** A transient replay may inspect slots but can never replace one. */
+  suppressWrites(): () => void {
+    writeSuppressions += 1;
+    let active = true;
+    return () => { if (active) { active = false; writeSuppressions = Math.max(0, writeSuppressions - 1); } };
+  },
   /**
    * Point the slots at one game. Called once from `main.ts` with the manifest
    * in hand, before Phaser starts and so before any scene can read a slot.
@@ -118,6 +125,7 @@ export const SaveManager = {
       bundleId: manifest.project.id,
       contentHash: manifest.contentHash,
     };
+    if (writeSuppressions > 0) return data;
     const encoded = JSON.stringify(data);
     try {
       store(this.key(slot), encoded);

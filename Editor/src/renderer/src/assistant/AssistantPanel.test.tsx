@@ -10,7 +10,7 @@ import { AssistantPanel } from './AssistantPanel'
 import { useAssistant } from './useAssistant'
 
 function turn(overrides: Partial<ChatTurnResult> = {}): ChatTurnResult {
-  return { ok: true, messages: [], message: null, truncated: false, filesWritten: [], ...overrides }
+  return { ok: true, messages: [], message: null, truncated: false, stopped: false, filesWritten: [], ...overrides }
 }
 
 /** Renders the dialog against a live `useAssistant`, as App does. */
@@ -381,5 +381,90 @@ describe('progress notes', () => {
     expect(await screen.findByText('drew bg/harbour.png')).toBeTruthy()
     // The call has landed, so its narration has nothing left to add.
     expect(screen.queryByText('queued — 1 job ahead')).toBeNull()
+  })
+})
+
+/**
+ * Stop, from the author's side.
+ *
+ * A turn can run for minutes and write files the whole way, so the only honest
+ * escape is one that leaves what it already did in place. Everything here is
+ * about the wait: the button has to appear while the turn runs, respond the
+ * moment it is pressed, and stop claiming to be working once it has been.
+ */
+describe('stopping a turn', () => {
+  /** Renders the panel over a turn that will not settle until it is told to. */
+  function running(): { cancelChat: ReturnType<typeof vi.fn>; settle: (result: ChatTurnResult) => void } {
+    let finish: ((result: ChatTurnResult) => void) | null = null
+    const cancelChat = vi.fn(async () => true)
+
+    installApi({
+      ai: {
+        cancelChat,
+        chat: vi.fn(() => new Promise<ChatTurnResult>((resolve) => { finish = resolve }))
+      }
+    })
+
+    function Host(): React.JSX.Element {
+      const assistant = useAssistant()
+      return (
+        <AssistantPanel
+          assistant={assistant}
+          projectPath="/w/data/projects/the-lighthouse"
+          projectTitle="The Lighthouse"
+          onFilesWritten={vi.fn()}
+        />
+      )
+    }
+
+    render(<Host />)
+    return { cancelChat, settle: (result) => act(() => finish?.(result)) }
+  }
+
+  it('offers Stop in place of Send while the turn runs', async () => {
+    const { cancelChat } = running()
+    await send('build me a chapter')
+
+    // Send is gone rather than merely disabled: it is dead for the length of
+    // the turn, and the thing wanted in its place is always the same.
+    expect(screen.queryByRole('button', { name: 'Send' })).toBeNull()
+    await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
+
+    expect(cancelChat).toHaveBeenCalledTimes(1)
+  })
+
+  it('acknowledges the press straight away, since a turn stops between tool calls', async () => {
+    const { cancelChat } = running()
+    await send('build me a chapter')
+    await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
+
+    const stopping = await screen.findByRole('button', { name: 'Stopping' })
+    expect(stopping).toBeDisabled()
+    // It is no longer working, and saying which round it is on would be a lie.
+    expect(screen.queryByText(/round [0-9]+ of/)).toBeNull()
+    expect(screen.getByText(/will finish first/)).toBeTruthy()
+
+    // A second press would ask main to stop a turn it has already stopped.
+    await userEvent.click(stopping)
+    expect(cancelChat).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps what the stopped turn did, and gives Send back', async () => {
+    const { settle } = running()
+    await send('build me a chapter')
+    await userEvent.click(await screen.findByRole('button', { name: 'Stop' }))
+
+    settle(
+      turn({
+        stopped: true,
+        messages: [assistantSays('Stopped. Anything listed above was done, and is on disk.')],
+        filesWritten: ['ink/one.ink']
+      })
+    )
+
+    expect(await screen.findByText(/Anything listed above was done/)).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Send' })).toBeTruthy()
+    // A stop is not a failure, so nothing should be reported as one.
+    expect(screen.queryByText('The assistant failed.')).toBeNull()
   })
 })

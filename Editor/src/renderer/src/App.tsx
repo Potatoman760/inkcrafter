@@ -146,7 +146,14 @@ type Sidebar = "files" | "codex";
 type PlanMode = "grid" | "matrix" | "outline";
 
 export function App(): React.JSX.Element {
-  const session = useProject();
+  /**
+   * Bumped whenever the workspace changed underneath the app — by the
+   * assistant's own writes, by unpacking a package, or by the watcher seeing
+   * somebody else write into the project. Every screen that reads from disk
+   * takes it, the file list included.
+   */
+  const [workspaceNonce, setWorkspaceNonce] = useState(0);
+  const session = useProject(workspaceNonce);
   const { project, files } = session;
 
   const [openFile, setOpenFile] = useState<ProjectFile | null>(null);
@@ -216,7 +223,6 @@ export function App(): React.JSX.Element {
    * this, because the writes happened in the main process and nothing in the
    * renderer would otherwise know they had.
    */
-  const [workspaceNonce, setWorkspaceNonce] = useState(0);
   const assistant = useAssistant();
   // Bumped to ask the file tree and the picker to focus their creation inputs,
   // so the menu's New… commands land somewhere visible rather than silently

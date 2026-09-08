@@ -189,8 +189,14 @@ export function AssistantPanel({
         {assistant.busy && (
           <div className="assistant-working">
             <p>
-              Working — round {assistant.progress.at(-1)?.round ?? 1} of {MAX_TOOL_ROUNDS}. Large
-              jobs can take a few minutes.
+              {assistant.stopping ? (
+                <>Stopping — whatever is running now will finish first.</>
+              ) : (
+                <>
+                  Working — round {assistant.progress.at(-1)?.round ?? 1} of {MAX_TOOL_ROUNDS}. Large
+                  jobs can take a few minutes.
+                </>
+              )}
             </p>
             {assistant.progress.length > 0 && (
               <ul className="assistant-tools">
@@ -297,10 +303,22 @@ export function AssistantPanel({
             }
           }}
         />
-        <Button variant="primary" type="submit" disabled={!ready || assistant.busy || input.trim().length === 0}>
-          <Icon name="send" size={13} />
-          Send
-        </Button>
+        {assistant.busy ? (
+          <Button
+            variant="danger"
+            type="button"
+            onClick={assistant.stop}
+            disabled={assistant.stopping}
+          >
+            <Icon name="x" size={13} />
+            {assistant.stopping ? 'Stopping' : 'Stop'}
+          </Button>
+        ) : (
+          <Button variant="primary" type="submit" disabled={!ready || input.trim().length === 0}>
+            <Icon name="send" size={13} />
+            Send
+          </Button>
+        )}
       </form>
     </div>
   )

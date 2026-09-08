@@ -133,6 +133,14 @@ export function EstateResidents({ game, flags, portraits, characterArt = [], onC
                 {portraits.map((name) => <option key={name} value={name}>{name}</option>)}
               </Select>
             </Field>
+            <Field label="Talk label" about="A short repeatable household exchange, separate from story scenes and memories.">
+              <Input aria-label="Talk title" placeholder="Talk" value={selected.talk?.title ?? ''}
+                onChange={(event) => patch(selected.key, { talk: event.target.value ? { title: event.target.value, result: selected.talk?.result ?? `villa_${selected.key}_talk` } : null })} />
+            </Field>
+            <Field label="Talk result" about="The story result that opens the repeatable exchange.">
+              <Input mono aria-label="Talk result" value={selected.talk?.result ?? ''}
+                onChange={(event) => patch(selected.key, { talk: event.target.value ? { title: selected.talk?.title || 'Talk', result: event.target.value.trim() } : null })} />
+            </Field>
           </div>
 
           <ArtField label="Bath sprite" value={selected.bathSprite} options={characterArt} shape="sprite"

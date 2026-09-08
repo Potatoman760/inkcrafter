@@ -4,16 +4,20 @@ import { Checkbox, Field, Input, Select, Tabs } from '../../design/components'
 import { ArtField, refKey, type ArtHome, type ArtOption } from '../ArtField'
 import { EstateCommissions } from './EstateCommissions'
 import { EstateFloorPlan } from './EstateFloorPlan'
+import { EstateGoalsFields } from './EstateGoalsFields'
+import { EstateEncountersFields } from './EstateEncountersFields'
 import { EstateResidents } from './EstateResidents'
 import { EstateTutorialFields } from './EstateTutorialFields'
 import { TuningField } from '../TuningField'
 
-type EstateTab = 'plan' | 'residents' | 'commissions' | 'ledger' | 'tutorial'
+type EstateTab = 'plan' | 'residents' | 'commissions' | 'goals' | 'encounters' | 'ledger' | 'tutorial'
 
 const TABS: { value: EstateTab; label: string }[] = [
   { value: 'plan', label: 'Plan' },
   { value: 'residents', label: 'Residents' },
   { value: 'commissions', label: 'Commissions' },
+  { value: 'goals', label: 'Goals' },
+  { value: 'encounters', label: 'Encounters' },
   { value: 'ledger', label: 'Ledger' },
   { value: 'tutorial', label: 'Tutorial' }
 ]
@@ -99,6 +103,9 @@ export function EstateFields({ game, textVariables, stats, flags, portraits, opt
           />
         </>
       )}
+
+      {tab === 'goals' && <EstateGoalsFields game={game} flags={flags} onChange={onChange} />}
+      {tab === 'encounters' && <EstateEncountersFields game={game} flags={flags} onChange={onChange} />}
 
       {tab === 'ledger' && (
         <>

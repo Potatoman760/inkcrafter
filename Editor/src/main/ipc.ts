@@ -180,6 +180,16 @@ async function entriesOfLibraries(libraryIds: string[]): Promise<CodexEntry[]> {
 /** The one project watcher, held here because only main can close it. */
 let watching: ProjectWatcher | null = null
 
+/**
+ * The assistant turn in flight for each window, so Stop can reach it.
+ *
+ * Keyed by sender rather than kept as a single controller because two windows
+ * have two conversations, and stopping one must not stop the other. The entry
+ * exists only while a turn is running, which is also how `ai:cancelChat`
+ * answers whether there was anything to stop.
+ */
+const chatTurns = new Map<number, AbortController>()
+
 export function registerIpcHandlers(): void {
   ipcMain.handle('ink:compile', (_event, request: CompileRequest): CompileResult => compileInk(request))
 
@@ -426,11 +436,35 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     'ai:chat',
-    (event, request: ChatTurnRequest): Promise<ChatTurnResult> =>
-      // A turn can run for minutes; without this the renderer cannot tell a slow
-      // one from a hung one.
-      runChatTurn(request, (progress) => event.sender.send('ai:chatProgress', progress))
+    async (event, request: ChatTurnRequest): Promise<ChatTurnResult> => {
+      // A second turn in the same window can only mean the first is stale, so it
+      // is stopped rather than left running alongside: it holds the same
+      // workspace and would write into whatever the new one is doing.
+      chatTurns.get(event.sender.id)?.abort()
+
+      const turn = new AbortController()
+      chatTurns.set(event.sender.id, turn)
+      try {
+        // A turn can run for minutes; without the progress callback the renderer
+        // cannot tell a slow one from a hung one.
+        return await runChatTurn(
+          request,
+          (progress) => event.sender.send('ai:chatProgress', progress),
+          turn.signal
+        )
+      } finally {
+        // Only if it is still ours. A turn that was superseded above must not
+        // delete the entry belonging to the one that replaced it.
+        if (chatTurns.get(event.sender.id) === turn) chatTurns.delete(event.sender.id)
+      }
+    }
   )
+
+  ipcMain.handle('ai:cancelChat', (event): boolean => {
+    const turn = chatTurns.get(event.sender.id)
+    turn?.abort()
+    return turn !== undefined
+  })
 
   ipcMain.handle('manuscript:close', (): void => closeManuscript())
 

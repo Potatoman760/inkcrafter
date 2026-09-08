@@ -15,6 +15,7 @@ import { BootScene } from "@/scenes/BootScene";
 import { MainMenuScene } from "@/scenes/MainMenuScene";
 import { SettingsScene } from "@/scenes/SettingsScene";
 import { VNScene } from "@/scenes/VNScene";
+import { ReplayScene } from '@/scenes/ReplayScene';
 import { SaveLoadScene } from "@/scenes/SaveLoadScene";
 import { MapScene } from "@/scenes/MapScene";
 import { CharacterScene } from "@/scenes/CharacterScene";
@@ -95,6 +96,7 @@ async function start(): Promise<void> {
       MainMenuScene,
       SettingsScene,
       VNScene,
+      ReplayScene,
       SaveLoadScene,
       MapScene,
       CharacterScene,

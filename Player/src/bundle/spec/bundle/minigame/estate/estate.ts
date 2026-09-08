@@ -51,6 +51,8 @@ export interface EstateResident {
   bathVisiblePercent?: number
   /** Result tokens returned to Ink; each room unlocks a separate scene. */
   scenes: EstateScene[]
+  /** Short repeatable household conversation, kept separate from story scenes and memories. */
+  talk?: { title: string; result: string } | null
 }
 
 export interface EstateScene {
@@ -92,6 +94,95 @@ export function estateWorkdayOpen(calendar: EstateCalendar | null | undefined, d
   return Number.isSafeInteger(day) && day >= 1 && (calendar?.lastWorkday == null || day <= calendar.lastWorkday)
 }
 
+/** Optional ambient scene discovered in a room by its current household. */
+export interface EstateEncounter {
+  room: string
+  result: string
+  title: string
+  cue: string
+  residents: string[]
+  gate?: string | null
+}
+
+export function estateEncounterEnabled(encounter: EstateEncounter, state: EstateState,
+  config: Pick<EstateMinigame, 'rooms' | 'residents'>, eligible: (variable: string) => boolean,
+  roomAvailable: (variable: string) => boolean = eligible): boolean {
+  const destination = config.rooms.find(room => room.key === encounter.room)
+  if (!destination || !state.rooms.includes(destination.key) || !estateRoomEnabled(destination, roomAvailable) ||
+      (encounter.gate && !eligible(encounter.gate)) || encounter.residents.length < 2 ||
+      new Set(encounter.residents).size !== encounter.residents.length) return false
+  return encounter.residents.every(key => {
+    const resident = config.residents.find(person => person.key === key)
+    const home = config.rooms.find(room => room.key === state.assignments[key])
+    return !!resident && eligible(resident.eligibilityVariable) && state.residents.includes(key) &&
+      !!home && state.rooms.includes(home.key) && estateRoomEnabled(home, roomAvailable)
+  })
+}
+
+export type EstateGoalCondition =
+  | { kind: 'room'; room: string }
+  | { kind: 'variable'; variable: string }
+  | { kind: 'residents'; count: number; exclude?: string[] }
+  | { kind: 'all-rooms' }
+
+export interface EstateGoal {
+  id: string
+  title: string
+  text: string
+  required: boolean
+  condition: EstateGoalCondition
+}
+
+export interface EstateFinale {
+  minimumDay: number
+  readyVariable: string
+  requiredGoalIds: string[]
+}
+
+export interface EstateGoalProgress {
+  complete: boolean
+  current: number
+  target: number
+  reason: string
+}
+
+/** Goal evaluation is shared by UI, readiness and tests. It never mutates the ledger. */
+export function estateGoalProgress(goal: EstateGoal, state: EstateState,
+  config: Pick<EstateMinigame, 'rooms' | 'residents'>, read: (variable: string) => boolean): EstateGoalProgress {
+  const condition = goal.condition
+  if (condition.kind === 'room') {
+    const room = config.rooms.find(one => one.key === condition.room)
+    const complete = !!room && state.rooms.includes(room.key)
+    return { complete, current: complete ? 1 : 0, target: 1, reason: room ? `Restore ${room.name}.` : 'This room is no longer available.' }
+  }
+  if (condition.kind === 'variable') {
+    const complete = read(condition.variable)
+    return { complete, current: complete ? 1 : 0, target: 1, reason: goal.text }
+  }
+  if (condition.kind === 'residents') {
+    const excluded = new Set(condition.exclude ?? [])
+    const available = config.residents.filter(person => !excluded.has(person.key) && read(person.eligibilityVariable) &&
+      config.rooms.some(room => estateRoomEnabled(room, read) && estateRoomMembers(room).includes(person.key)))
+    const target = Math.min(condition.count, available.length)
+    const current = available.filter(person => state.residents.includes(person.key) && !!state.assignments[person.key]).length
+    return { complete: current >= target, current: Math.min(current, target), target,
+      reason: target ? `Invite ${Math.max(0, target - current)} more eligible resident${target - current === 1 ? '' : 's'}.` : 'No additional resident is available on this route.' }
+  }
+  const available = config.rooms.filter(room => estateRoomEnabled(room, read))
+  const current = available.filter(room => state.rooms.includes(room.key)).length
+  return { complete: current >= available.length, current, target: available.length,
+    reason: `Restore ${Math.max(0, available.length - current)} more available room${available.length - current === 1 ? '' : 's'}.` }
+}
+
+export function estateFinaleReady(state: EstateState, config: Pick<EstateMinigame, 'rooms' | 'residents' | 'goals' | 'finale'>,
+  day: number, read: (variable: string) => boolean): boolean {
+  if (!config.finale || day < config.finale.minimumDay) return false
+  return config.finale.requiredGoalIds.every(id => {
+    const goal = config.goals?.find(one => one.id === id)
+    return !!goal && estateGoalProgress(goal, state, config, read).complete
+  })
+}
+
 export interface EstateMinigame {
   id: string
   kind: 'estate'
@@ -109,6 +200,12 @@ export interface EstateMinigame {
   calendar?: EstateCalendar | null
   /** Authored guided tour; edited as JSON and carried in the minigame catalogue. */
   tutorial?: EstateTutorial | null
+  /** Authored household milestones shown in the villa. */
+  goals?: EstateGoal[]
+  /** Ambient moments requiring every listed participant to live here. */
+  encounters?: EstateEncounter[]
+  /** Optional readiness milestone written when all required goals are complete. */
+  finale?: EstateFinale | null
   resultVariable: string
   stateVariable: string
   showStateHints: boolean
@@ -121,15 +218,17 @@ export interface EstateMinigame {
 
 /** All progress lives in one Ink text global and follows the normal save slots. */
 export interface EstateState {
-  version: 2
+  version: 3
   day: number
   crowns: number
   rooms: string[]
   residents: string[]
   seen: string[]
+  /** Scenes that reached their authored return boundary. `seen` is retained as legacy launch history. */
+  completed: string[]
   selected: number[]
   lastIncome: number
-  /** Resident key → room key. Departures free the specific suite. */
+  /** Resident key → room key. */
   assignments: Record<string, string>
   /** Script revision completed or skipped. Optional for existing saves. */
   tutorialSeen?: number
@@ -211,14 +310,14 @@ export const ESTATE_ROOMS: EstateRoom[] = [
 ]
 
 export function newEstateState(funds: number, rooms = ESTATE_ROOMS): EstateState {
-  return { version: 2, day: 1, crowns: Math.max(0, Math.round(funds)), rooms: rooms.filter(room => room.key === 'hall' || room.startsActive).map(room => room.key), residents: [], seen: [], selected: [], lastIncome: 0, assignments: {} }
+  return { version: 3, day: 1, crowns: Math.max(0, Math.round(funds)), rooms: rooms.filter(room => room.key === 'hall' || room.startsActive).map(room => room.key), residents: [], seen: [], completed: [], selected: [], lastIncome: 0, assignments: {} }
 }
 
 export function readEstateState(raw: unknown, funds: number, rooms = ESTATE_ROOMS): EstateState {
   if (raw === '' || raw === undefined || raw === null) return newEstateState(funds, rooms)
   // Refuse bad/future saves instead of silently replacing a developed household.
   const value = JSON.parse(String(raw)) as Omit<EstateState, 'version'> & { version: number }
-  if (!value || ![1, 2].includes(value.version) || !Number.isSafeInteger(value.day) || value.day < 1 ||
+  if (!value || ![1, 2, 3].includes(value.version) || !Number.isSafeInteger(value.day) || value.day < 1 ||
       !Number.isSafeInteger(value.crowns) || value.crowns < 0 ||
       ![value.rooms, value.residents, value.seen].every(list => Array.isArray(list) && list.every(key => typeof key === 'string')) ||
       !Array.isArray(value.selected) || !value.selected.every(n => Number.isInteger(n) && n >= 0 && n < 6)) {
@@ -226,9 +325,12 @@ export function readEstateState(raw: unknown, funds: number, rooms = ESTATE_ROOM
   }
   if (value.version === 2 && (!value.assignments || typeof value.assignments !== 'object' || Array.isArray(value.assignments) ||
       !Object.values(value.assignments).every(key => typeof key === 'string'))) throw new Error('The villa room assignments could not be read.')
+  if (value.version === 3 && (!value.assignments || typeof value.assignments !== 'object' || Array.isArray(value.assignments) ||
+      !Object.values(value.assignments).every(key => typeof key === 'string') || !Array.isArray(value.completed) ||
+      !value.completed.every(key => typeof key === 'string'))) throw new Error('The villa completion history could not be read.')
   const restored = [...value.rooms, ...rooms.filter(room => room.startsActive ||
     (value.version === 1 && room.legacyRestoredBy && value.rooms.includes(room.legacyRestoredBy))).map(room => room.key)]
-  return placeEstateResidents({ ...value, version: 2, assignments: value.assignments ?? {}, rooms: [...new Set(restored)], residents: [...new Set(value.residents)], seen: [...new Set(value.seen)], selected: [...new Set(value.selected)] }, rooms)
+  return placeEstateResidents({ ...value, version: 3, assignments: value.assignments ?? {}, completed: value.version === 3 ? [...new Set(value.completed)] : [], rooms: [...new Set(restored)], residents: [...new Set(value.residents)], seen: [...new Set(value.seen)], selected: [...new Set(value.selected)] }, rooms)
 }
 
 /** Keep valid placements, then house older saves without losing any residents. */
@@ -324,6 +426,26 @@ export function estateInvitationRoom(state: EstateState, config: Pick<EstateMini
         (!state.residents.includes(one) || state.assignments[one] === room.key)
     }) && missing.length + estateRoomResidents(state, room.key).length <= estateRoomCapacity(room)
   })
+}
+
+/**
+ * Restoration is the invitation. Every eligible resident an available room
+ * accepts moves in, in authored order. A room restored before her story
+ * finishes houses her on the next visit.
+ */
+export function autoInviteEstateResidents(state: EstateState, config: Pick<EstateMinigame, 'rooms' | 'residents'>,
+  eligible: (variable: string) => boolean, roomAvailable: (variable: string) => boolean = eligible,
+  roomKey?: string): EstateState {
+  let next = state
+  for (const resident of config.residents) {
+    if (next.residents.includes(resident.key)) continue
+    const room = estateInvitationRoom(next, config, resident.key, roomKey, eligible, roomAvailable)
+    if (!room) continue
+    const group = estateInviteGroup(room, resident.key)
+    next = { ...next, residents: [...new Set([...next.residents, ...group])],
+      assignments: { ...next.assignments, ...Object.fromEntries(group.map(key => [key, room.key])) } }
+  }
+  return next
 }
 
 export function availableEstateRoom(state: EstateState, rooms: EstateRoom[], key?: string, resident?: string, read: (variable: string) => boolean = () => false): EstateRoom | undefined {
@@ -424,26 +546,33 @@ export function estateCapacity(state: EstateState, rooms: EstateRoom[], read: (v
 export type EstateAction =
   | { kind: 'restore'; key: string }
   | { kind: 'invite'; key: string; room?: string }
-  | { kind: 'farewell'; key: string }
   | { kind: 'contract'; index: number }
   | { kind: 'settle' }
   | { kind: 'scene'; result: string }
+  | { kind: 'talk'; result: string }
+  | { kind: 'encounter'; result: string }
 
 /** Central rules for mouse, keyboard, controller, and saved state alike. */
 export function actOnEstate(
   state: EstateState,
   action: EstateAction,
-  config: Pick<EstateMinigame, 'rooms' | 'residents' | 'contracts'>,
+  config: Pick<EstateMinigame, 'rooms' | 'residents' | 'contracts' | 'encounters'>,
   eligible: (variable: string) => boolean,
   stipend: number,
   bonus: number,
   roomAvailable: (variable: string) => boolean = eligible
 ): EstateState {
   switch (action.kind) {
+    case 'encounter': {
+      const encounter = config.encounters?.find(one => one.result === action.result)
+      return encounter && estateEncounterEnabled(encounter, state, config, eligible, roomAvailable) ? { ...state } : state
+    }
     case 'restore': {
       const room = config.rooms.find(room => room.key === action.key)
       if (!room || !estateRoomEnabled(room, roomAvailable) || state.rooms.includes(room.key) || state.crowns < room.cost) return state
-      return placeEstateResidents({ ...state, crowns: state.crowns - room.cost, rooms: [...state.rooms, room.key] }, config.rooms)
+      return autoInviteEstateResidents(
+        placeEstateResidents({ ...state, crowns: state.crowns - room.cost, rooms: [...state.rooms, room.key] }, config.rooms),
+        config, eligible, roomAvailable, room.key)
     }
     case 'invite': {
       const room = estateInvitationRoom(state, config, action.key, action.room, eligible, roomAvailable)
@@ -451,11 +580,6 @@ export function actOnEstate(
       const group = estateInviteGroup(room, action.key)
       return { ...state, residents: [...new Set([...state.residents, ...group])],
         assignments: { ...state.assignments, ...Object.fromEntries(group.map(key => [key, room.key])) } }
-    }
-    case 'farewell': {
-      const room = config.rooms.find(one => one.key === state.assignments[action.key])
-      const group = room ? estateInviteGroup(room, action.key) : [action.key]
-      return { ...state, residents: state.residents.filter(key => !group.includes(key)), assignments: Object.fromEntries(Object.entries(state.assignments).filter(([key]) => !group.includes(key))) }
     }
     case 'contract': {
       const selected = state.selected.includes(action.index)
@@ -477,13 +601,21 @@ export function actOnEstate(
       if (!resident || !scene || !estateSceneEnabled(scene, eligible) || !eligible(resident.eligibilityVariable) ||
           !destination || !estateRoomEnabled(destination, roomAvailable) || !home || !estateRoomEnabled(home, roomAvailable) ||
           !state.residents.includes(resident.key) || !state.rooms.includes(scene.room)) return state
-      return { ...state, seen: [...new Set([...state.seen, scene.result])] }
+      // Completion is recorded by the player only when the authored scene
+      // reaches its return boundary. A launch may be cancelled or interrupted.
+      return { ...state }
+    }
+    case 'talk': {
+      const resident = config.residents.find(person => person.talk?.result === action.result)
+      if (!resident || !state.residents.includes(resident.key) || !eligible(resident.eligibilityVariable)) return state
+      const room = config.rooms.find(one => one.key === state.assignments[resident.key])
+      return room && state.rooms.includes(room.key) && estateRoomEnabled(room, roomAvailable) ? { ...state } : state
     }
   }
 }
 
 /** Parser preserves authored room/resident data; preflight checks references. */
-export function estateConfiguration(value: Record<string, unknown>): Pick<EstateMinigame, 'rooms' | 'residents' | 'contracts' | 'calendar' | 'tutorial'> {
+export function estateConfiguration(value: Record<string, unknown>): Pick<EstateMinigame, 'rooms' | 'residents' | 'contracts' | 'calendar' | 'tutorial' | 'goals' | 'finale' | 'encounters'> {
   const rooms = Array.isArray(value.rooms) ? value.rooms : ESTATE_ROOMS
   const residents = Array.isArray(value.residents) ? value.residents : []
   const contracts = estateContracts(value.contracts)
@@ -492,10 +624,32 @@ export function estateConfiguration(value: Record<string, unknown>): Pick<Estate
   // The raw-JSON editor uses the strict parser directly and refuses invalid edits.
   let tutorial: EstateTutorial | null = null
   try { tutorial = parseEstateTutorial(value.tutorial) } catch { /* no tour */ }
+  const goals = Array.isArray(value.goals) ? value.goals.filter((goal): goal is EstateGoal => {
+    if (!goal || typeof goal !== 'object') return false
+    const one = goal as Partial<EstateGoal>, condition = one.condition as Partial<EstateGoalCondition> | undefined
+    const validCondition = condition?.kind === 'room' ? typeof condition.room === 'string' && !!condition.room
+      : condition?.kind === 'variable' ? typeof condition.variable === 'string' && !!condition.variable
+        : condition?.kind === 'residents' ? Number.isSafeInteger(condition.count) && (condition.count as number) > 0 &&
+          (condition.exclude === undefined || (Array.isArray(condition.exclude) && condition.exclude.every(key => typeof key === 'string')))
+          : condition?.kind === 'all-rooms'
+    return typeof one.id === 'string' && !!one.id && typeof one.title === 'string' && typeof one.text === 'string' &&
+      typeof one.required === 'boolean' && validCondition
+  }) : undefined
+  const finaleRaw = value.finale && typeof value.finale === 'object' ? value.finale as Partial<EstateFinale> : null
+  const finale = finaleRaw && Number.isSafeInteger(finaleRaw.minimumDay) && (finaleRaw.minimumDay as number) > 0 &&
+    typeof finaleRaw.readyVariable === 'string' && Array.isArray(finaleRaw.requiredGoalIds) && finaleRaw.requiredGoalIds.every(id => typeof id === 'string')
+    ? finaleRaw as EstateFinale : null
   return {
+    ...(Array.isArray(value.encounters) ? { encounters: value.encounters.filter((one): one is EstateEncounter =>
+      !!one && typeof one === 'object' && typeof one.room === 'string' && typeof one.result === 'string' &&
+      typeof one.title === 'string' && typeof one.cue === 'string' && Array.isArray(one.residents) &&
+      one.residents.every((key: unknown) => typeof key === 'string') &&
+      (one.gate == null || typeof one.gate === 'string')) } : {}),
     ...(value.tutorial === undefined ? {} : { tutorial }),
     ...(contracts ? { contracts } : {}),
     ...(calendar ? { calendar } : {}),
+    ...(goals ? { goals } : {}),
+    ...(value.finale === undefined ? {} : { finale }),
     rooms: rooms.filter((room): room is EstateRoom => room && typeof room.key === 'string' && typeof room.name === 'string' &&
       Number.isSafeInteger(room.cost) && room.cost >= 0 && Number.isSafeInteger(room.beds) && room.beds >= 0 &&
       (room.requires === null || typeof room.requires === 'string') && typeof room.description === 'string' &&
@@ -517,7 +671,9 @@ export function estateConfiguration(value: Record<string, unknown>): Pick<Estate
         typeof scene.result === 'string' && typeof scene.title === 'string'))
       .map(one => ({ ...one, ...(one.bathVisiblePercent === undefined ? {} : { bathVisiblePercent: estateBathPercent(one.bathVisiblePercent) }), ...(one.bathSprite === undefined ? {} : { bathSprite: estateMediaRef(one.bathSprite) }), scenes: one.scenes.map(scene => typeof scene.gate === 'string' && scene.gate.length > 0
         ? { room: scene.room, result: scene.result, title: scene.title, gate: scene.gate }
-        : { room: scene.room, result: scene.result, title: scene.title }) }))
+        : { room: scene.room, result: scene.result, title: scene.title }),
+        ...(one.talk && typeof one.talk === 'object' && typeof one.talk.title === 'string' && typeof one.talk.result === 'string'
+          ? { talk: { title: one.talk.title, result: one.talk.result } } : {}) }))
   }
 }
 

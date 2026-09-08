@@ -208,6 +208,11 @@ export class GameState {
     return new GameState(bundle, { achievementsEnabled: options.achievementsEnabled ?? true });
   }
 
+  /** Release observers held by a disposable preview or memory state. */
+  destroy(): void {
+    this.achievements.destroy();
+  }
+
   /** Begin a fresh playthrough from the top of the story. */
   newGame(): void {
     this.engine.reset();

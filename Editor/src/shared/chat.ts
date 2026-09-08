@@ -27,6 +27,19 @@ export interface ChatMessage {
   content: string
   /** Present on an assistant message that used tools before answering. */
   toolCalls?: ChatToolCall[]
+  /**
+   * Written by the editor, not by the model.
+   *
+   * It sits in the assistant's column because it is about the turn the author
+   * just watched, but it is not something the model said, and it must never be
+   * replayed as though it were.
+   *
+   * The value says why the turn ended early: `rounds` for the loop's own cap,
+   * `stopped` for the author pressing Stop. The next turn is told which, because
+   * "you ran out of rounds" and "the author stopped you" ask for different
+   * things next.
+   */
+  notice?: 'rounds' | 'stopped'
 }
 
 /**
@@ -76,6 +89,14 @@ export interface ChatTurnResult {
   message: string | null
   /** True when the loop was stopped by its own cap rather than by the model finishing. */
   truncated: boolean
+  /**
+   * True when the author pressed Stop.
+   *
+   * Not a failure, and deliberately separate from `ok`: files written before the
+   * stop are on disk and are reported, so the renderer must show the transcript
+   * rather than an error.
+   */
+  stopped: boolean
   /** Workspace-relative paths written this turn, so the UI can refresh what it shows. */
   filesWritten: string[]
 }

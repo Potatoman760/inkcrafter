@@ -39,8 +39,7 @@ describe('two-person villa households', () => {
     expect(estateBathGuests(state, config, 'baths', () => false)).toEqual([])
     const hiddenHome = { ...config, rooms: config.rooms.map(room => room.key === 'garden' ? { ...room, availabilityVariable: 'hide' } : room) }
     expect(estateBathGuests(state, hiddenHome, 'baths', flag => flag !== 'hide')).toEqual([])
-    const departed = actOnEstate(state, { kind: 'farewell', key: 'piri' }, config, () => true, 18, 0)
-    expect(estateBathGuests(departed, config, 'baths', () => true)).toEqual([])
+    expect(estateBathGuests({ ...state, residents: [] }, config, 'baths', () => true)).toEqual([])
   })
   it('round-trips special bath portraits and keeps missing slots optional', () => {
     const config = { ...game, rooms: game.rooms.map(room => ({ ...room, sharedBaths: room.key === 'hall' })),
@@ -76,13 +75,11 @@ describe('two-person villa households', () => {
     const complete = act(loaded, { kind: 'invite', key: 'lira', room: 'garden' })
     expect(complete.residents).toEqual(['lira', 'piri'])
     expect(complete.crowns).toBe(old.crowns)
-    expect(act(complete, { kind: 'farewell', key: 'piri' }).residents).toEqual([])
   })
   it('also supports independently invited roommates', () => {
     const separate = { ...game, rooms: game.rooms.map(room => ({ ...room, inviteTogether: false })) }
     const first = actOnEstate(restored(), { kind: 'invite', key: 'lira' }, separate, () => true, 18, 0)
     const both = actOnEstate(first, { kind: 'invite', key: 'piri' }, separate, () => true, 18, 0)
     expect(estateRoomResidents(both, 'garden')).toEqual(['lira', 'piri'])
-    expect(actOnEstate(both, { kind: 'farewell', key: 'piri' }, separate, () => true, 18, 0).residents).toEqual(['lira'])
   })
 })

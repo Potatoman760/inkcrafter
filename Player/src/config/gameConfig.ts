@@ -27,6 +27,7 @@ export const SceneKey = {
   MainMenu: "MainMenu",
   Settings: "Settings",
   VN: "VN",
+  Replay: "Replay",
   SaveLoad: "SaveLoad",
   Map: "Map",
   Character: "Character",

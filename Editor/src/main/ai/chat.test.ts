@@ -177,6 +177,111 @@ describe('runChatTurn', () => {
     expect(result.messages.at(-1)!.content).toMatch(/stopped after/i)
   })
 
+  /**
+   * Stop, from the loop's side. The author presses it because the turn is doing
+   * the wrong thing, or too much of it, so what matters is that it stops soon
+   * and that the work it had already done survives to be built on.
+   */
+  describe('when the author stops it', () => {
+    it('ends the turn between rounds and reports it as a stop, not a failure', async () => {
+      const fetchMock = queue()
+      const turn = new AbortController()
+      turn.abort()
+
+      const result = await runChatTurn(request(), undefined, turn.signal)
+
+      expect(fetchMock).not.toHaveBeenCalled()
+      expect(result.ok).toBe(true)
+      expect(result.stopped).toBe(true)
+      expect(result.truncated).toBe(false)
+      expect(result.message).toBeNull()
+    })
+
+    it('keeps the tool calls it had already made, and the files they wrote', async () => {
+      queue(reply({ tools: [['write_file', { path: 'a.md', contents: 'x' }]] }))
+      const turn = new AbortController()
+
+      // Stop the moment the first tool call lands, which is where an author
+      // watching the panel would reach for the button.
+      const result = await runChatTurn(request(), (update) => {
+        if (update.call) turn.abort()
+      }, turn.signal)
+
+      expect(result.stopped).toBe(true)
+      expect(result.filesWritten).toEqual(['a.md'])
+      const last = result.messages.at(-1)!
+      expect(last.notice).toBe('stopped')
+      expect(last.toolCalls!.map((call) => call.summary)).toEqual([
+        expect.stringContaining('a.md')
+      ])
+    })
+
+    it('does not call another tool once it has been stopped', async () => {
+      queue(
+        reply({
+          tools: [
+            ['write_file', { path: 'a.md', contents: 'x' }],
+            ['write_file', { path: 'b.md', contents: 'x' }]
+          ]
+        })
+      )
+      const turn = new AbortController()
+
+      const result = await runChatTurn(request(), (update) => {
+        if (update.call) turn.abort()
+      }, turn.signal)
+
+      // Both were asked for in one round; only the first ran.
+      expect(result.filesWritten).toEqual(['a.md'])
+    })
+
+    it('reads a stopped request as a stop rather than a provider failure', async () => {
+      const turn = new AbortController()
+      vi.stubGlobal('fetch', vi.fn(async () => {
+        turn.abort()
+        throw Object.assign(new Error('This operation was aborted'), { name: 'AbortError' })
+      }))
+
+      const result = await runChatTurn(request(), undefined, turn.signal)
+
+      expect(result.ok).toBe(true)
+      expect(result.stopped).toBe(true)
+      expect(result.message).toBeNull()
+    })
+
+    it('tells the next turn the author stopped it, not that it ran out of rounds', async () => {
+      const fetchMock = queue(reply({ content: 'Right.' }))
+      await runChatTurn({
+        ...request(),
+        messages: [
+          { id: 'a', role: 'user', content: 'Write the scene.' },
+          {
+            id: 'b',
+            role: 'assistant',
+            content: 'Stopped.',
+            notice: 'stopped' as const,
+            toolCalls: [
+              { id: 't1', name: 'write_file', argumentsJson: '{}', summary: 'wrote a.md', ok: true }
+            ]
+          },
+          { id: 'c', role: 'user', content: 'Do it differently.' }
+        ]
+      })
+
+      const sent = JSON.parse(String(fetchMock.mock.calls[0]![1].body)).messages as {
+        role: string
+        content: string
+      }[]
+      const notice = sent[2]!
+      expect(notice.role).toBe('system')
+      expect(notice.content).toContain('the author stopped')
+      expect(notice.content).not.toContain('rounds of tool calls')
+      // It must not resume on its own: stopping is what the button was for.
+      expect(notice.content).toContain('wrote a.md')
+      expect(notice.content).not.toContain('Carry on from there. Do not repeat')
+    })
+  })
+
   it('reports an HTTP failure without losing what it already did', async () => {
     queue(
       reply({ tools: [['write_file', { path: 'a.md', contents: 'x' }]] }),
@@ -409,6 +514,42 @@ describe('runChatTurn', () => {
 
       expect(calls).toEqual([false])
     })
+  })
+
+  it('replays a stop notice as an editor note, with what that turn had already done', async () => {
+    const fetchMock = queue(reply({ content: 'Carrying on.' }))
+    await runChatTurn({
+      messages: [
+        { id: 'a', role: 'user', content: 'Write the scene.' },
+        {
+          id: 'b',
+          role: 'assistant',
+          content: 'I stopped after 12 rounds of tool calls without finishing.',
+          notice: 'rounds' as const,
+          toolCalls: [
+            { id: 't1', name: 'read_file', argumentsJson: '{}', summary: 'read villa.ink (24137 chars)', ok: true },
+            { id: 't2', name: 'read_file', argumentsJson: '{}', summary: 'could not read ink/villa.ink', ok: false }
+          ]
+        },
+        { id: 'c', role: 'user', content: 'Continue.' }
+      ],
+      providerId: 'prv_0000000000',
+      model: 'a-model',
+      projectPath: '/w/data/projects/the-lighthouse'
+    })
+
+    const sent = JSON.parse(String(fetchMock.mock.calls[0]![1].body)).messages as {
+      role: string
+      content: string
+    }[]
+    const notice = sent[2]!
+    // Never as the assistant's own words: the model copies what it is shown.
+    expect(notice.role).toBe('system')
+    expect(notice.content).not.toContain('I stopped after')
+    expect(notice.content).toContain('read villa.ink (24137 chars)')
+    // A failed call is not work it can skip.
+    expect(notice.content).not.toContain('could not read ink/villa.ink')
+    expect(sent.map((message) => message.role)).toEqual(['system', 'user', 'system', 'user'])
   })
 
   it('carries the conversation so far, under a system prompt', async () => {

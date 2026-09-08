@@ -1,19 +1,21 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, SceneKey } from '@/config/gameConfig';
 import { getGameState } from '@/state/registry';
-import type { GameState } from '@/state/GameState';
+import { GameState } from '@/state/GameState';
 import { getAssetIndex } from '@/bundle/registry';
 import type { GalleryMediaRef } from '@/bundle/spec/bundle/galleryDoc';
 import { resolveTunable } from '@/bundle/spec/bundle/minigameDoc';
 import {
-  actOnEstate, estateBathGuests, estateBathPercent, estateSpriteBounds, estateInvitationRoom, estateInviteGroup, estateRoomMembers, commissionBoard, commissionQuote, CREWS, estateCapacity,
+  actOnEstate, autoInviteEstateResidents, estateBathGuests, estateBathPercent, estateSpriteBounds, estateRoomMembers, commissionBoard, commissionQuote, CREWS, estateCapacity,
+  estateFinaleReady, estateGoalProgress, estateEncounterEnabled,
   estateRoomBackground, estateRoomEnabled, estateRoomCapacity, estateRoomResidents, estateSceneEnabled, estateWorkdayOpen, readEstateState, settleWorkday,
   type EstateAction, type EstateCalendar, type EstateMinigame, type EstateResident, type EstateRoom, type EstateState, type EstateTutorialStep,
 } from '@/bundle/spec/bundle/estate';
 import { registerFocusable, setControllerActions } from '@/input/FocusNavigation';
 import { estateButton, estatePanel, ESTATE_COLORS as C, type EstateControl } from '@/minigame/estate/EstateUI';
+import { EstateMemories } from '@/minigame/estate/EstateMemories';
 
-type Page = 'villa' | 'room' | 'bath' | 'commissions' | 'gates';
+type Page = 'villa' | 'room' | 'bath' | 'commissions' | 'goals' | 'gates';
 
 /** The floor plan is the navigation; each illustrated room is a destination. */
 export class EstateScene extends Phaser.Scene {
@@ -25,8 +27,8 @@ export class EstateScene extends Phaser.Scene {
   private roomKey = '';
   private resident: string | null = null;
   private detailPage = 0;
+  private residentSection: 'menu' | 'spend' | 'memories' = 'menu';
   private listingPage = 0;
-  private farewell = false;
   private note = '';
   private stipend = 18;
   private bonus = 0;
@@ -50,7 +52,7 @@ export class EstateScene extends Phaser.Scene {
   create(data: { name: string; mode: 'story' | 'test' }): void {
     this.launchData = data; this.state = getGameState(this);
     this.page = 'villa'; this.resident = null; this.roomKey = '';
-    this.detailPage = 0; this.listingPage = 0; this.farewell = false;
+    this.detailPage = 0; this.residentSection = 'menu'; this.listingPage = 0;
     this.closed = false; this.note = ''; this.controls = []; this.focused = -1;
     this.testGates = new Map(); this.gatePage = 0; this.calendar = null; this.leaving = false;
     this.tutorialStep = -1; this.tutorialReturn = null;
@@ -75,6 +77,7 @@ export class EstateScene extends Phaser.Scene {
         this.calendar = game.calendar;
         this.syncCalendar(savedLedger !== '');
       }
+      this.ledger = this.autoInvite(this.ledger);
       this.roomKey = this.visibleRooms().find(room => room.beds && this.ledger.rooms.includes(room.key))?.key ?? this.visibleRooms()[0]?.key ?? '';
       this.persist();
       if (game.tutorial?.autoStart && (this.ledger.tutorialSeen ?? 0) < game.tutorial.version) this.startTutorial();
@@ -159,9 +162,18 @@ export class EstateScene extends Phaser.Scene {
   private roomVariable = (variable: string): boolean => this.launchData.mode === 'test' && this.testGates.has(variable)
     ? this.testGates.get(variable) === true : this.state.engine.getVariable(variable) === true;
   private roomEnabled = (room: EstateRoom): boolean => estateRoomEnabled(room, this.roomVariable);
+  /** Restoration is the invitation, so eligibility gained since the last visit settles on entry. */
+  private autoInvite = (state: EstateState): EstateState =>
+    autoInviteEstateResidents(state, this.definition, this.eligible, this.roomVariable);
   private visibleRooms(): EstateRoom[] { return this.definition.rooms.filter(this.roomEnabled); }
   private persist(): void {
-    if (this.launchData.mode === 'story') this.state.engine.setVariable(this.definition.stateVariable, JSON.stringify(this.ledger));
+    if (this.launchData.mode !== 'story') return;
+    this.state.engine.setVariable(this.definition.stateVariable, JSON.stringify(this.ledger));
+    const finale = this.definition.finale;
+    if (finale && this.state.engine.getVariable(finale.readyVariable) === false &&
+        estateFinaleReady(this.ledger, this.definition, this.ledger.day, this.eligible)) {
+      this.state.engine.setVariable(finale.readyVariable, true);
+    }
   }
   private act(action: EstateAction): void {
     if (this.closed || this.tutorialStep >= 0) return;
@@ -172,12 +184,14 @@ export class EstateScene extends Phaser.Scene {
     const next = actOnEstate(this.ledger, action, this.definition, this.eligible, this.stipend, this.bonus, this.roomVariable);
     if (next === this.ledger) return;
     this.ledger = next; this.persist();
-    if (action.kind === 'scene') {
-      if (this.launchData.mode === 'story') { this.finish(action.result); return; }
-      this.note = 'Test scene: ' + action.result + '. Story mode opens the authored scene.';
+    if (action.kind === 'scene' || action.kind === 'talk' || action.kind === 'encounter') {
+      if (this.launchData.mode === 'story') {
+        if (action.kind === 'scene') EstateMemories.launched(this.definition.stateVariable, action.result);
+        this.finish(action.result); return;
+      }
+      this.note = `Test ${action.kind === 'talk' ? 'conversation' : 'scene'}: ${action.result}. Story mode opens the authored content.`;
     } else if (action.kind === 'settle') this.note = 'Day ' + (next.day - 1) + ' complete · ' + next.lastIncome + ' crowns received. New notices have arrived.';
     else if (action.kind === 'invite') { this.note = 'Invitation accepted. Welcome home.'; this.resident = action.key; this.detailPage = 0; }
-    else if (action.kind === 'farewell') { this.note = 'Her home stays reserved. You may invite her back.'; this.resident = null; this.farewell = false; }
     else if (action.kind === 'restore') this.note = 'Restored · A little more of the villa comes to life.';
     else this.note = '';
     this.render();
@@ -198,17 +212,16 @@ export class EstateScene extends Phaser.Scene {
   }
   private back(): void {
     if (this.tutorialStep >= 0) { this.endTutorial(); return; }
-    if (this.farewell) { this.farewell = false; this.render(); }
-    else if (this.page === 'bath') this.openRoom(this.roomKey);
+    if (this.page === 'bath') this.openRoom(this.roomKey);
     else if (this.page !== 'villa') this.navigate('villa');
     else this.finish();
   }
-  private navigate(page: Page): void { if (this.tutorialStep >= 0) return; this.page = page; this.farewell = false; this.note = ''; this.render(); }
+  private navigate(page: Page): void { if (this.tutorialStep >= 0) return; this.page = page; this.note = ''; this.render(); }
   private currentRoom(): EstateRoom | undefined { return this.visibleRooms().find(one => one.key === this.roomKey) ?? this.visibleRooms()[0]; }
   private openRoom(key: string, enter = true): void {
     if (this.tutorialStep >= 0) return;
     if (!this.visibleRooms().some(room => room.key === key)) return;
-    this.roomKey = key; this.detailPage = 0; this.farewell = false; this.note = '';
+    this.roomKey = key; this.detailPage = 0; this.residentSection = 'menu'; this.note = '';
     this.resident = estateRoomResidents(this.ledger, key)[0] ?? null;
     if (enter) this.page = 'room';
     this.render();
@@ -252,13 +265,11 @@ export class EstateScene extends Phaser.Scene {
     else if (this.page === 'room') this.roomInterior();
     else if (this.page === 'bath' && room) this.bathInterior(room);
     else if (this.page === 'commissions') this.commissions();
+    else if (this.page === 'goals') this.goals();
     else this.roomGates();
     if (this.page === 'bath') this.header();
     this.add.rectangle(0, 674, 1280, 46, 0x101d17, 0.96).setOrigin(0);
-    const boardNote = !this.calendar ? 'Choose your commissions, then collect the day’s earnings.'
-      : this.workFinished() ? 'Commissions are finished. Your crowns remain available for rooms and visits.'
-      : this.boardLocked() ? 'Today’s work is paid. New notices arrive tomorrow.' : 'Pin notices now. The crews work while you are out, and pay arrives at dusk.';
-    this.text(26, 683, this.note || (this.page === 'bath' ? 'Warm water, familiar company. Stay a while.' : this.page === 'gates' ? 'Test only · These switches never change story variables or saves.' : this.page === 'villa' ? 'A house becomes a home, one room at a time.' : this.page === 'room' ? 'Every room has a story of its own.' : boardNote), 16, '#e1cca3', 860, true);
+    if (this.note) this.text(26, 683, this.note, 16, '#e1cca3', 860, true);
     this.text(930, 685, 'Arrows / Tab · Enter     D-pad · A     Esc / B', 12, C.muted, 330);
     if (this.tutorialStep >= 0) this.drawTutorial();
   }
@@ -283,9 +294,15 @@ export class EstateScene extends Phaser.Scene {
     const visibleResidents = this.ledger.residents.filter(key => this.visibleRooms().some(room => room.key === this.ledger.assignments[key]));
     this.text(888, 47, visibleResidents.length + ' / ' + estateCapacity(this.ledger, this.definition.rooms, this.roomVariable), 24, C.cream, 100, true);
     this.button(1180, 45, 'Return', () => this.finish(), true, 145, false, true);
-    this.button(115, 98, 'The villa', () => this.navigate('villa'), true, 174, this.page !== 'commissions', true, 34);
+    this.button(115, 98, 'The villa', () => this.navigate('villa'), true, 174, this.page === 'villa', true, 34);
     this.button(307, 98, 'Notice board', () => this.navigate('commissions'), true, 184, this.page === 'commissions', true, 34);
-    if (this.page === 'room' || this.page === 'bath') this.text(424, 90, 'VILLA  /  ' + (this.currentRoom()?.name ?? 'Room'), 13, '#ceb98f', 345);
+    if (this.definition.goals?.length) this.button(493, 98, 'Goals', () => this.navigate('goals'), true, 145, this.page === 'goals', true, 34);
+    if (this.page === 'room' || this.page === 'bath') {
+      // Sits in the gap after the last tab, before Tutorial or the test controls.
+      const left = this.definition.goals?.length ? 578 : 412;
+      const right = this.definition.tutorial ? 772 : this.launchData.mode === 'test' ? 906 : 1248;
+      this.text(left, 90, 'VILLA  /  ' + (this.currentRoom()?.name ?? 'Room'), 13, '#ceb98f', right - left).setFixedSize(right - left, 33);
+    }
     if (this.definition.tutorial) this.button(838, 98, 'Tutorial', () => this.startTutorial(), true, 116, false, true, 30);
     if (this.launchData.mode === 'test') {
       this.text(914, 91, 'TEST', 11, '#ddc891');
@@ -334,13 +351,42 @@ export class EstateScene extends Phaser.Scene {
     else this.roomCards();
     this.roomPreview();
   }
-  private invitations(room: string): EstateResident[] {
-    const home = this.definition.rooms.find(one => one.key === room);
-    return this.definition.residents.filter(one => (!home?.inviteTogether || one.key === home.residentKey) &&
-      !!estateInvitationRoom(this.ledger, this.definition, one.key, room, this.eligible, this.roomVariable));
+  private goals(): void {
+    const goals = this.definition.goals ?? [];
+    this.text(39, 145, 'Household goals', 30, '#ffedc8', 700, true);
+    this.text(40, 184, 'Prepare the house at your own pace. The reception begins only when you choose it in the story.', 15, '#c5cbb6', 1120);
+    goals.slice(0, 8).forEach((goal, index) => {
+      const progress = estateGoalProgress(goal, this.ledger, this.definition, this.eligible);
+      const x = 38 + (index % 2) * 608, y = 224 + Math.floor(index / 2) * 105;
+      estatePanel(this, x, y, 584, 90, true);
+      this.text(x + 18, y + 13, progress.complete ? '✓' : '○', 23, progress.complete ? '#3f6b39' : '#8a7a52');
+      this.text(x + 52, y + 12, goal.title, 20, '#352f22', 380, true);
+      this.text(x + 500, y + 15, goal.required ? 'REQUIRED' : 'OPTIONAL', 10, goal.required ? '#7c6431' : '#5f6a55').setOrigin(1, 0);
+      this.text(x + 52, y + 43, progress.complete ? goal.text : progress.reason, 14, '#4e513a', 505);
+      if (progress.target > 1) this.text(x + 548, y + 58, `${progress.current}/${progress.target}`, 12, '#776035').setOrigin(1, 0);
+    });
+  }
+  private beginMemory(result: string): void {
+    if (this.launchData.mode !== 'story' || !this.ledger.completed.includes(result)) return;
+    const replay = GameState.fromBundle(this.state.bundle, { achievementsEnabled: false });
+    try {
+      replay.engine.loadState(this.state.engine.saveState());
+      replay.sceneMeta = structuredClone(this.state.sceneMeta);
+      if (!replay.engine.goTo(result)) throw new Error(`Missing memory knot ${result}.`);
+    } catch (error) {
+      replay.destroy();
+      this.note = error instanceof Error ? error.message : 'The memory could not be opened.';
+      this.render();
+      return;
+    }
+    this.scene.launch(SceneKey.Replay, { mode: 'replay', state: replay, onReplayExit: (error?: string) => {
+      this.note = error ?? 'Memory complete. Your live game is unchanged.';
+      this.scene.resume();
+      this.render();
+    } });
+    this.scene.pause();
   }
   private guestNames(keys: string[]): string { return keys.map(key => this.definition.residents.find(one => one.key === key)?.name ?? key).join(' + '); }
-  private invitationName(room: EstateRoom, guest: EstateResident): string { return this.guestNames(estateInviteGroup(room, guest.key)); }
   private floorPlan(texture: string): void {
     const size = this.definition.floorPlanSize, scale = Math.min(916 / size.width, 516 / size.height);
     const left = 20 + (916 - size.width * scale) / 2, top = 142 + (516 - size.height * scale) / 2;
@@ -386,7 +432,7 @@ export class EstateScene extends Phaser.Scene {
         else this.text(px, y, person.name, 12, C.cream, w / occupants.length - 6).setOrigin(0.5);
       });
       if (!owned && this.ledger.crowns >= room.cost) this.button(x, y + h / 2 - 14, 'Restore · ' + room.cost, () => { this.roomKey = room.key; this.act({ kind: 'restore', key: room.key }); }, true, Math.min(w - 5, 115), false, false, 25, true);
-      else if (owned && this.invitations(room.key).length) this.button(x, y + h / 2 - 14, 'Invite', () => this.openRoom(room.key), true, Math.min(w - 5, 95), false, false, 25, true);
+      else if (this.roomEncounter(room.key)) this.button(x, y + h / 2 - 14, 'Voices', () => this.openRoom(room.key), true, Math.min(w - 5, 95), false, false, 25, true);
     }
   }
   private roomPreview(): void {
@@ -398,6 +444,7 @@ export class EstateScene extends Phaser.Scene {
     this.text(975, 329, room.name, 26, C.cream, 260, true);
     this.text(975, 405, room.description, 16, '#c9c9b7', 263).setFixedSize(265, 86);
     this.text(975, 500, this.roomStatus(room), 15, '#d8be83', 265);
+    if (this.roomEncounter(room.key)) this.text(975, 531, 'Voices inside', 15, '#ffdc8e', 265);
     this.button(1106, 573, this.ledger.rooms.includes(room.key) ? 'Enter room' : 'View room', () => this.openRoom(room.key), true, 266);
     this.roomNavigation(1106, 627, 266);
   }
@@ -453,24 +500,32 @@ export class EstateScene extends Phaser.Scene {
     if (!owned) {
       const enough = this.ledger.crowns >= room.cost;
       this.button(1062, 430, enough ? 'Restore · ' + room.cost : 'More crowns needed', () => this.act({ kind: 'restore', key: room.key }), enough, 342);
-      this.text(889, 473, intended ? 'A home for ' + this.guestNames(estateRoomMembers(room)) + '. ' + intended.requirement : 'Restore this shared space to enjoy more of the villa.', 17, '#b9c1aa', 341);
+      this.text(889, 473, intended ? 'A home for ' + this.guestNames(estateRoomMembers(room)) + '. Once occupied, it supports time together, household talk and completed memories. ' + intended.requirement : 'Restore this shared space to enjoy more of the villa.', 17, '#b9c1aa', 341);
     } else if (room.sharedBaths) {
       this.button(1062, 430, 'Take a bath', () => this.takeBath(), true, 342);
       this.text(889, 480, 'Step into the warm pool. Companions who live at the villa can join you here.', 20, '#d7d6c2', 341, true);
     } else if (resident && occupants.includes(resident.key)) {
       this.residentActions(resident, occupants);
-      const guest = this.invitations(room.key)[0];
-      if (guest) this.button(300, 636, 'Invite ' + this.invitationName(room, guest), () => this.act({ kind: 'invite', key: guest.key, room: room.key }), true, 360);
     }
     else {
-      const invitations = this.invitations(room.key), pages = Math.max(1, Math.ceil(invitations.length / 3));
-      this.detailPage = Math.min(this.detailPage, pages - 1);
-      if (invitations.length) {
-        invitations.slice(this.detailPage * 3, this.detailPage * 3 + 3).forEach((guest, i) => this.button(1062, 417 + i * 54, 'Invite ' + this.invitationName(room, guest), () => this.act({ kind: 'invite', key: guest.key, room: room.key }), true, 342));
-        this.detailNavigation(pages);
-      } else this.text(889, 420, intended ? intended.requirement : estateRoomCapacity(room) ? 'Invitations appear here as relationships are completed.' : 'A restored place for everyone to enjoy. Related visits unlock in each companion’s room.', 20, '#d7d6c2', 341, true);
+      this.text(889, 420, intended ? intended.requirement
+        : estateRoomCapacity(room) ? 'A home waiting for its resident. She moves in once her story reaches that point.'
+        : 'A restored place for everyone to enjoy. Related visits unlock in each companion’s room.', 20, '#d7d6c2', 341, true);
+    }
+    const encounter = this.roomEncounter(room.key);
+    if (encounter) {
+      estatePanel(this, 24, 531, 812, 91);
+      this.text(43, 544, encounter.title, 20, C.cream, 510, true);
+      this.text(43, 575, encounter.cue, 15, '#d7d6c2', 510).setFixedSize(510, 39);
+      this.button(697, 578, 'Join them', () => this.act({ kind: 'encounter', result: encounter.result }), true, 220);
     }
     this.roomNavigation(1062, 630, 342);
+  }
+  /** Stable within a day; rooms with several moments rotate without changing story state. */
+  private roomEncounter(room: string) {
+    const available = (this.definition.encounters ?? []).filter(one => one.room === room &&
+      estateEncounterEnabled(one, this.ledger, this.definition, this.eligible, this.roomVariable));
+    return available.length ? available[(Math.max(1, this.ledger.day) - 1) % available.length] : undefined;
   }
   /** A social view of the household, deliberately separate from bedrooms and invitations. */
   private takeBath(): void {
@@ -540,27 +595,30 @@ export class EstateScene extends Phaser.Scene {
     }
   }
   private residentActions(resident: EstateResident, occupants: string[]): void {
-    if (this.farewell) {
-      const home = this.currentRoom();
-      const names = home ? this.guestNames(estateInviteGroup(home, resident.key)) : resident.name;
-      this.text(889, 415, 'See ' + names + ' off? The room and your memories will be kept.', 20, C.cream, 337, true);
-      this.button(972, 535, 'Cancel', () => { this.farewell = false; this.render(); }, true, 166);
-      this.button(1152, 535, 'See her off', () => this.act({ kind: 'farewell', key: resident.key }), true, 166); return;
-    }
     const scenes = resident.scenes.filter(scene => this.visibleRooms().some(room => room.key === scene.room));
-    const pages = Math.max(1, Math.ceil(scenes.length / 2)); this.detailPage = Math.min(this.detailPage, pages - 1);
-    if (!scenes.length) this.text(889, 412, 'At home, with you.', 22, C.cream, 340, true);
-    scenes.slice(this.detailPage * 2, this.detailPage * 2 + 2).forEach((scene, i) => {
+    const spend = scenes.filter(scene => !this.ledger.completed.includes(scene.result));
+    const memories = scenes.filter(scene => this.ledger.completed.includes(scene.result));
+    if (this.residentSection === 'menu') {
+      this.text(889, 400, resident.name + ' is at home.', 21, C.cream, 337, true);
+      this.button(1062, 460, 'Spend time' + (spend.length ? ` · ${spend.length}` : ''), () => { this.residentSection = 'spend'; this.detailPage = 0; this.render(); }, spend.length > 0, 342);
+      this.button(1062, 512, resident.talk?.title ?? 'Talk', () => resident.talk && this.act({ kind: 'talk', result: resident.talk.result }), !!resident.talk, 342);
+      this.button(1062, 564, 'Memories' + (memories.length ? ` · ${memories.length}` : ''), () => { this.residentSection = 'memories'; this.detailPage = 0; this.render(); }, memories.length > 0, 342);
+      if (occupants.length > 1) this.button(735, 642, 'Next guest', () => { this.resident = occupants[(occupants.indexOf(resident.key) + 1) % occupants.length] ?? null; this.residentSection = 'menu'; this.detailPage = 0; this.render(); }, true, 180, false, true, 34);
+      return;
+    }
+    const listed = this.residentSection === 'spend' ? spend : memories;
+    const pages = Math.max(1, listed.length); this.detailPage = Math.min(this.detailPage, pages - 1);
+    this.text(889, 398, this.residentSection === 'spend' ? 'Spend time' : 'Memories', 21, '#ffedc8', 220, true);
+    this.button(1181, 410, 'Back', () => { this.residentSection = 'menu'; this.detailPage = 0; this.render(); }, true, 104, false, true, 27);
+    listed.slice(this.detailPage, this.detailPage + 1).forEach((scene) => {
       const gateOpen = estateSceneEnabled(scene, this.eligible);
       const unlocked = gateOpen && this.ledger.rooms.includes(scene.room) && this.eligible(resident.eligibilityVariable);
-      this.button(1062, 416 + i * 74, scene.title, () => this.act({ kind: 'scene', result: scene.result }), unlocked, 342);
+      this.button(1062, 472, scene.title, () => this.residentSection === 'memories' ? this.beginMemory(scene.result) : this.act({ kind: 'scene', result: scene.result }), unlocked, 342);
       const where = this.definition.rooms.find(one => one.key === scene.room);
-      const hint = !this.eligible(resident.eligibilityVariable) ? resident.requirement : !this.ledger.rooms.includes(scene.room) ? 'Restore ' + (where?.name ?? scene.room) : !gateOpen ? 'Continue her story to unlock this moment' : this.ledger.seen.includes(scene.result) ? 'Revisit this moment' : 'A new moment together';
-      this.text(895, 441 + i * 74, hint, 12, '#bcbda5', 331);
+      const hint = this.residentSection === 'memories' ? 'Replay this completed moment' : !this.eligible(resident.eligibilityVariable) ? resident.requirement : !this.ledger.rooms.includes(scene.room) ? 'Restore ' + (where?.name ?? scene.room) : !gateOpen ? 'Continue her story to unlock this moment' : 'A new moment together';
+      this.text(895, 497, hint, 12, '#bcbda5', 331);
     });
     this.detailNavigation(pages);
-    this.button(1062, 589, this.currentRoom()?.inviteTogether ? 'See them off' : 'See her off', () => { this.farewell = true; this.render(); }, true, 342, false, true, 29);
-    if (occupants.length > 1) this.button(735, 636, 'Next guest', () => { this.resident = occupants[(occupants.indexOf(resident.key) + 1) % occupants.length] ?? null; this.detailPage = 0; this.render(); }, true, 180, false, true, 34);
   }
   private detailNavigation(pages: number): void {
     if (pages <= 1) return;
@@ -639,7 +697,7 @@ export class EstateScene extends Phaser.Scene {
   private startTutorial(): void {
     if (this.closed || this.tutorialStep >= 0 || !this.tutorialSteps().length) { this.render(); return; }
     this.tutorialReturn = { page: this.page, room: this.roomKey, resident: this.resident, detail: this.detailPage, note: this.note };
-    this.farewell = false; this.tutorialStep = 0; this.moveTutorial(0);
+    this.tutorialStep = 0; this.moveTutorial(0);
   }
   private moveTutorial(offset: number): void {
     const steps = this.tutorialSteps();
