@@ -8,6 +8,18 @@ export interface SaveData {
   timestamp: number;
   /** Human-readable label, e.g. the current speaker or a short preview. */
   label: string;
+  /**
+   * What the player called this save, if they named it.
+   *
+   * Kept apart from `label`, which the game writes for itself and which is only
+   * ever a guess at what the moment was: overwriting that guess would mean a
+   * rename could not be undone by clearing the field.
+   *
+   * Optional rather than defaulted, so a save made before naming existed still
+   * parses and still shows its label. That is why `SAVE.version` does not move
+   * for this: nothing that could already be read stopped being readable.
+   */
+  name?: string;
   inkState: string;
   sceneMeta: SceneMeta;
   /**
@@ -114,12 +126,16 @@ export const SaveManager = {
     return currentGame ? `${SAVE.prefix}${currentGame}:${slot}` : `${SAVE.prefix}${slot}`;
   },
 
-  save(slot: string, state: GameState, label: string): SaveData {
+  save(slot: string, state: GameState, label: string, name?: string): SaveData {
     const { manifest } = state.bundle;
+    const named = (name ?? "").trim().slice(0, SAVE.maxNameLength);
     const data: SaveData = {
       version: SAVE.version,
       timestamp: Date.now(),
       label,
+      // Absent rather than empty, so an unnamed save looks the same as every
+      // save written before names existed.
+      ...(named ? { name: named } : {}),
       inkState: state.engine.saveState(),
       sceneMeta: structuredClone(state.sceneMeta),
       bundleId: manifest.project.id,
@@ -140,6 +156,35 @@ export const SaveManager = {
       store(this.key(slot), encoded);
     }
     return data;
+  },
+
+  /**
+   * Rename a save in place, leaving the position it holds untouched.
+   *
+   * Reads the raw blob rather than going through `load`, which is entitled to
+   * refuse a save it cannot vouch for. A save made against an older draft is
+   * exactly the one worth labelling before it is lost track of, and naming it
+   * reads nothing of the story, so there is nothing here for a verdict to
+   * protect.
+   *
+   * An empty name clears it: the slot falls back to the label the game wrote
+   * for itself, which is what it showed before anyone renamed it.
+   */
+  rename(slot: string, name: string): boolean {
+    if (writeSuppressions > 0) return false;
+    const raw = stored(this.key(slot)) ?? legacyRaw(slot);
+    if (!raw) return false;
+    try {
+      const data = JSON.parse(raw) as SaveData;
+      const chosen = name.trim().slice(0, SAVE.maxNameLength);
+      if (chosen) data.name = chosen;
+      else delete data.name;
+      store(this.key(slot), JSON.stringify(data));
+      return true;
+    } catch (err) {
+      console.error(`Failed to rename save slot "${slot}":`, err);
+      return false;
+    }
   },
 
   load(slot: string, state?: GameState): SaveData | null {
@@ -262,6 +307,17 @@ export const SaveManager = {
     return this.loadLatest(state) !== null;
   },
 };
+
+/**
+ * What a slot calls itself: the player's name for it, or the game's own guess.
+ *
+ * One function rather than the same `||` in each place that shows a save, since
+ * a slot that read differently in the menu and on the title screen would look
+ * like two different saves.
+ */
+export function saveTitle(data: SaveData): string {
+  return data.name?.trim() || data.label;
+}
 
 function slotId(page: SavePageId, index: number): string {
   return `${page}-${index}`;

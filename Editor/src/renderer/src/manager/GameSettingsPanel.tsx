@@ -85,6 +85,16 @@ export function GameSettingsPanel({
       {saving && <span className="saving-note saving-note--loose">saving…</span>}
       {error && <p className="settings-error">{error}</p>}
 
+      <Field label="Version" note="Shown in the top-right of the launch screen exactly as entered.">
+        <Input
+          value={doc.releaseVersion}
+          placeholder="v1.0.0"
+          maxLength={32}
+          aria-label="Game version"
+          onChange={(event) => onChange({ ...doc, releaseVersion: event.target.value })}
+        />
+      </Field>
+
       <Field
         label="Startup background"
         note="Shown behind the launch menu, before the story starts."

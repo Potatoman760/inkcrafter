@@ -534,7 +534,7 @@ export class VNScene extends Phaser.Scene {
     this.dialogue.setVisible(shown);
     this.quick.setVisible(shown);
     this.choices.setVisible(shown);
-    this.mapButton?.setVisible(shown);
+    this.mapButton?.setVisible(shown && this.state.sceneMeta.mapEnabled);
     this.characterButton?.setVisible(shown);
     this.menuButton?.setVisible(shown);
     this.variableDisplay.setChromeVisible(shown);
@@ -708,9 +708,9 @@ export class VNScene extends Phaser.Scene {
   }
 
   /**
-   * (Re)build the Map button so its enabled/disabled appearance tracks
-   * `sceneMeta.mapEnabled` — the story disables the map during cutscenes via
-   * `# map: off`.
+   * (Re)build the Map button so its visibility tracks `sceneMeta.mapEnabled`.
+   * A story with no map at its current point should not advertise a control
+   * that cannot do anything; `# map: off` therefore removes it entirely.
    */
   private refreshMapButton(): void {
     this.mapButton?.destroy();
@@ -723,7 +723,7 @@ export class VNScene extends Phaser.Scene {
       enabled,
     })
       .setDepth(400)
-      .setVisible(!this.uiHidden);
+      .setVisible(enabled && !this.uiHidden);
   }
 
   private openMap(): void {

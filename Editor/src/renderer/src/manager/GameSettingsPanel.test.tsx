@@ -59,6 +59,15 @@ const options = (name: string): string[] =>
   )
 
 describe('GameSettingsPanel', () => {
+  it('edits the player-facing version without disturbing other launch settings', async () => {
+    const { onChange } = panel()
+
+    await userEvent.type(screen.getByLabelText('Game version'), 'v1.2.3')
+
+    expect(onChange).toHaveBeenLastCalledWith({ ...emptyGame(), releaseVersion: '3' })
+    expect(screen.getByLabelText('Game version')).toHaveAttribute('maxlength', '32')
+  })
+
   it('offers still backgrounds, and nothing else', () => {
     panel()
 

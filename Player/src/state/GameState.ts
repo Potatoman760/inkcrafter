@@ -142,7 +142,7 @@ export interface SceneMeta {
    * Null until a claimed knot or a hotspot has named one.
    */
   mapArea: string | null;
-  /** Whether the map button is usable here (toggled by `# map:` tags). */
+  /** Whether the map button is shown and usable here (toggled by `# map:` tags). */
   mapEnabled: boolean;
   /** The optional top-left readout, automatically dropped at the next knot. */
   display: VariableDisplayRef | null;

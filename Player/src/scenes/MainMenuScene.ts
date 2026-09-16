@@ -17,6 +17,7 @@ import { setControllerActions } from "@/input/FocusNavigation";
  */
 const FIRST_BUTTON_Y = GAME_HEIGHT / 2 - 40;
 const TITLE_MARGIN = 24;
+const VERSION_MARGIN = 22;
 
 /** Title screen: starting, loading, and player-wide settings. */
 export class MainMenuScene extends Phaser.Scene {
@@ -95,6 +96,21 @@ export class MainMenuScene extends Phaser.Scene {
       .setOrigin(0.5);
   }
 
+  /** Optional release label, authored beside the rest of the launch screen. */
+  private showVersion(): void {
+    const version = getBundle(this).game.releaseVersion.trim();
+    if (!version) return;
+
+    this.add
+      .text(GAME_WIDTH - VERSION_MARGIN, VERSION_MARGIN, version, {
+        fontFamily: "Arial, sans-serif",
+        fontSize: "18px",
+        color: "#f3ead5",
+      })
+      .setOrigin(1, 0)
+      .setShadow(1, 2, "#000000", 3, true, true);
+  }
+
   create(): void {
     setControllerActions(this, { accept: () => this.startNewGame() });
     // Settings can change the visual treatment of every button. Rebuild this
@@ -104,6 +120,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.showStartupBackground();
 
     this.showTitle();
+    this.showVersion();
 
     const cx = GAME_WIDTH / 2;
     let y = FIRST_BUTTON_Y;

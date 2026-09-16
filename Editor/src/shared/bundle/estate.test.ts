@@ -9,6 +9,24 @@ const act = (state: ReturnType<typeof newEstateState>, action: Parameters<typeof
   actOnEstate(state, action, game, () => eligible, 18, 0)
 
 describe('villa economy and household progression', () => {
+  it('round-trips room visits and gates a non-resident activity by room restoration and story progress', () => {
+    const villa = newEstateMinigame('A home together')
+    villa.roomVisits = true
+    villa.activities = [{ room: 'garden', title: 'Royal visit', result: 'royal_visit', gate: 'ready', repeatable: true }]
+    expect(parseMinigames(serialiseMinigames({ version: 1, minigames: [villa] })).minigames).toEqual([villa])
+    const closed = newEstateState(80, villa.rooms)
+    const action = { kind: 'scene' as const, result: 'royal_visit' }
+    expect(actOnEstate(closed, action, villa, () => true, 18, 0)).toBe(closed)
+    const open = { ...closed, rooms: [...closed.rooms, 'garden'] }
+    expect(actOnEstate(open, action, villa, () => false, 18, 0)).toBe(open)
+    const visited = actOnEstate(open, action, villa, () => true, 18, 0)
+    expect(visited).not.toBe(open)
+    expect(visited).toEqual(open)
+    expect(visited.residents).toEqual([])
+    expect(visited.completed).toEqual([])
+    villa.rooms.find(room => room.key === 'garden')!.availabilityVariable = 'garden_open'
+    expect(actOnEstate(open, action, villa, () => true, 18, 0, () => false)).toBe(open)
+  })
   it('round-trips room encounters and requires all participants to remain eligible residents with available restored homes', () => {
     const villa = newEstateMinigame('Ambient villa')
     villa.rooms = [

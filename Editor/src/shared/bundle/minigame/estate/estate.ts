@@ -58,6 +58,8 @@ export interface EstateScene {
   title: string
   /** An Ink boolean that must also be true: her story has to reach the moment before the room can hold it. */
   gate?: string | null
+  /** A room visit that can be repeated without adding a memory. */
+  repeatable?: boolean
 }
 
 /** Story gates apply equally to visible controls and dispatched scene actions. */
@@ -201,6 +203,10 @@ export interface EstateMinigame {
   goals?: EstateGoal[]
   /** Ambient moments requiring every listed participant to live here. */
   encounters?: EstateEncounter[]
+  /** Room-owned visits, including guests who do not live at the estate. */
+  activities?: EstateScene[]
+  /** Offer scenes at their destination instead of collecting them in bedrooms. */
+  roomVisits?: boolean
   /** Optional readiness milestone written when all required goals are complete. */
   finale?: EstateFinale | null
   resultVariable: string
@@ -229,6 +235,14 @@ export interface EstateState {
   assignments: Record<string, string>
   /** Script revision completed or skipped. Optional for existing saves. */
   tutorialSeen?: number
+}
+
+/** The same authorization is used by room buttons and dispatched actions. */
+export function estateActivityEnabled(scene: EstateScene, state: EstateState,
+  config: Pick<EstateMinigame, 'rooms'>, read: (variable: string) => boolean,
+  roomAvailable: (variable: string) => boolean = read): boolean {
+  const room = config.rooms.find(one => one.key === scene.room)
+  return !!room && state.rooms.includes(room.key) && estateRoomEnabled(room, roomAvailable) && estateSceneEnabled(scene, read)
 }
 
 export const ESTATE_TUTORIAL_TARGETS = ['overview', 'funds', 'noticeboard', 'notices', 'crews', 'income', 'room', 'restore', 'invitation', 'visits', 'return'] as const
@@ -553,7 +567,7 @@ export type EstateAction =
 export function actOnEstate(
   state: EstateState,
   action: EstateAction,
-  config: Pick<EstateMinigame, 'rooms' | 'residents' | 'contracts' | 'encounters'>,
+  config: Pick<EstateMinigame, 'rooms' | 'residents' | 'contracts' | 'encounters' | 'activities'>,
   eligible: (variable: string) => boolean,
   stipend: number,
   bonus: number,
@@ -591,6 +605,8 @@ export function actOnEstate(
       return { ...state, day: state.day + 1, crowns: state.crowns + income, selected: [], lastIncome: income }
     }
     case 'scene': {
+      const activity = config.activities?.find(one => one.result === action.result)
+      if (activity) return estateActivityEnabled(activity, state, config, eligible, roomAvailable) ? { ...state } : state
       const resident = config.residents.find(one => one.scenes.some(scene => scene.result === action.result))
       const scene = resident?.scenes.find(one => one.result === action.result)
       const destination = config.rooms.find(room => room.key === scene?.room)
@@ -612,7 +628,7 @@ export function actOnEstate(
 }
 
 /** Parser preserves authored room/resident data; preflight checks references. */
-export function estateConfiguration(value: Record<string, unknown>): Pick<EstateMinigame, 'rooms' | 'residents' | 'contracts' | 'calendar' | 'tutorial' | 'goals' | 'finale' | 'encounters'> {
+export function estateConfiguration(value: Record<string, unknown>): Pick<EstateMinigame, 'rooms' | 'residents' | 'contracts' | 'calendar' | 'tutorial' | 'goals' | 'finale' | 'encounters' | 'activities' | 'roomVisits'> {
   const rooms = Array.isArray(value.rooms) ? value.rooms : ESTATE_ROOMS
   const residents = Array.isArray(value.residents) ? value.residents : []
   const contracts = estateContracts(value.contracts)
@@ -637,6 +653,10 @@ export function estateConfiguration(value: Record<string, unknown>): Pick<Estate
     typeof finaleRaw.readyVariable === 'string' && Array.isArray(finaleRaw.requiredGoalIds) && finaleRaw.requiredGoalIds.every(id => typeof id === 'string')
     ? finaleRaw as EstateFinale : null
   return {
+    ...(typeof value.roomVisits === 'boolean' ? { roomVisits: value.roomVisits } : {}),
+    ...(Array.isArray(value.activities) ? { activities: value.activities.filter((one): one is EstateScene =>
+      !!one && typeof one === 'object' && typeof one.room === 'string' && typeof one.title === 'string' && typeof one.result === 'string' &&
+      (one.gate == null || typeof one.gate === 'string') && (one.repeatable === undefined || typeof one.repeatable === 'boolean')) } : {}),
     ...(Array.isArray(value.encounters) ? { encounters: value.encounters.filter((one): one is EstateEncounter =>
       !!one && typeof one === 'object' && typeof one.room === 'string' && typeof one.result === 'string' &&
       typeof one.title === 'string' && typeof one.cue === 'string' && Array.isArray(one.residents) &&

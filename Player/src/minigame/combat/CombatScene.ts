@@ -19,6 +19,9 @@ export interface CombatSceneData {
 type Side = "left" | "right";
 type Phase = "idle" | "prep" | "strike" | "counter" | "resolved";
 
+/** Leave room above and below the opponent for the combat HUD and controls. */
+const COMBATANT_HEIGHT_RATIO = 0.8;
+
 interface ResolvedCombat {
   opponentHealth: number;
   incomingDamage: number;
@@ -120,14 +123,6 @@ export class CombatScene extends Phaser.Scene {
     this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x090b12).setOrigin(0).setDepth(-100);
     this.showBackground();
     this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x05070c, 0.32).setOrigin(0).setDepth(-80);
-    this.add
-      .text(GAME_WIDTH / 2, 30, found.display || found.name, {
-        fontFamily: "system-ui, sans-serif",
-        fontSize: "30px",
-        color: "#f0e7dc",
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(30);
 
     this.health = this.add.graphics().setDepth(20);
     this.playerHealthLabel = this.add
@@ -278,7 +273,7 @@ export class CombatScene extends Phaser.Scene {
         this,
         GAME_WIDTH / 2,
         635,
-        "RETURN TO STORY",
+        "CONTINUE",
         () => {
           this.scene.resume(SceneKey.VN);
           this.scene.stop();
@@ -319,7 +314,7 @@ export class CombatScene extends Phaser.Scene {
       .image(GAME_WIDTH / 2, GAME_HEIGHT / 2, resolved.key)
       .setOrigin(0.5)
       .setDepth(10);
-    art.setScale(GAME_HEIGHT / Math.max(art.height, 1));
+    art.setScale((GAME_HEIGHT * COMBATANT_HEIGHT_RATIO) / Math.max(art.height, 1));
     this.art = art;
   }
 

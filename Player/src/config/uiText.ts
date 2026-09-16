@@ -57,6 +57,9 @@ export const UI_TEXT = {
   saveMenuSave: "Save",
   saveMenuLoad: "Load",
   saveMenuDefaultLabel: "Saved game",
+  /** Naming a save: the row's description doubles as the field that renames it. */
+  saveNameLabel: "Name this save",
+  saveNamePlaceholder: "What was happening here",
 
   mapClose: "Close Map",
 

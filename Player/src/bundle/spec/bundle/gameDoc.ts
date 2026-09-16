@@ -14,6 +14,8 @@ import type { GalleryMediaRef } from './galleryDoc'
  */
 export interface GameDocument {
   version: 1
+  /** Optional player-facing release number, drawn on the launch screen. */
+  releaseVersion: string
   /**
    * The picture behind the launch menu, or null for the plain colour.
    *
@@ -56,7 +58,7 @@ export const TITLE_DEFAULTS: LauncherTitle = {
 }
 
 export function emptyGame(): GameDocument {
-  return { version: 1, startupBackground: null, title: { ...TITLE_DEFAULTS } }
+  return { version: 1, releaseVersion: '', startupBackground: null, title: { ...TITLE_DEFAULTS } }
 }
 
 /** Reads a game document, tolerating anything, like every other catalogue. */
@@ -68,12 +70,18 @@ export function parseGame(json: string): GameDocument {
 
     return {
       version: 1,
+      releaseVersion: releaseVersion(record['releaseVersion']),
       startupBackground: mediaRef(record['startupBackground']),
       title: title(record['title'])
     }
   } catch {
     return emptyGame()
   }
+}
+
+/** Kept short enough to remain a corner label at every supported resolution. */
+function releaseVersion(value: unknown): string {
+  return typeof value === 'string' ? value.trim().slice(0, 32) : ''
 }
 
 export function serialiseGame(doc: GameDocument): string {

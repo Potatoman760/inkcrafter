@@ -86,6 +86,14 @@ const check: MinigameCheck = ({ game, input, variables, problems, at }) => {
     }
   }
   const resultTokens = new Set<string>()
+  for (const scene of game.activities ?? []) {
+    if (!keys.has(scene.room) || !scene.title.trim() || !scene.result || scene.result === 'return' || resultTokens.has(scene.result)) {
+      problems.push(at('Each room activity needs a known room, title and unique result.'))
+    }
+    resultTokens.add(scene.result)
+    if (scene.gate && !declaredBoolean(scene.gate)) problems.push(at(`${scene.title} needs a declared boolean gate.`))
+    if (!input.knots.includes(scene.result)) problems.push(at(`${scene.title} names an unknown story knot ${scene.result}.`))
+  }
   if (new Set(game.residents.map(one => one.key)).size !== game.residents.length) {
     problems.push(at(`${game.display || game.name} has duplicate resident keys.`))
   }

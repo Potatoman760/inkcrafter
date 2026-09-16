@@ -68,4 +68,11 @@ export const SAVE = {
   /** Separate rotating pages, matching the way readers use these saves. */
   quickSlots: 10,
   autosaveSlots: 10,
+  /**
+   * Longest name a player may give a save.
+   *
+   * Long enough to say what the moment was rather than merely which chapter,
+   * short enough to sit in one row of the menu beside a date.
+   */
+  maxNameLength: 40,
 } as const;
