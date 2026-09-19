@@ -7,6 +7,7 @@ import { GameState } from "@/state/GameState";
 import { isVideoFile } from "@/bundle/spec/mediaDoc";
 import { assertNever } from "@/util/exhaustive";
 import { UI_TEXT } from "@/config/uiText";
+import { AdultConfirmation } from "@/settings/AdultConfirmation";
 
 /** Registry key under which the shared GameState is stored. */
 export const GAME_STATE_KEY = "gameState";
@@ -49,6 +50,10 @@ export class BootScene extends Phaser.Scene {
         case "image":
           this.load.image(asset.key, url);
           break;
+        case "font":
+          // Loaded through FontFace before Phaser starts, so the first text
+          // object is measured with the right glyphs rather than changing later.
+          break;
         // Named one by one rather than defaulting to `load.image`: a kind added
         // later would otherwise be handed to the picture loader, and a track
         // decoded as a texture fails somewhere a long way from here.
@@ -82,7 +87,12 @@ export class BootScene extends Phaser.Scene {
       state.newGame();
       this.scene.start(testScene ?? minigameScene(undefined), { name: testMinigame, mode: "test" });
     } else {
-      this.scene.start(SceneKey.MainMenu);
+      const bundle = getBundle(this);
+      this.scene.start(
+        bundle.game.requireAdultConfirmation && !AdultConfirmation.hasConfirmed(bundle.manifest.project.id)
+          ? SceneKey.AdultConfirmation
+          : SceneKey.MainMenu,
+      );
     }
   }
 

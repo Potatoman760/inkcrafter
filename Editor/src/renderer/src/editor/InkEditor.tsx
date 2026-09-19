@@ -57,6 +57,16 @@ interface InkEditorProps {
    */
   onKnotChange?: (knot: string | null) => void
   /**
+   * Which line the caret is on, 1-based.
+   *
+   * Beside `onKnotChange` rather than folded into it, because they answer
+   * different questions: the preview reads the tags *down to* the caret, so
+   * moving within a knot changes what it draws even though the knot has not
+   * changed. Fires only when the line moves — arrowing along one line stages
+   * nothing new.
+   */
+  onCursorLine?: (line: number) => void
+  /**
    * A range replacement to apply as one transaction, so undo takes it back in
    * one step. It carries the source snapshot and file it was calculated from,
    * so an old character range is never replayed against different prose.
@@ -205,6 +215,7 @@ export function InkEditor({
   onEditHandled,
   onSelectionChange,
   onKnotChange,
+  onCursorLine,
   onContextMenu
 }: InkEditorProps): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -219,6 +230,8 @@ export function InkEditor({
   onSelectionChangeRef.current = onSelectionChange
   const onKnotChangeRef = useRef(onKnotChange)
   onKnotChangeRef.current = onKnotChange
+  const onCursorLineRef = useRef(onCursorLine)
+  onCursorLineRef.current = onCursorLine
   /** What was last reported, so an unchanged answer is not reported again. */
   const lastKnot = useRef<string | null>(null)
   const lastLine = useRef(0)
@@ -285,6 +298,7 @@ export function InkEditor({
               const line = update.state.doc.lineAt(from).number
               if (update.docChanged || line !== lastLine.current) {
                 lastLine.current = line
+                onCursorLineRef.current?.(line)
                 const found = knotAt(update.state.doc.toString(), line)
                 if (found !== lastKnot.current) {
                   lastKnot.current = found
@@ -305,6 +319,7 @@ export function InkEditor({
     const line = view.state.doc.lineAt(view.state.selection.main.from).number
     const found = knotAt(view.state.doc.toString(), line)
     lastLine.current = line
+    onCursorLineRef.current?.(line)
     if (found !== lastKnot.current) {
       lastKnot.current = found
       setHere(found)
@@ -339,6 +354,7 @@ export function InkEditor({
     const line = view.state.doc.lineAt(view.state.selection.main.from).number
     const found = knotAt(view.state.doc.toString(), line)
     lastLine.current = line
+    onCursorLineRef.current?.(line)
     if (found !== lastKnot.current) {
       lastKnot.current = found
       setHere(found)

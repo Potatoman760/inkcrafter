@@ -8,6 +8,12 @@
 export const UI_TEXT = {
   loading: "Loading…",
 
+  adultConfirmationDeclaration:
+    "This is an Adult Game, you must be 18+ years old to play. Are you 18+?",
+  adultConfirmationYes: "Yes, I am 18+",
+  adultConfirmationNo: "No",
+  adultConfirmationDenied: "You must be 18 or older to play this game.",
+
   mainMenuNewGame: "New Game",
   mainMenuContinue: "Continue",
   mainMenuLoadGame: "Load Game",

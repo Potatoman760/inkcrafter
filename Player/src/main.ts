@@ -12,6 +12,7 @@ import {
 import { BUNDLE_KEY, PREVIEW_CHECKPOINT_KEY, TEST_MINIGAME_KEY } from "@/bundle/registry";
 import { SaveManager } from "@/save/SaveManager";
 import { BootScene } from "@/scenes/BootScene";
+import { AdultConfirmationScene } from "@/scenes/AdultConfirmationScene";
 import { MainMenuScene } from "@/scenes/MainMenuScene";
 import { SettingsScene } from "@/scenes/SettingsScene";
 import { VNScene } from "@/scenes/VNScene";
@@ -28,6 +29,7 @@ import { AudioSettings } from "@/audio/AudioSettings";
 import { PlayerSettings } from "@/settings/PlayerSettings";
 import { installLifecycleHandling } from "@/platform/lifecycle";
 import { installDiagnostics } from "@/platform/diagnostics";
+import { loadGameFonts } from "@/bundle/loadFonts";
 
 installDiagnostics();
 
@@ -54,6 +56,7 @@ async function start(): Promise<void> {
   let preview = null;
   try {
     bundle = await loadBundle(base, previewId);
+    await loadGameFonts(bundle);
     if (previewId) preview = await loadPreviewCheckpoint(bundle, previewId);
   } catch (error) {
     showFailure(base, error);
@@ -93,6 +96,7 @@ async function start(): Promise<void> {
     },
     scene: [
       BootScene,
+      AdultConfirmationScene,
       MainMenuScene,
       SettingsScene,
       VNScene,

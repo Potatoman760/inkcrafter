@@ -9,7 +9,12 @@ import {
 import { mkdir, open, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, sep } from 'node:path'
 import type { ProjectProtection } from '@shared/project'
-import { BUNDLE_FILES, BUNDLE_MEDIA_DIR, type BundleManifest } from '@shared/bundle/manifest'
+import {
+  BUNDLE_FILES,
+  BUNDLE_FONTS_DIR,
+  BUNDLE_MEDIA_DIR,
+  type BundleManifest
+} from '@shared/bundle/manifest'
 import {
   PROTECTED_CHUNK_BYTES,
   PROTECTED_CONTENT_DIR,
@@ -127,6 +132,7 @@ export async function protectStagingBundle(
 
   await Promise.all([
     rm(join(staging, BUNDLE_MEDIA_DIR), { recursive: true, force: true }),
+    rm(join(staging, BUNDLE_FONTS_DIR), { recursive: true, force: true }),
     ...Object.values(BUNDLE_FILES)
       .filter((file) => file !== BUNDLE_FILES.manifest)
       .map((file) => rm(join(staging, file), { force: true }))
@@ -262,7 +268,8 @@ function mimeFor(path: string): string {
   return ({
     png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif',
     mp4: 'video/mp4', webm: 'video/webm', mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav',
-    m4a: 'audio/mp4', aac: 'audio/aac', flac: 'audio/flac'
+    m4a: 'audio/mp4', aac: 'audio/aac', flac: 'audio/flac',
+    woff2: 'font/woff2', woff: 'font/woff', ttf: 'font/ttf', otf: 'font/otf'
   } as Record<string, string>)[extension ?? ''] ?? 'application/octet-stream'
 }
 

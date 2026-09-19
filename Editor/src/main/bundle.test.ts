@@ -4,10 +4,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { generateKeyPairSync, privateDecrypt } from 'node:crypto'
 import { Story } from 'inkjs/engine/Story'
-import { BUNDLE_FILES, type BundleManifest } from '@shared/bundle/manifest'
+import { BUNDLE_FILES, BUNDLE_FORMAT, type BundleManifest } from '@shared/bundle/manifest'
 import { parsePreviewCheckpoint } from '@shared/bundle/preview'
 import type { MediaDocument } from '@shared/mediaDoc'
 import { parseGallery, type GalleryDocument } from '@shared/bundle/galleryDoc'
+import { emptyGame, serialiseGame } from '@shared/bundle/gameDoc'
 import { newCombatMinigame, parseMinigames, serialiseMinigames } from '@shared/bundle/minigameDoc'
 import type { Project } from '@shared/project'
 import type { CatalogueExport } from '@shared/statsExport'
@@ -205,6 +206,11 @@ describe('exportBundle', () => {
     }
     const large = Buffer.alloc(PROTECTED_CHUNK_BYTES + 17, 0x5a)
     await writeFile(join(project.path, 'media', 'bg', 'courtyard-storm.webm'), large)
+    await mkdir(join(project.path, 'fonts'), { recursive: true })
+    await writeFile(join(project.path, 'fonts', 'dialogue.woff2'), 'protected font')
+    const game = emptyGame()
+    game.dialogue.text = { ...game.dialogue.text, font: 'custom', file: 'fonts/dialogue.woff2' }
+    await writeFile(join(project.path, 'game.json'), serialiseGame(game))
 
     const result = await exportBundle(project, out)
 
@@ -241,6 +247,15 @@ describe('exportBundle', () => {
     )
     expect(recovered.equals(large)).toBe(true)
 
+    const protectedFont = payload.assets.find((asset) => asset.logicalPath === 'fonts/dialogue.woff2')!
+    const recoveredFont = decryptProtectedBytes(
+      await readFile(join(out, protectedFont.path)),
+      contentKey,
+      header!.protection.keyId,
+      protectedFont.logicalPath
+    )
+    expect(recoveredFont.toString('utf8')).toBe('protected font')
+
     const corrupted = await readFile(join(out, protectedClip.path))
     const last = corrupted.length - 1
     corrupted[last] = (corrupted[last] ?? 0) ^ 1
@@ -266,7 +281,7 @@ describe('exportBundle', () => {
     })
 
     expect(result.ok).toBe(true)
-    expect(JSON.parse(await readFile(join(out, BUNDLE_FILES.manifest), 'utf8')).format).toBe(2)
+    expect(JSON.parse(await readFile(join(out, BUNDLE_FILES.manifest), 'utf8')).format).toBe(BUNDLE_FORMAT)
     await expect(readFile(join(out, BUNDLE_FILES.story), 'utf8')).resolves.toContain('inkVersion')
     await expect(readFile(join(out, BUNDLE_FILES.preview), 'utf8')).resolves.toContain(
       'preview-protected-project'
@@ -312,7 +327,7 @@ describe('exportBundle', () => {
     )
 
     const manifest = await manifestOf(out)
-    expect(manifest.format).toBe(2)
+    expect(manifest.format).toBe(BUNDLE_FORMAT)
     expect(manifest.project).toEqual({ id: 'prj_0000000000', title: 'The Gate' })
     expect(manifest.contentHash).toMatch(/^[0-9a-f]{64}$/)
     expect(parseGallery(await readFile(join(out, BUNDLE_FILES.gallery), 'utf8'))).toEqual(GALLERY)
@@ -428,6 +443,23 @@ describe('exportBundle', () => {
     // Catalogued but not on disk: a warning, not a failed export.
     expect(result.ok).toBe(true)
     expect(result.warnings.join(' ')).toContain('abeline-gone.png')
+  })
+
+  it('bundles each custom dialogue font once and identifies it for the player', async () => {
+    await mkdir(join(project.path, 'fonts'), { recursive: true })
+    await writeFile(join(project.path, 'fonts', 'dialogue.woff2'), 'font bytes')
+    const game = emptyGame()
+    game.dialogue.text = { ...game.dialogue.text, font: 'custom', file: 'fonts/dialogue.woff2' }
+    game.dialogue.name = { ...game.dialogue.name, font: 'custom', file: 'fonts/dialogue.woff2' }
+    await writeFile(join(project.path, 'game.json'), serialiseGame(game))
+
+    await exportBundle(project, out)
+    const manifest = await manifestOf(out)
+
+    expect(manifest.assets.filter((asset) => asset.kind === 'font')).toEqual([
+      expect.objectContaining({ path: 'fonts/dialogue.woff2', kind: 'font', bytes: 10 })
+    ])
+    await expect(readFile(join(out, 'fonts', 'dialogue.woff2'), 'utf8')).resolves.toBe('font bytes')
   })
 
   it('regenerates the catalogue rather than copying a stale export/', async () => {

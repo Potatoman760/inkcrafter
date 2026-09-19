@@ -72,7 +72,7 @@ import { usePlan } from "./plan/usePlan";
 import { ManuscriptView } from "./manuscript/ManuscriptView";
 import { useManuscript } from "./manuscript/useManuscript";
 import { WritePanel } from "./manuscript/WritePanel";
-import { StoryPlayer } from "./player/StoryPlayer";
+import { ScenePreview } from "./player/ScenePreview";
 import { FileTree } from "./project/FileTree";
 import { SearchDialog } from "./search/SearchDialog";
 import { ProjectPicker } from "./project/ProjectPicker";
@@ -216,6 +216,11 @@ export function App(): React.JSX.Element {
    * name the author has not looked at in a while.
    */
   const [activeKnot, setActiveKnot] = useState<string | null>(null)
+  /**
+   * The line the cursor is on, which is where the preview reads the staging up
+   * to. Separate from the knot because it moves within one.
+   */
+  const [cursorLine, setCursorLine] = useState(1)
   const [editorSelection, setEditorSelection] = useState("");
   /**
    * Bumped whenever the assistant writes to the workspace. Everything that
@@ -1639,6 +1644,7 @@ export function App(): React.JSX.Element {
               }
               onSelectionChange={setEditorSelection}
               onKnotChange={setActiveKnot}
+              onCursorLine={setCursorLine}
               onContextMenu={setMenuTarget}
             />
           ) : (
@@ -1687,13 +1693,11 @@ export function App(): React.JSX.Element {
             ))}
 
           {rightTab === "preview" && (
-            <StoryPlayer
-              storyJson={result.storyJson}
-              knot={activeKnot}
+            <ScenePreview
+              source={source}
+              line={cursorLine}
               media={media.doc}
               mediaFiles={media.files}
-              stats={stats.doc}
-              npcs={npcs.doc}
             />
           )}
 

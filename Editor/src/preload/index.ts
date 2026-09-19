@@ -96,7 +96,10 @@ const api: InkCrafterApi = {
 
   game: {
     read: (project) => ipcRenderer.invoke('game:read', project),
-    write: (project, doc) => ipcRenderer.invoke('game:write', project, doc)
+    write: (project, doc) => ipcRenderer.invoke('game:write', project, doc),
+    importFont: (project) => ipcRenderer.invoke('game:importFont', project),
+    importIcon: (project) => ipcRenderer.invoke('game:importIcon', project),
+    icons: (project) => ipcRenderer.invoke('game:icons', project)
   },
 
   gallery: {

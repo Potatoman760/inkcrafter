@@ -18,6 +18,7 @@ type StoredValues = Record<string, string>;
 interface PlayerConfig {
   game: string | null;
   steamAppId: number | null;
+  icon: string | null;
 }
 type SteamClient = {
   localplayer: { getName(): string };
@@ -61,6 +62,7 @@ protocol.registerSchemesAsPrivileged([{
 }]);
 
 const config = readPlayerConfig();
+const desktopIcon = config.icon ? resolve(__dirname, "..", config.icon) : null;
 const appId = readSteamAppId(config);
 const steamworks = loadSteamworks();
 if (steamworks && appId !== null) {
@@ -80,6 +82,9 @@ if (steamworks && appId !== null) {
 void app.whenReady().then(async () => {
   if (relaunchingThroughSteam) return;
   registerAppProtocol();
+  if (desktopIcon && existsSync(desktopIcon) && process.platform === "darwin") {
+    app.dock?.setIcon(desktopIcon);
+  }
   values = await loadValues();
   registerIpc();
   createWindow();
@@ -117,6 +122,7 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: "#05060a",
+    ...(desktopIcon && existsSync(desktopIcon) ? { icon: desktopIcon } : {}),
     fullscreen: app.isPackaged,
     webPreferences: {
       preload: join(__dirname, "preload.cjs"),
@@ -299,7 +305,7 @@ function commandLineGame(): string | null {
 }
 
 function readPlayerConfig(): PlayerConfig {
-  const none: PlayerConfig = { game: null, steamAppId: null };
+  const none: PlayerConfig = { game: null, steamAppId: null, icon: null };
   let parsed: unknown;
   try {
     parsed = JSON.parse(readFileSync(resolve(__dirname, "..", "player.json"), "utf8"));
@@ -311,10 +317,12 @@ function readPlayerConfig(): PlayerConfig {
   if (!parsed || typeof parsed !== "object") return none;
   const record = parsed as Record<string, unknown>;
   const game = typeof record["game"] === "string" ? record["game"] : "";
+  const icon = typeof record["icon"] === "string" ? record["icon"] : "";
   const steamAppId = Number(record["steamAppId"]);
   return {
     game: /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(game) ? game : null,
     steamAppId: Number.isInteger(steamAppId) && steamAppId > 0 ? steamAppId : null,
+    icon: /^[A-Za-z0-9][A-Za-z0-9._-]*\.(?:png|jpe?g)$/i.test(icon) ? icon : null,
   };
 }
 

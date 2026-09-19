@@ -473,6 +473,36 @@ export interface GameApi {
   read(project: Project): Promise<GameDocument>
   /** Generates no ink; the player reads this from the exported bundle. */
   write(project: Project, doc: GameDocument): Promise<void>
+  /** Copies a reader-facing font into the project's `fonts/` folder. */
+  importFont(project: Project): Promise<FontImportResult>
+  /** Copies a desktop icon into the project and returns its preview URL. */
+  importIcon(project: Project): Promise<IconImportResult>
+  /** Lists uploaded desktop icons already stored with the project. */
+  icons(project: Project): Promise<IconFile[]>
+}
+
+export interface FontImportResult {
+  ok: boolean
+  /** True when the author closed the file dialog. */
+  cancelled: boolean
+  /** Project-relative `fonts/…` path when the copy succeeded. */
+  file: string | null
+  message: string
+}
+
+export interface IconImportResult {
+  ok: boolean
+  cancelled: boolean
+  /** Project-relative `icons/…` path when the copy succeeded. */
+  file: string | null
+  /** Renderer-safe preview URL when the copy succeeded. */
+  url: string | null
+  message: string
+}
+
+export interface IconFile {
+  file: string
+  url: string
 }
 
 export interface GalleryApi {

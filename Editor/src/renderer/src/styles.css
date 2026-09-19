@@ -401,82 +401,6 @@ body.is-resizing {
   font-style: italic;
 }
 
-.transcript {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--space-7) var(--space-8);
-  line-height: 1.65;
-  font-size: var(--text-lg);
-}
-
-.transcript-text {
-  margin: 0 0 0.9em;
-}
-
-.transcript-choice {
-  margin: 0 0 0.9em;
-  color: var(--text-accent);
-  font-style: italic;
-}
-
-.transcript-choice::before {
-  content: '› ';
-}
-
-.transcript-error {
-  margin: 0 0 0.9em;
-  color: var(--state-error);
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-}
-
-.transcript-tags {
-  margin-left: 8px;
-}
-
-.tag {
-  margin-left: 5px;
-  padding: 1px 6px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-active);
-  color: var(--text-tertiary);
-  font-size: var(--text-xs);
-  white-space: nowrap;
-}
-
-.choices {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: 14px 24px 18px;
-  border-top: 1px solid var(--border-default);
-}
-
-.choice {
-  width: 100%;
-  text-align: left;
-  padding: var(--space-4) var(--space-5);
-  border-color: var(--border-strong);
-}
-
-.choice:hover {
-  border-color: var(--text-accent);
-  color: var(--text-accent);
-}
-
-.player-ended {
-  margin: 0;
-  color: var(--text-tertiary);
-  font-style: italic;
-}
-
-.restart {
-  margin-top: 4px;
-  font-size: var(--text-sm);
-  color: var(--text-tertiary);
-}
-
 /* Codex sidebar */
 
 .codex {
@@ -4397,7 +4321,10 @@ body.is-resizing {
   position: relative;
   flex: none;
   aspect-ratio: 16 / 9;
-  max-height: 46%;
+  /* The panel is narrow and the frame is wide, so 16:9 of the full width is
+     well short of the height available. Capped anyway, for a panel dragged
+     wide enough that the frame would otherwise push the music bar off. */
+  max-height: 100%;
   overflow: hidden;
   background: var(--surface-inset);
   border-bottom: 1px solid var(--border-default);
@@ -5264,6 +5191,88 @@ body.is-resizing {
   margin-top: var(--space-3);
 }
 
+.game-settings__background-picker {
+  position: relative;
+  width: min(100%, 34rem);
+}
+
+.game-settings__background-trigger {
+  display: flex;
+  align-items: center;
+  text-align: left;
+  cursor: pointer;
+}
+
+.game-settings__background-popover {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) 18rem;
+  width: min(42rem, calc(100vw - 5rem));
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.game-settings__background-list {
+  max-height: 19rem;
+  padding: var(--space-2);
+  overflow-y: auto;
+}
+
+.game-settings__background-option {
+  display: block;
+  width: 100%;
+  min-height: var(--control-md);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font: var(--text-sm) / var(--leading-tight) var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.game-settings__background-option:hover,
+.game-settings__background-option.is-active {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.game-settings__background-option.is-selected {
+  color: var(--text-accent);
+}
+
+.game-settings__background-hover-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-left: var(--border-width) solid var(--border-hairline);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.game-settings__background-hover-preview .ic-thumb,
+.game-settings__plain-preview {
+  aspect-ratio: 16 / 9;
+}
+
+.game-settings__plain-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--border-width) solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+  color: var(--text-faint);
+  font-size: var(--text-2xs);
+}
+
 /* Colour and size sit together: two short controls, not two full rows. */
 .game-settings__row {
   display: grid;
@@ -5272,10 +5281,71 @@ body.is-resizing {
   align-items: start;
 }
 
+.game-settings__row--typography {
+  grid-template-columns: minmax(20rem, 34rem) max-content;
+  justify-content: start;
+}
+
 .game-settings__colour {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+}
+
+.game-settings__font {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.game-settings__font .ic-select {
+  flex: 0 1 24rem;
+  min-width: 0;
+}
+
+.game-settings__font-upload {
+  flex: none;
+  width: 7rem;
+  text-align: center;
+}
+
+.game-settings__font-size {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-tertiary);
+}
+
+.game-settings__font-size-input {
+  flex: none;
+  width: 5rem;
+}
+
+.game-settings__icon-setting {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.game-settings__icon-controls {
+  display: flex;
+  width: min(100%, 34rem);
+  gap: var(--space-3);
+}
+
+.game-settings__icon-controls .ic-select {
+  min-width: 0;
+}
+
+.game-settings__icon-upload {
+  flex: none;
+  width: 7rem;
+}
+
+.game-settings__icon-preview {
+  flex: none;
+  width: var(--control-md);
+  height: var(--control-md);
 }
 
 /* A swatch, not a text field: the browser draws the whole control. */

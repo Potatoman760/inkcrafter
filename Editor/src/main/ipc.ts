@@ -38,6 +38,9 @@ import type {
   CutoutResult,
   ImportLookRequest,
   ImportLookResult,
+  FontImportResult,
+  IconFile,
+  IconImportResult,
   MediaFile,
   NameUse
 } from '@shared/types'
@@ -76,6 +79,7 @@ import {
 } from './projectFiles'
 import type { InkReference } from '@shared/inkRefs'
 import type { InkMoveResult } from '@shared/types'
+import { ICON_EXTENSIONS, importGameIcon, listGameIcons } from './gameIcon'
 import { compileInk } from './ink/compiler'
 import { writeSection } from './ai/generate'
 import { runChatTurn } from './ai/chat'
@@ -110,6 +114,7 @@ import { searchInk } from './search'
 import { checkProject } from './check'
 import { mediaUsage } from './mediaUsage'
 import { readGame, writeGame } from './game'
+import { FONT_EXTENSIONS, importGameFont } from './gameFont'
 import type { GameDocument } from '@shared/bundle/gameDoc'
 import { exportBundle } from './bundle'
 import { desktopTools, exportDesktop } from './desktopExport'
@@ -569,6 +574,36 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     'game:write',
     (_event, project: Project, doc: GameDocument): Promise<void> => writeGame(project, doc)
+  )
+
+  ipcMain.handle(
+    'game:importFont',
+    async (_event, project: Project): Promise<FontImportResult> => {
+      const chosen = await chooseUploadFile('Choose a game font', [
+        { name: 'Fonts', extensions: [...FONT_EXTENSIONS] }
+      ])
+      if (chosen === null) {
+        return { ok: false, cancelled: true, file: null, message: '' }
+      }
+      return importGameFont(project, chosen)
+    }
+  )
+
+  ipcMain.handle(
+    'game:importIcon',
+    async (_event, project: Project): Promise<IconImportResult> => {
+      const chosen = await chooseUploadFile('Choose a desktop icon', [
+        { name: 'PNG or JPEG images', extensions: [...ICON_EXTENSIONS] }
+      ])
+      if (chosen === null) {
+        return { ok: false, cancelled: true, file: null, url: null, message: '' }
+      }
+      return importGameIcon(project, chosen)
+    }
+  )
+
+  ipcMain.handle('game:icons', (_event, project: Project): Promise<IconFile[]> =>
+    listGameIcons(project)
   )
 
   ipcMain.handle('gallery:read', (_event, project: Project): Promise<GalleryDocument> =>

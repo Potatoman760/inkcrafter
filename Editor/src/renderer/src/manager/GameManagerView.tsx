@@ -268,6 +268,7 @@ export function GameManagerView({
           {configTab === "settings" && (
             <GameSettingsPanel
               {...game}
+              project={project}
               projectTitle={project?.title ?? ""}
               media={media.doc}
               files={media.files}

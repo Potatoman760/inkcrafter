@@ -24,6 +24,7 @@ export const GAME = {
 
 export const SceneKey = {
   Boot: "Boot",
+  AdultConfirmation: "AdultConfirmation",
   MainMenu: "MainMenu",
   Settings: "Settings",
   VN: "VN",

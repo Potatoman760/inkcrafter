@@ -6,6 +6,7 @@ import {
   assetKey,
   BUNDLE_FILES,
   BUNDLE_FORMAT,
+  BUNDLE_FONTS_DIR,
   BUNDLE_MEDIA_DIR,
   DEFAULT_STAGE,
   isGameId,
@@ -157,7 +158,7 @@ export async function exportBundle(
   // and a dev server watching the folder never serves a story.json from this
   // export beside a media.json from the last.
   const staging = join(dirname(outDir), `.${basename(outDir)}.inkcrafter-tmp`)
-  await rm(staging, { recursive: true, force: true })
+  await rmPatiently(staging, { recursive: true })
   await mkdir(join(staging, BUNDLE_MEDIA_DIR), { recursive: true })
 
   try {
@@ -182,7 +183,7 @@ export async function exportBundle(
       { diagnostics, warnings, filesRead }
     )
   } catch (error) {
-    await rm(staging, { recursive: true, force: true })
+    await rmPatiently(staging, { recursive: true })
     throw error
   }
 }
@@ -229,7 +230,9 @@ async function writeBundle(
     )
   }
 
-  const assets = await copyMedia(project, staging, media.assets, warnings)
+  const mediaAssets = await copyMedia(project, staging, media.assets, warnings)
+  const fontAssets = await copyFonts(project, staging, game, warnings)
+  const assets = [...mediaAssets, ...fontAssets]
   const sources = await readSources(project, filesRead)
   const knots = destinationsIn(sources)
 
@@ -332,21 +335,21 @@ export async function swapIn(
     } catch (error) {
       if (!isHeld(error)) throw error
       await mirror(staging, outDir)
-      await rm(staging, { recursive: true, force: true })
+      await rmPatiently(staging, { recursive: true })
       warnings.push(held(outDir))
     }
     return
   }
 
   const aside = join(dirname(outDir), `.${basename(outDir)}.inkcrafter-old`)
-  await rm(aside, { recursive: true, force: true })
+  await rmPatiently(aside, { recursive: true })
 
   try {
     await renamePatiently(outDir, aside)
   } catch (error) {
     if (!isHeld(error)) throw error
     await mirror(staging, outDir)
-    await rm(staging, { recursive: true, force: true })
+    await rmPatiently(staging, { recursive: true })
     warnings.push(held(outDir))
     return
   }
@@ -358,12 +361,12 @@ export async function swapIn(
     await rename(aside, outDir)
     if (!isHeld(error)) throw error
     await mirror(staging, outDir)
-    await rm(staging, { recursive: true, force: true })
+    await rmPatiently(staging, { recursive: true })
     warnings.push(held(outDir))
     return
   }
 
-  await rm(aside, { recursive: true, force: true })
+  await rmPatiently(aside, { recursive: true })
 }
 
 const held = (outDir: string): string =>
@@ -392,9 +395,51 @@ async function renamePatiently(from: string, to: string): Promise<void> {
   }
 }
 
-function isHeld(error: unknown): boolean {
+export function isHeld(error: unknown): boolean {
   const code = (error as NodeJS.ErrnoException).code
   return code === 'EPERM' || code === 'EACCES' || code === 'EBUSY' || code === 'ENOTEMPTY'
+}
+
+/**
+ * `rm`, retried briefly while something is holding a file inside the tree.
+ *
+ * The companion to `renamePatiently`, and needed for the same reason: on Windows
+ * an indexer or a scanner holds a file that was written a moment ago for a few
+ * hundred milliseconds, and a removal that meets one gives up instantly. A
+ * recursive `rm` is worse than a failed `rename`, because it deletes its way
+ * down the tree before it meets the held file — so it half-removes a folder and
+ * *then* throws. That is what left a desktop export's scratch folder holding one
+ * locked `default_app.asar` and nothing else, and what made the next export fail
+ * before it started.
+ *
+ * Whole attempts, and deliberately **not** `fs.rm`'s own `maxRetries`. That
+ * option retries per entry as the walk meets it, so on a tree its cost is
+ * multiplied by the depth: a file three deep that is held for good is retried
+ * five times, then its parent gets ENOTEMPTY and retries, re-walking and
+ * re-retrying the child each time, and so on up. What should have been an
+ * instant EBUSY became a stall of several minutes, which read as a hang with no
+ * way to tell it from one. Whole attempts cost the same as the first one.
+ *
+ * So the budget is a few hundred milliseconds either way. A lock an indexer
+ * took clears inside it; a lock something is really holding fails fast enough
+ * for the caller to say so, which is the outcome an author can act on.
+ */
+const ATTEMPTS = 4
+const PAUSE = 150
+
+export async function rmPatiently(
+  target: string,
+  options: { recursive?: boolean } = {}
+): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await rm(target, { ...options, force: true })
+      return
+    } catch (error) {
+      if (attempt >= ATTEMPTS || !isHeld(error)) throw error
+      await new Promise((resolve) => setTimeout(resolve, PAUSE))
+    }
+  }
 }
 
 /**
@@ -409,7 +454,7 @@ export async function mirror(from: string, to: string): Promise<void> {
   const wanted = await filesUnder(from)
 
   for (const path of await filesUnder(to)) {
-    if (!wanted.has(path)) await rm(join(to, path.split('/').join(sep)), { force: true })
+    if (!wanted.has(path)) await rmPatiently(join(to, path.split('/').join(sep)))
   }
 
   await cp(from, to, { recursive: true, force: true })
@@ -617,6 +662,40 @@ async function copyMedia(
         key,
         bytes
       })
+    }
+  }
+
+  return copied
+}
+
+async function copyFonts(
+  project: Project,
+  staging: string,
+  game: GameDocument,
+  warnings: string[]
+): Promise<BundleAsset[]> {
+  const files = [...new Set(
+    [game.dialogue.text, game.dialogue.name]
+      .filter((style) => style.font === 'custom' && style.file !== null)
+      .map((style) => style.file!)
+  )]
+  const copied: BundleAsset[] = []
+
+  for (const file of files) {
+    const from = join(project.path, ...file.split('/'))
+    const to = join(staging, ...file.split('/'))
+    try {
+      const info = await stat(from)
+      await mkdir(dirname(to), { recursive: true })
+      await copyFile(from, to)
+      copied.push({
+        path: file,
+        kind: 'font',
+        key: assetKey('font', BUNDLE_FONTS_DIR, file),
+        bytes: info.size
+      })
+    } catch {
+      warnings.push(`${file} is selected as a game font but was not found. Nothing was copied.`)
     }
   }
 

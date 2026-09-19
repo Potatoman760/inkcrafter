@@ -20,6 +20,7 @@
  *       achievements.json  Steam API names and Ink-global unlock conditions
  *       game.json       settings the player reads before the story starts
  *       media/…         the image and video files themselves
+ *       fonts/…         fonts selected by the game's dialogue settings
  *
  * Deliberately one directory of plain files rather than an archive. A player in
  * a browser can serve it as static assets, and an author can look inside it when
@@ -45,6 +46,7 @@ export const BUNDLE_FILES = {
 
 /** Where media files live inside a bundle. Matches the project's own layout. */
 export const BUNDLE_MEDIA_DIR = 'media'
+export const BUNDLE_FONTS_DIR = 'fonts'
 
 /**
  * What a bundle's own folder may be called.
@@ -71,7 +73,7 @@ export function isGameId(name: string): boolean {
  * that does not know this number cannot read the bundle at all, so a mismatch is
  * a refusal. Content changing under a save is a much softer problem.
  */
-export const BUNDLE_FORMAT = 2
+export const BUNDLE_FORMAT = 3
 
 /**
  * The resolution media are authored against, when the project does not say.
@@ -90,7 +92,7 @@ export const DEFAULT_STAGE = { width: 1280, height: 720 } as const
  * of asset it belongs to, because the two disagree: a background may be a
  * still or a looping clip, and only its extension says which.
  */
-export type AssetKind = 'image' | 'video' | 'audio'
+export type AssetKind = 'image' | 'video' | 'audio' | 'font'
 
 export interface BundleAsset {
   /** Bundle-relative, forward slashes: `media/sprites/wren-happy.png`. */
@@ -106,8 +108,8 @@ export interface BundleAsset {
 }
 
 export interface BundleManifest {
-  /** Format 1 had no minigames; the current player remains able to load it. */
-  format: 1 | typeof BUNDLE_FORMAT
+  /** Format 1 had no minigames; format 2 had no bundled fonts. */
+  format: 1 | 2 | typeof BUNDLE_FORMAT
   generatedBy: 'InkCrafter'
   /** ISO 8601. For showing "exported 5 minutes ago", not for cache-busting. */
   generatedAt: string
@@ -162,7 +164,7 @@ function inkSafe(name: string): string {
 
 /** Why this manifest cannot be used, or null when it can. */
 export function manifestProblem(manifest: BundleManifest): string | null {
-  if (manifest.format !== 1 && manifest.format !== BUNDLE_FORMAT) {
+  if (manifest.format !== 1 && manifest.format !== 2 && manifest.format !== BUNDLE_FORMAT) {
     return `This bundle is format ${manifest.format}; this player reads format ${BUNDLE_FORMAT}.`
   }
   return null

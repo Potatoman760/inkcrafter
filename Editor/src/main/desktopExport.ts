@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
-import { cp, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { basename, dirname, join } from 'node:path'
+import { copyFile, cp, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { basename, dirname, extname, join } from 'node:path'
 import { slugify } from '@shared/codex'
 import { BUNDLE_FILES, isGameId } from '@shared/bundle/manifest'
 import {
@@ -12,8 +12,10 @@ import {
   type DesktopPlatformInfo
 } from '@shared/desktop'
 import type { Project } from '@shared/project'
-import { exportBundle, swapIn } from './bundle'
+import { exportBundle, rmPatiently, swapIn } from './bundle'
 import { exists, isDirectory } from './fs'
+import { readGame } from './game'
+import { readMedia } from './media'
 
 /**
  * Exporting a project as a desktop game: one folder per platform, each of
@@ -118,8 +120,28 @@ export async function exportDesktop(
   }
 
   const gameId = gameIdFor(project)
-  const work = join(dirname(outDir), `.${basename(outDir)}.inkcrafter-desktop-tmp`)
-  await rm(work, { recursive: true, force: true })
+  const beside = dirname(outDir)
+  const scratch = `.${basename(outDir)}.inkcrafter-desktop-tmp`
+
+  // Scratch space goes beside the destination because the finished folder is
+  // *renamed* into place, and a rename cannot cross volumes. It gets a fresh
+  // name every time rather than one the next export has to clear first.
+  //
+  // Reusing one name meant a single file Windows would not part with stopped
+  // every future export before it started. A scanner holding
+  // `resources/default_app.asar` is enough: the handle permits reading and
+  // writing and forbids deleting, so no amount of patience gets it, and a
+  // leftover folder is litter rather than a reason to refuse to export.
+  const stuck = await sweepScratch(beside, scratch)
+  if (stuck.length > 0) {
+    warnings.push(
+      `Left ${stuck.join(', ')} in ${beside} — something has a file open in there, so they could ` +
+        'not be removed. They are scratch folders from earlier exports, not part of this one; ' +
+        'delete them whenever whatever is holding them lets go.'
+    )
+  }
+
+  const work = join(beside, `${scratch}-${Date.now().toString(36)}`)
   await mkdir(work, { recursive: true })
 
   try {
@@ -129,6 +151,9 @@ export async function exportDesktop(
     if (!bundle.ok) {
       return { ok: false, outDir, builds: [], diagnostics: bundle.diagnostics, warnings }
     }
+
+    const icon = await desktopIconSource(project)
+    if (icon.problem) warnings.push(icon.problem)
 
     await mkdir(outDir, { recursive: true })
     const builds: DesktopBuildResult[] = []
@@ -144,6 +169,7 @@ export async function exportDesktop(
           engineVersion: engine.version,
           steamAppId: options.steamAppId,
           playerDir: tools.playerDir,
+          icon: icon.source,
           staging,
           tools,
           progress
@@ -183,8 +209,48 @@ export async function exportDesktop(
 
     return { ok: written.length > 0, outDir, builds, diagnostics: bundle.diagnostics, warnings }
   } finally {
-    await rm(work, { recursive: true, force: true })
+    // Best effort, and deliberately not allowed to throw: this runs after the
+    // builds are already in place, so a scanner holding one scratch file for a
+    // moment would otherwise report a finished export as a hard failure. The
+    // warning goes into the array the returned result is already holding, and
+    // the next export clears the folder anyway.
+    try {
+      await rmPatiently(work, { recursive: true })
+    } catch {
+      warnings.push(
+        `${work} could not be removed — something has a file in it open. It is scratch space, ` +
+          'not part of the export, and the next export will clear it.'
+      )
+    }
   }
+}
+
+/**
+ * Clears the scratch folders earlier exports left beside the destination.
+ *
+ * Best effort on purpose: this is tidying, and tidying that can fail an export
+ * is worse than the mess. Returns the ones it could not remove so the caller
+ * can mention them once rather than silently growing a folder of them.
+ */
+async function sweepScratch(beside: string, prefix: string): Promise<string[]> {
+  let entries: string[]
+  try {
+    entries = await readdir(beside)
+  } catch {
+    return []
+  }
+
+  const stuck: string[] = []
+  for (const name of entries) {
+    if (!name.startsWith(prefix)) continue
+    try {
+      await rmPatiently(join(beside, name), { recursive: true })
+    } catch {
+      stuck.push(name)
+    }
+  }
+
+  return stuck
 }
 
 /**
@@ -213,6 +279,7 @@ interface Assembly {
   engineVersion: string
   steamAppId: number | null
   playerDir: string
+  icon: { path: string; extension: string } | null
   staging: string
   tools: DesktopTools
   progress: (report: DesktopExportProgress) => void
@@ -241,7 +308,7 @@ async function assemble(target: DesktopPlatformInfo, at: Assembly): Promise<void
   })
 
   progress({ message: `Unpacking Electron for ${target.label}…` })
-  await rm(staging, { recursive: true, force: true })
+  await rmPatiently(staging, { recursive: true })
   await tools.unzip(zip, staging)
 
   progress({ message: `Assembling ${target.label}…` })
@@ -250,7 +317,7 @@ async function assemble(target: DesktopPlatformInfo, at: Assembly): Promise<void
     case 'win32': {
       await renameRequired(join(staging, 'electron.exe'), join(staging, `${name}.exe`))
       appDir = join(staging, 'resources', 'app')
-      await rm(join(staging, 'resources', 'default_app.asar'), { force: true })
+      await rmPatiently(join(staging, 'resources', 'default_app.asar'))
       break
     }
     case 'linux': {
@@ -258,7 +325,7 @@ async function assemble(target: DesktopPlatformInfo, at: Assembly): Promise<void
       // capitals in it is a support ticket waiting to happen.
       await renameRequired(join(staging, 'electron'), join(staging, gameId))
       appDir = join(staging, 'resources', 'app')
-      await rm(join(staging, 'resources', 'default_app.asar'), { force: true })
+      await rmPatiently(join(staging, 'resources', 'default_app.asar'))
       break
     }
     case 'darwin': {
@@ -273,7 +340,7 @@ async function assemble(target: DesktopPlatformInfo, at: Assembly): Promise<void
       xml = setPlistString(xml, 'CFBundleIdentifier', `com.inkcrafter.${gameId}`)
       await writeFile(plist, xml, 'utf8')
       appDir = join(app, 'Contents', 'Resources', 'app')
-      await rm(join(app, 'Contents', 'Resources', 'default_app.asar'), { force: true })
+      await rmPatiently(join(app, 'Contents', 'Resources', 'default_app.asar'))
       break
     }
   }
@@ -300,6 +367,9 @@ async function writeApp(appDir: string, target: DesktopPlatformInfo, at: Assembl
   const { project, gameId, playerDir } = at
   await mkdir(join(appDir, 'dist'), { recursive: true })
 
+  const iconFile = at.icon ? `app-icon${at.icon.extension}` : null
+  if (at.icon && iconFile) await copyFile(at.icon.path, join(appDir, iconFile))
+
   await writeFile(
     join(appDir, 'package.json'),
     `${JSON.stringify(
@@ -318,7 +388,13 @@ async function writeApp(appDir: string, target: DesktopPlatformInfo, at: Assembl
   )
   await writeFile(
     join(appDir, PLAYER_CONFIG),
-    `${JSON.stringify({ format: 1, game: gameId, title: project.title, steamAppId: at.steamAppId }, null, 2)}\n`,
+    `${JSON.stringify({
+      format: 1,
+      game: gameId,
+      title: project.title,
+      steamAppId: at.steamAppId,
+      ...(iconFile ? { icon: iconFile } : {})
+    }, null, 2)}\n`,
     'utf8'
   )
 
@@ -335,6 +411,39 @@ async function writeApp(appDir: string, target: DesktopPlatformInfo, at: Assembl
   }
   const native = STEAMWORKS_NATIVE[target.platform]
   await cp(join(steamworks, 'dist', native), join(shipped, 'dist', native), { recursive: true })
+}
+
+async function desktopIconSource(project: Project): Promise<{
+  source: { path: string; extension: string } | null
+  problem: string | null
+}> {
+  const icon = (await readGame(project)).desktopIcon
+  if (!icon) return { source: null, problem: null }
+
+  let path: string
+  if (icon.kind === 'file') {
+    path = join(project.path, ...icon.file.split('/'))
+  } else {
+    const media = await readMedia(project)
+    const asset = media.assets.find((candidate) => candidate.id === icon.ref.assetId)
+    const variant = asset?.variants.find((candidate) => candidate.id === icon.ref.variantId)
+    if (!variant) {
+      return {
+        source: null,
+        problem: 'The configured desktop icon is no longer in the media catalogue. Electron’s default icon was used.'
+      }
+    }
+    path = join(project.path, 'media', ...variant.file.split('/'))
+  }
+
+  const extension = extname(path).toLowerCase()
+  if (!['.png', '.jpg', '.jpeg'].includes(extension) || !(await exists(path))) {
+    return {
+      source: null,
+      problem: 'The configured desktop icon is missing or is not a PNG or JPEG. Electron’s default icon was used.'
+    }
+  }
+  return { source: { path, extension }, problem: null }
 }
 
 /** What has to be there once the player has built, and which Electron it was built against. */

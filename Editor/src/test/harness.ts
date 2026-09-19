@@ -12,6 +12,7 @@ import { emptyComfySettings } from '@shared/comfy'
 import { emptyPromptOverrides } from '@shared/prompts'
 import { emptyMedia } from '@shared/mediaDoc'
 import { emptyGallery } from '@shared/bundle/galleryDoc'
+import { emptyGame } from '@shared/bundle/gameDoc'
 import { emptyAchievements } from '@shared/bundle/achievementDoc'
 import { emptyMinigames } from '@shared/bundle/minigameDoc'
 import { emptyStats } from '@shared/statsDoc'
@@ -173,6 +174,24 @@ export function installApi(overrides: DeepPartial<InkCrafterApi> = {}): InkCraft
       write: vi.fn(),
       destinations: vi.fn(async () => [])
     },
+    game: {
+      read: vi.fn(async () => emptyGame()),
+      write: vi.fn(),
+      importFont: vi.fn(async () => ({
+        ok: false,
+        cancelled: true,
+        file: null,
+        message: ''
+      })),
+      importIcon: vi.fn(async () => ({
+        ok: false,
+        cancelled: true,
+        file: null,
+        url: null,
+        message: ''
+      })),
+      icons: vi.fn(async () => [])
+    },
     gallery: {
       read: vi.fn(async () => emptyGallery()),
       write: vi.fn()
@@ -327,6 +346,7 @@ export function installApi(overrides: DeepPartial<InkCrafterApi> = {}): InkCraft
     npcs: { ...base.npcs, ...overrides.npcs },
     map: { ...base.map, ...overrides.map },
     gallery: { ...base.gallery, ...overrides.gallery },
+    game: { ...base.game, ...overrides.game },
     achievements: { ...base.achievements, ...overrides.achievements },
     bundle: { ...base.bundle, ...overrides.bundle },
     packages: { ...base.packages, ...overrides.packages },

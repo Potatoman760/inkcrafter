@@ -1,9 +1,36 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+/**
+ * A Windows lock, on demand.
+ *
+ * `rm` is the real one until a test names a path fragment to hold, which is
+ * what the rest of the file relies on. Held, it refuses the way Windows does
+ * when a scanner has a handle on a file inside: readable, writable, and not
+ * deletable, which no amount of retrying gets past.
+ */
+const lock = { match: null as RegExp | null }
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const real = await importOriginal<typeof import('node:fs/promises')>()
+  return {
+    ...real,
+    rm: async (target: Parameters<typeof real.rm>[0], options: Parameters<typeof real.rm>[1]) => {
+      if (lock.match !== null && lock.match.test(String(target))) {
+        const error = new Error(`EBUSY: resource busy or locked, rmdir '${String(target)}'`)
+        ;(error as NodeJS.ErrnoException).code = 'EBUSY'
+        throw error
+      }
+      return real.rm(target, options)
+    }
+  }
+})
+
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DesktopPlatformInfo } from '@shared/desktop'
 import type { Project } from '@shared/project'
+import { emptyGame, serialiseGame } from '@shared/bundle/gameDoc'
 import {
   DESKTOP_MARKER,
   exportDesktop,
@@ -96,6 +123,7 @@ function tools(overrides: Partial<DesktopTools> = {}): DesktopTools {
 }
 
 beforeEach(async () => {
+  lock.match = null
   root = await mkdtemp(join(tmpdir(), 'inkcrafter-desktop-'))
   out = join(root, 'release')
   player = join(root, 'Player')
@@ -135,6 +163,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  lock.match = null
   await rm(root, { recursive: true, force: true })
 })
 
@@ -196,6 +225,30 @@ describe('exportDesktop', () => {
       builds: [{ platform: 'win32-x64', folder: 'windows' }]
     })
     expect(await readFile(join(out, 'README.txt'), 'utf8')).toContain('Run The Gate Part 2.exe')
+  })
+
+  it('ships the configured icon with the desktop shell', async () => {
+    await mkdir(join(project.path, 'icons'), { recursive: true })
+    await writeFile(join(project.path, 'icons', 'game.png'), 'icon bytes')
+    await writeFile(
+      join(project.path, 'game.json'),
+      serialiseGame({
+        ...emptyGame(),
+        desktopIcon: { kind: 'file', file: 'icons/game.png' }
+      })
+    )
+
+    const result = await exportDesktop(
+      project,
+      out,
+      { platforms: ['win32-x64'], steamAppId: null },
+      tools()
+    )
+
+    expect(result.ok).toBe(true)
+    const app = join(out, 'windows', 'resources', 'app')
+    expect(await readFile(join(app, 'app-icon.png'), 'utf8')).toBe('icon bytes')
+    expect(await json(join(app, 'player.json'))).toMatchObject({ icon: 'app-icon.png' })
   })
 
   it('renames the Mac app and its executable together', async () => {
@@ -444,6 +497,77 @@ describe('exportDesktop', () => {
     expect(result.ok).toBe(false)
     expect(result.warnings.join(' ')).toContain('npm install')
     expect(t.buildPlayer).not.toHaveBeenCalled()
+  })
+
+  /**
+   * Scratch space is not the export. Removing it is the last thing an export
+   * does, so a lock met there used to throw away builds already written and
+   * sitting in place.
+   */
+  it('finishes when its own scratch folder cannot be cleared afterwards', async () => {
+    // The scratch folder itself. Anchored, so the staging the bundle export
+    // makes *inside* it is left alone — that is a different removal.
+    lock.match = /\.inkcrafter-desktop-tmp-[a-z0-9]+$/
+
+    const result = await exportDesktop(
+      project,
+      out,
+      { platforms: ['win32-x64'], steamAppId: null },
+      tools()
+    )
+
+    expect(result.ok).toBe(true)
+    expect(result.builds).toEqual([
+      { platform: 'win32-x64', outDir: join(out, 'windows'), problem: null }
+    ])
+    expect(await exists(join(out, 'windows', 'The Gate Part 2.exe'))).toBe(true)
+    expect(result.warnings.join(' ')).toMatch(/could not be removed/)
+  })
+
+  /**
+   * The failure this replaced: one file a scanner would not let go of — it
+   * permits reading and writing and forbids deleting — meant every later export
+   * refused before it started. A folder nothing can remove is litter, and an
+   * export is not the thing to stop over it.
+   */
+  it('exports past a leftover scratch folder it cannot remove', async () => {
+    const leftover = join(root, '.release.inkcrafter-desktop-tmp-stuck')
+    await mkdir(join(leftover, 'windows', 'resources'), { recursive: true })
+    await writeFile(join(leftover, 'windows', 'resources', 'default_app.asar'), 'held', 'utf8')
+    lock.match = /-stuck$/
+
+    const result = await exportDesktop(
+      project,
+      out,
+      { platforms: ['win32-x64'], steamAppId: null },
+      tools()
+    )
+
+    expect(result.ok).toBe(true)
+    expect(await exists(join(out, 'windows', 'The Gate Part 2.exe'))).toBe(true)
+    // Named once, so the folder does not quietly accumulate siblings.
+    expect(result.warnings.join(' ')).toMatch(/\.release\.inkcrafter-desktop-tmp-stuck/)
+    expect(await exists(leftover)).toBe(true)
+  })
+
+  it('clears the scratch folders earlier exports left behind', async () => {
+    const old = join(root, '.release.inkcrafter-desktop-tmp-abc')
+    await mkdir(join(old, 'windows'), { recursive: true })
+    await writeFile(join(old, 'windows', 'electron.exe'), 'exe', 'utf8')
+
+    const result = await exportDesktop(
+      project,
+      out,
+      { platforms: ['win32-x64'], steamAppId: null },
+      tools()
+    )
+
+    expect(result.ok).toBe(true)
+    expect(await exists(old)).toBe(false)
+    expect(result.warnings.join(' ')).not.toMatch(/scratch/)
+    // And it did not leave its own behind either.
+    const left = (await readdir(root)).filter((name) => name.includes('inkcrafter-desktop-tmp'))
+    expect(left).toEqual([])
   })
 
   it('asks for at least one platform', async () => {
